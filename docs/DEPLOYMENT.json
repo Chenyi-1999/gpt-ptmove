@@ -9,11 +9,14 @@
   "image_id": "sha256:074a09af0a2b2dff9de2cc7ab9cfe238e0453dd88b5f3e0c8e448417441c655c",
   "architecture": "linux/amd64",
   "image_archive_sha256": "556e66f74ecd4ba77822a5adb1058c6a988c4df0bc1a88f4161a5d84c014263a",
-  "listen": "127.0.0.1:18120",
-  "access": "SSH local forwarding, then http://127.0.0.1:18120",
+  "listen": "0.0.0.0:18120",
+  "access": "http://152.136.236.238:18120",
   "schedule_enabled": false,
   "tests_local": 105,
   "tests_linux_docker_network_none": 105,
   "browser_verified": true,
-  "real_nas_tracker_publish_verified": false
+  "real_nas_tracker_publish_verified": false,
+  "qb_readonly_version_verified": true,
+  "qb_application_version": "v5.2.1",
+  "qb_webapi_version": "2.15.1"
 }

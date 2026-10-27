@@ -10,7 +10,7 @@ services:
       PTMOVE_DATA_DIR: /data
       TZ: Asia/Shanghai
     ports:
-      - "127.0.0.1:${PTMOVE_PORT:-18120}:8000"
+      - "0.0.0.0:${PTMOVE_PORT:-18120}:8000"
     volumes:
       - ./data:/data
     read_only: true

@@ -22,19 +22,13 @@ docker compose up -d --build
 docker compose ps
 ```
 
-默认只绑定 `127.0.0.1:18120`，不修改系统 Nginx、防火墙或其他项目。Windows 本机运行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1
-```
-
-保持隧道运行，浏览器打开 `http://127.0.0.1:18120`。另一个终端获取初始控制台密码：
+控制台通过 Docker 绑定服务器的 `0.0.0.0:18120`，部署后直接访问 `http://152.136.236.238:18120`。另一个终端可通过现有脚本获取初始控制台密码：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1 -ShowPassword
 ```
 
-也可直接运行 `ssh -N -L 18120:127.0.0.1:18120 itemkeep-server`。后续有域名可在 HTTPS 反代后开放；配置真实站点账号前，应始终使用 SSH 隧道或 HTTPS。
+如需使用原有 SSH 隧道访问方式，可运行 `ssh -N -L 18120:127.0.0.1:18120 itemkeep-server` 并打开 `http://127.0.0.1:18120`。该隧道方式为可选项。
 
 ## 接入 NAS
 
