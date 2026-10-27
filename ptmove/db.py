@@ -19,7 +19,9 @@ from .policy import evaluate_candidates
 from .scheduler import due, month_key, next_run
 from .security import SETTING_KEYS, SECRET_SETTINGS, Vault, redact, validate_url
 
-VERSION = "0.1.0"
+from . import __version__
+
+VERSION = __version__
 LEASE_SECONDS = 180
 TERMINAL = {"succeeded", "failed", "needs_review", "cancelled"}
 PROGRESS = {"queued": 0, "leased": 1, "downloading": 2, "preparing": 3, "publishing": 4, "published": 5, "seeding": 6, "succeeded": 7}

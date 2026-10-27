@@ -14,8 +14,8 @@ from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
 
-SECRET_SETTINGS = {"source_cookie", "target_cookie", "source_rss_url", "qb_password", "ptnexus_password"}
-SETTING_KEYS = ("source_cookie", "target_cookie", "source_rss_url", "qb_url", "qb_username", "qb_password", "qb_save_path", "media_root", "ptnexus_url", "ptnexus_username", "ptnexus_downloader_id", "ptnexus_password")
+SECRET_SETTINGS = {"source_cookie", "target_cookie", "source_rss_url", "qb_password", "qb_api_key", "ptnexus_password"}
+SETTING_KEYS = ("source_cookie", "target_cookie", "source_rss_url", "qb_url", "qb_username", "qb_password", "qb_api_key", "qb_save_path", "media_root", "ptnexus_url", "ptnexus_username", "ptnexus_downloader_id", "ptnexus_password")
 
 
 class Vault:

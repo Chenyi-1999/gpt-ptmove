@@ -57,7 +57,7 @@ def cp(store, job, status, **values):
 
 
 def test_auth_csrf_origin_and_worker_separation(client):
-    assert client.get("/health").json() == {"status": "ok", "version": "0.1.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.1.1"}
     assert client.get("/api/tasks").status_code == 401
     headers = authenticate(client)
     assert "HttpOnly" in client.cookies.get("ptmove_session", "") or client.cookies.get("ptmove_session")
@@ -519,6 +519,6 @@ def test_reconciliation_across_month_preserves_old_quota_and_starts_repair_windo
 def test_worker_compose_matches_nas_runtime_and_never_contains_token(client):
     authenticate(client)
     compose = client.get("/api/worker-compose").json()["compose"]
-    for expected in ("image: ptmove:0.1.0", "network_mode: host", "env_file: .env.nas", "PTMOVE_WORKER_STATE_DIR: /state", "./worker-state:/state", "read_only: true", "healthcheck:\n      disable: true"):
+    for expected in ("image: ptmove:0.1.1", "network_mode: host", "env_file: .env.nas", "PTMOVE_WORKER_STATE_DIR: /state", "./worker-state:/state", "read_only: true", "healthcheck:\n      disable: true"):
         assert expected in compose
     assert "w" * 40 not in compose and "PTMOVE_WORKER_TOKEN" not in compose

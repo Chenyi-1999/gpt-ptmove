@@ -45,6 +45,7 @@ class SettingsPatch(BaseModel):
     qb_url: str | None = Field(None, max_length=4096)
     qb_username: str | None = Field(None, max_length=256)
     qb_password: str | None = Field(None, max_length=4096)
+    qb_api_key: str | None = Field(None, max_length=4096)
     qb_save_path: str | None = Field(None, max_length=4096)
     media_root: str | None = Field(None, max_length=4096)
     ptnexus_url: str | None = Field(None, max_length=4096)

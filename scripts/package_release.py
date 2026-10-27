@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import tomllib
 import zipfile
 
 
@@ -13,12 +14,13 @@ def main():
     parser.add_argument("--image", type=Path, help="Optional existing Docker image archive already on D:")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
+    version = tomllib.loads((root / "pyproject.toml").read_text("utf-8"))["project"]["version"]
     now = datetime.now(timezone(timedelta(hours=8)))
     archive_root = Path("D:/A_GPT/GPT-BackUp/GPT-PTMOVE") / now.strftime("%Y-%m")
     if not Path("D:/").exists():
         raise SystemExit("D: is unavailable; refusing to fall back to C:")
     archive_root.mkdir(parents=True, exist_ok=True)
-    target = archive_root / ("GPT-PTMOVE__" + now.strftime("%Y-%m-%d_%H%M%S") + "__历史发布__v0.1.0.zip")
+    target = archive_root / ("GPT-PTMOVE__" + now.strftime("%Y-%m-%d_%H%M%S") + "__历史发布__v" + version + ".zip")
     if target.exists():
         raise SystemExit("Archive already exists; rerun with a fresh timestamp")
     names = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=root).decode().split("\0")
@@ -38,8 +40,8 @@ def main():
             digest = hashlib.file_digest(image.open("rb"), "sha256").hexdigest()
             manifest["docker/" + image.name] = digest
             z.write(image, "docker/" + image.name)
-        restore = {"project": "GPT-PTMOVE", "version": "0.1.0", "created_at": now.isoformat(), "source_path": str(root),
-                   "scope": "Source and restore instructions; optional Docker image. No live database, credentials, NAS media or site accounts.",
+        restore = {"project": "GPT-PTMOVE", "version": version, "created_at": now.isoformat(), "source_path": str(root),
+                   "scope": "Source, restore instructions" + (" and Docker image archive" if args.image else "") + ". No live database, credentials, NAS media or site accounts.",
                    "restore": "Extract source/, copy deployment .env and data/ (including encryption.key) from your separately secured live-data backup, then docker compose up -d --build. For NAS see source/docs/NAS_SETUP.md.",
                    "not_full_backup": True}
         z.writestr("RESTORE.json", json.dumps(restore, ensure_ascii=False, indent=2))
@@ -52,7 +54,7 @@ def main():
                     raise RuntimeError("Archive integrity mismatch: " + name)
     index = archive_root.parent / "INDEX.jsonl"
     with index.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"path": str(target), "created_at": now.isoformat(), "kind": "历史发布", "version": "0.1.0", "sha256": hashlib.file_digest(target.open("rb"), "sha256").hexdigest(), "scope": restore["scope"]}, ensure_ascii=False) + "\n")
+        f.write(json.dumps({"path": str(target), "created_at": now.isoformat(), "kind": "历史发布", "version": version, "sha256": hashlib.file_digest(target.open("rb"), "sha256").hexdigest(), "scope": restore["scope"]}, ensure_ascii=False) + "\n")
     print(target)
 
 

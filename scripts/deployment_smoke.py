@@ -53,7 +53,7 @@ try:
     config = request("/api/settings")
     assert not config["source_cookie"] and not config["qb_password"]
     worker = request("/api/worker/config", headers={"Authorization": "Bearer " + env["PTMOVE_WORKER_TOKEN"]})
-    assert worker["version"] == "0.1.0"
+    assert worker["version"] == "0.1.1"
 finally:
     request("/api/rules", original, "PUT")
 after = request("/api/dashboard")

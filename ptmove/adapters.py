@@ -387,12 +387,18 @@ class Tracker:
 
 
 class QBittorrent:
-    def __init__(self, url: str, username: str, password: str, client: httpx.Client | None = None):
+    def __init__(self, url: str, username: str, password: str, client: httpx.Client | None = None, api_key: str | None = None):
         self.url = safe_url(url).rstrip("/")
         self.username, self.password = username, password
+        self.key_mode = bool(api_key)
+        if self.key_mode:
+            if not re.fullmatch(r"qbt_[A-Za-z0-9]{28}", api_key):
+                raise AdapterError("qB API Token 格式无效")
         self.resolve = client is None
         self.client = client or httpx.Client(base_url=self.url, timeout=45, follow_redirects=False, trust_env=False, transport=httpx.HTTPTransport(retries=2, trust_env=False),
                                              headers={"Referer": self.url + "/", "Origin": self.url})
+        if self.key_mode:
+            self.client.headers["Authorization"] = "Bearer " + api_key
         self.major = 4
 
     def close(self):
@@ -401,26 +407,40 @@ class QBittorrent:
     def request(self, method: str, path: str, **kwargs) -> httpx.Response:
         if self.resolve:
             resolve_safe(self.url)
+        failed = False
         try:
             r = self.client.request(method, "/api/v2/" + path, **kwargs)
             r.raise_for_status()
             if r.is_redirect:
                 raise AdapterError("qB 地址发生跳转")
             return r
-        except httpx.HTTPError as exc:
-            raise AdapterError("qB API 请求失败，请检查连接和权限") from exc
+        except httpx.HTTPError:
+            # Do not retain an HTTP exception whose attached Request can
+            # contain the Authorization header carrying the API key.
+            failed = True
+        if failed:
+            raise AdapterError("qB API 请求失败，请检查连接和权限")
 
     def login(self) -> dict:
-        r = self.request("POST", "auth/login", data={"username": self.username, "password": self.password})
-        if r.text.strip() != "Ok.":
-            raise AdapterError("qB 登录失败")
+        if not self.key_mode:
+            r = self.request("POST", "auth/login", data={"username": self.username, "password": self.password})
+            if r.text.strip() != "Ok.":
+                raise AdapterError("qB 登录失败")
         version = self.request("GET", "app/version").text.strip()
         api = self.request("GET", "app/webapiVersion").text.strip()
-        match = re.match(r"v?(\d+)\.(\d+)", version)
-        if not match or tuple(map(int, match.groups())) < (4, 1) or not api.startswith("2."):
+        version_match = re.match(r"v?(\d+)\.(\d+)(?:\.(\d+))?", version)
+        version_numbers = tuple(int(part or 0) for part in version_match.groups()) if version_match else ()
+        version_numbers = version_numbers + (0,) * (3 - len(version_numbers))
+        api_match = re.match(r"(\d+)\.(\d+)\.(\d+)", api)
+        if self.key_mode:
+            if (not version_match or version_numbers < (5, 2, 0)
+                    or not api_match or tuple(map(int, api_match.groups())) < (2, 14, 1)):
+                raise AdapterError("qB API Token 需要 qBittorrent 5.2.0+ 和 Web API 2.14.1+")
+        elif (not version_match or version_numbers[:2] < (4, 1)
+              or not api.startswith("2.")):
             raise AdapterError("需要 qBittorrent 4.1+ 和 Web API v2")
-        self.major = int(match[1])
-        return {"version": version, "api_version": api}
+        self.major = int(version_match[1])
+        return {"version": version, "api_version": api, "auth_method": "api_key" if self.key_mode else "password"}
 
     def info(self, info_hash: str) -> dict | None:
         items = self.request("GET", "torrents/info", params={"hashes": info_hash}).json()

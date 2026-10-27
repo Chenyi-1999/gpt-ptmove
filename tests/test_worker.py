@@ -90,7 +90,7 @@ def execution(tmp_path, monkeypatch):
             return raw_torrent("NOVA" if self.base == worker.TARGET else "ZM")
 
     class QB:
-        def __init__(self, *args):
+        def __init__(self, *args, **kwargs):
             pass
         def close(self):
             pass
@@ -143,6 +143,14 @@ def test_controller_to_executor_complete_workflow(execution):
     assert calls["publish"] == 1 and calls["add_target"] == 1 and calls["verify"] == 2
     assert task["published_url"].endswith("id=456")
     assert store.dashboard()["quota"]["used"] == 1
+
+
+def test_worker_token_mode_does_not_require_username_or_password(execution):
+    store, controller, executor, job, calls = execution
+    controller.settings.update(qb_api_key="qbt_" + "B" * 28, qb_username="", qb_password="")
+    executor.execute(job)
+    assert store.tasks()["items"][0]["status"] == "succeeded"
+    assert calls["publish"] == 1
 
 
 def test_uncertain_publish_cannot_be_retried_or_republished(execution):

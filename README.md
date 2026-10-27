@@ -2,7 +2,7 @@
 
 织梦（zmpt.cc）→ NovaHD（pt.novahd.top）的月度自动转种控制台。独立实现调度、筛选、配额、任务恢复和 NAS 执行端，通过 HTTP API 调用 PTNexus 进行站点发布；未复制或重新分发 PTNexus 源码。
 
-## v0.1.0 功能
+## v0.1.1 功能
 
 - 中文管理页面：规则、候选、批量入队、任务、事件和连接配置。
 - 默认每月 1 日 02:00（北京时间），最多 6 个、单个 1–10 GiB、预算 60 GiB，做种人数 ≥3，优先 NovaHD 缺少的作品，其次缺少的版本，同级优先官种。
@@ -10,6 +10,7 @@
 - NAS 执行端主动领取任务，qB 4.1+/5.x API 下载资源，检查全部文件完成后才发布。PTNexus 复用源站资料并处理媒体信息；目标种子校验与 Tracker 做种确认独立于上传成功。
 - 月度名额和资源体积预算原子预留；领取过的任务保留预算。预算按资源文件体积计算，保守计入失败任务的完整预留体积，不是网络流量计费器（协议开销和重传另计）。
 - 加密保存连接信息；管理员会话、CSRF 和独立执行端令牌；租约和发布检查点防止超时后盲目重复发布。
+- qB 5.2+ 可用原生 API Token（优先使用），无需用户名/密码；旧版继续使用账号登录。遵循 [qB 官方 Bearer 认证规范](https://github.com/qbittorrent/qBittorrent/wiki/API-Key-Authentication-%28%E2%89%A5v5.2.0%29)。
 
 ## 部署控制台（152）
 
@@ -47,8 +48,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1 -ShowPasswor
 python -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
-docker build --target test -t ptmove-test:0.1.0 .
-docker run --rm --network none ptmove-test:0.1.0
+docker build --target test -t ptmove-test:0.1.1 .
+docker run --rm --network none ptmove-test:0.1.1
 ```
 
 测试覆盖配额并发、跨月、租约、发布不确定性、发布后修复、全部文件完成、qB 版本接口和鉴权。模拟适配器测试不代表已经在真实站点发种；实际验证状态见 [VALIDATION.md](docs/VALIDATION.md)。

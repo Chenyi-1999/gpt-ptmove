@@ -218,12 +218,15 @@ class Executor:
         repair = job["kind"] == "seed_repair" or bool(url)
         if attempted and not url:
             raise AdapterError("上次发布结果不确定，请人工确认目标站；禁止自动重复发布")
-        self.require(settings, "source_cookie", "target_cookie", "qb_url", "qb_username", "qb_password", "qb_save_path")
+        self.require(settings, "source_cookie", "target_cookie", "qb_url", "qb_save_path")
+        if not str(settings.get("qb_api_key", "")).strip():
+            self.require(settings, "qb_username", "qb_password")
         if not repair:
             self.require(settings, "ptnexus_url", "ptnexus_password", "ptnexus_downloader_id")
         source = Tracker(SOURCE, settings["source_cookie"])
         target = Tracker(TARGET, settings["target_cookie"])
-        qb = QBittorrent(settings["qb_url"], settings["qb_username"], settings["qb_password"])
+        qb = QBittorrent(settings["qb_url"], settings.get("qb_username", ""), settings.get("qb_password", ""),
+                         api_key=settings.get("qb_api_key") or None)
         engine = None
         try:
             qb.login()

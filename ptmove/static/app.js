@@ -59,7 +59,7 @@
 
   async function refreshAll() { await Promise.allSettled([refreshDashboard(), refreshTasks()]); }
   async function refreshDashboard() {
-    try { const [data, eventData] = await Promise.all([request(`${apiRoot}/dashboard`), request(`${apiRoot}/events`)]); state.dashboard = data; renderDashboard(data); renderEvents(eventData.items || []); text($('#app-version'), `v${data.version || '0.1.0'}`); }
+    try { const [data, eventData] = await Promise.all([request(`${apiRoot}/dashboard`), request(`${apiRoot}/events`)]); state.dashboard = data; renderDashboard(data); renderEvents(eventData.items || []); text($('#app-version'), `v${data.version || '0.1.1'}`); }
     catch (err) { showNotice(safeError(err), true); }
   }
   async function refreshTasks() {
@@ -155,13 +155,13 @@
   async function loadSettings() {
     try { const data = await request(`${apiRoot}/settings`); const form = $('#settings-form'); for (const [key,value] of Object.entries(data)) { const field = form.elements.namedItem(key); if (field && field.type !== 'password' && field.type !== 'checkbox') field.value = value || ''; }
       $$('[data-secret]').forEach(node => text(node,(data.configured_secrets || {})[node.dataset.secret] ? (node.dataset.secret === 'source_rss_url' ? '已配置 · 留空保持不变' : '已配置 · 保留现有密钥') : '尚未配置'));
-      for (const name of ['source_cookie','target_cookie','qb_password','ptnexus_password']) form.elements.namedItem(name).value = '';
+      for (const name of ['source_cookie','target_cookie','qb_api_key','qb_password','ptnexus_password']) form.elements.namedItem(name).value = '';
     } catch (err) { showNotice(safeError(err),true); }
   }
   $('#settings-form').addEventListener('submit',async event => {
     event.preventDefault(); const form = event.currentTarget; const body = {};
     for (const field of $$('input:not([type=checkbox])',form)) { const clear = form.elements.namedItem(`clear_${field.name}`); if (field.type === 'password' || field.name === 'source_rss_url') { if (clear && clear.checked) body[field.name] = ''; else if (field.value) body[field.name] = field.value; } else body[field.name] = field.value; }
-    for (const name of ['source_cookie','target_cookie','source_rss_url','qb_password','ptnexus_password']) if (form.elements.namedItem(`clear_${name}`)?.checked) body[name] = '';
+    for (const name of ['source_cookie','target_cookie','source_rss_url','qb_api_key','qb_password','ptnexus_password']) if (form.elements.namedItem(`clear_${name}`)?.checked) body[name] = '';
     const submit = $('button[type="submit"]',form); submit.disabled=true;
     try { await request(`${apiRoot}/settings`,{method:'PUT',body:JSON.stringify(body)}); text($('#settings-message'),'连接信息已保存。密钥不会再次显示。'); form.reset(); await loadSettings(); showNotice('连接设置已更新。'); }
     catch (err) { text($('#settings-message'),safeError(err)); showNotice(safeError(err),true); }

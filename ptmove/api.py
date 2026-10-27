@@ -254,7 +254,7 @@ def create_app(data_dir=None, admin_password=None, secret_key=None, worker_token
         return {"compose": """name: gpt-ptmove-nas
 services:
   worker:
-    image: ptmove:0.1.0
+    image: ptmove:0.1.1
     build: .
     command: [python, -m, ptmove.worker]
     restart: unless-stopped

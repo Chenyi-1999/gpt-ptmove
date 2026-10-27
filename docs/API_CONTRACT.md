@@ -1,5 +1,7 @@
 # PTMove v0.1 API contract
 
+v0.1.1 adds encrypted secret `qb_api_key`. It takes precedence over qB username/password and uses the official qB 5.2+/WebAPI 2.14.1+ Bearer API mode, never auth/login/logout. Other wire formats remain compatible.
+
 New independent implementation; no PTNexus source copied. Python 3.12/FastAPI + SQLite, static HTML/CSS/JS frontend, pull-based NAS worker. Controller default loopback deployment; use SSH tunnel or HTTPS. All source/target HTTP operations happen on NAS. No real publishing without configured credentials and explicit rule enablement.
 
 ## Invariants

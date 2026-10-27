@@ -68,17 +68,22 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   if (process.env.QA_WRITE_FORMS === '1') {
     await page.locator('[name=source_rss_url]').fill('https://zmpt.cc/rss.php?passkey=synthetic-qa-only');
+    await page.locator('[name=qb_api_key]').fill('qbt_' + 'A'.repeat(28));
     let saved=page.waitForResponse(r=>r.url().endsWith('/api/settings')&&r.request().method()==='PUT');
     await page.locator('#settings-form button[type=submit]').click();
     assert.equal((await saved).status(),200);
     await page.waitForFunction(()=>document.querySelector('[name=source_rss_url]').value==='');
+    assert.equal(await page.locator('[name=qb_api_key]').inputValue(),'');
     saved=page.waitForResponse(r=>r.url().endsWith('/api/settings')&&r.request().method()==='PUT');
     await page.locator('#settings-form button[type=submit]').click();
     assert.equal((await saved).status(),200);
     let settings=await page.evaluate(()=>fetch('/api/settings').then(r=>r.json()));
     assert.equal(settings.configured_secrets.source_rss_url,true);
+    assert.equal(settings.configured_secrets.qb_api_key,true);
     assert(!JSON.stringify(settings).includes('synthetic-qa-only'));
+    assert(!JSON.stringify(settings).includes('qbt_'+'A'.repeat(28)));
     await page.locator('[name=clear_source_rss_url]').check();
+    await page.locator('[name=clear_qb_api_key]').check();
     saved=page.waitForResponse(r=>r.url().endsWith('/api/settings')&&r.request().method()==='PUT');
     await page.locator('#settings-form button[type=submit]').click();
     assert.equal((await saved).status(),200);
