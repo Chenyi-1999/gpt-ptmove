@@ -83,3 +83,11 @@
 - Checks: local and152 Git were clean at e4601c3 before checkpoint;152 Docker remains healthy, public0.0.0.0:18120, health returns0.1.1. No new runtime code changes, tests/build/deploy not rerun. Existing105 passing tests remain the previous release validation, not evidence for the unimplemented features.
 - Remaining: JSON schema/registry/import UI/dynamic execution and AI credentials/scopes/idempotent API are not implemented. ActualNAS andA/B publishing still unverified; schedule off. Protected81 prior version-only plan already completed and does not authorize new operations.
 - Git: e4601c3 previously pushed; this checkpoint documentation is to be committed/pushed and synchronized to152. Backup: source/Git checkpoint to be written and verified directly on D under the prescribed archive root. Deployment: unchanged, no server/container restart needed; PC reboot will not stop152.
+
+## PTM-20261027-012 — 2026-10-27 16:46:12 +08:00 — root
+
+- Purpose/files: CHANGELOG.md; complete the reboot checkpoint record linked to PTM-20261027-011.
+- Git verification: checkpoint commit f7ece5569e4b5e0a513ef8bde39a27324715a5fc is pushed to Gitee master and synchronized to /opt/gpt-ptmove on152; both worktrees were clean.
+- Backup: D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-10\GPT-PTMOVE__2026-10-27_164536__源码快照__重启断点.zip; source and complete Git bundle for f7ece55, excludes runtime data/secrets and Docker image. SHA256 1adb3c29095900d1241d0075c70f005d3347b9d9f6251c30967370b2e485cb84. ZIP CRC and every source/bundle SHA256 verified; Git bundle verified; archive INDEX.jsonl updated. This is a source checkpoint, not a full runtime backup.
+- Deployment/checks:152 container healthy on0.0.0.0:18120, image ptmove:0.1.1. No application changes, rebuild, restart or new test run; JSON-site/AI-API implementation remains pending. No81 operation performed.
+- Handoff: user-requested pause remains in effect; resume from docs/CHECKPOINT-2026-10-27.md after the user asks to continue. This completion record will be committed, pushed and synchronized without restarting the service.
