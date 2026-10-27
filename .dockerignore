@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+.env.*
+data
+.local
+output
+dist
+__pycache__
+*.pyc
+*.torrent
+*.sqlite*
+*.pem
+*.key

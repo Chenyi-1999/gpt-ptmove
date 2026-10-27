@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>PTMove · 管理台</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <main id="login-view" class="login-shell" hidden>
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark" aria-hidden="true">P</div>
+      <p class="eyebrow">PTMOVE · 本地转种控制器</p>
+      <h1 id="login-title">欢迎回来</h1>
+      <p class="muted">登录以查看本月任务与规则。</p>
+      <form id="login-form">
+        <label for="login-password">管理员密码</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        <p class="field-error" id="login-error" role="alert"></p>
+        <button class="button primary full" type="submit">登录管理台</button>
+      </form>
+      <p class="login-foot">仅通过已配置的安全连接访问</p>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell" hidden>
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="#overview" aria-label="PTMove 概览">
+        <span class="brand-mark" aria-hidden="true">P</span><span><strong>PTMove</strong><small>管理控制台</small></span>
+      </a>
+      <div class="route-label">工作区</div>
+      <nav class="nav-list">
+        <button class="nav-item active" data-page="overview"><span class="nav-icon" aria-hidden="true">◫</span>总览</button>
+        <button class="nav-item" data-page="candidates"><span class="nav-icon" aria-hidden="true">⌕</span>候选种子</button>
+        <button class="nav-item" data-page="tasks"><span class="nav-icon" aria-hidden="true">≡</span>转种任务</button>
+        <button class="nav-item" data-page="rules"><span class="nav-icon" aria-hidden="true">⚙</span>自动规则</button>
+        <button class="nav-item" data-page="connections"><span class="nav-icon" aria-hidden="true">⌁</span>连接与执行端</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="route-label">站点路径</div>
+        <div class="site-flow"><span>织梦</span><i aria-hidden="true">→</i><span>NovaHD</span></div>
+        <p class="sidebar-note">所有扫描与传输由 NAS 执行端完成。</p>
+        <button id="logout-button" class="nav-item logout"><span class="nav-icon" aria-hidden="true">↪</span>退出登录</button>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="breadcrumb"><span>PTMove</span><span aria-hidden="true">/</span><strong id="page-title">总览</strong></div>
+        <div class="top-actions"><span class="secure-label"><span class="secure-dot"></span>控制器已连接</span><button id="refresh-button" class="button secondary small">刷新数据</button></div>
+      </header>
+      <main id="main-content" class="content">
+        <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+        <section id="page-overview" class="page active" aria-labelledby="overview-heading">
+          <div class="page-heading"><div><p class="eyebrow">运营状态</p><h1 id="overview-heading">转种总览</h1><p class="muted">查看本月额度、扫描状态与最近任务。</p></div><div class="heading-actions"><button id="scan-button" class="button secondary">手动扫描</button><button id="demo-button" class="button ghost">预览模拟数据</button></div></div>
+          <div class="route-banner"><span class="route-pill">织梦</span><span class="route-line"></span><span class="route-pill target">NovaHD</span><span class="route-hint">只处理经确认可转种的候选内容</span></div>
+          <div class="metrics-grid">
+            <article class="metric-card"><div class="metric-label">本月已用名额 <span class="info-dot" title="已发布或保留中的转种任务">i</span></div><div class="metric-value" id="quota-value">— <small>/ —</small></div><div class="metric-foot" id="quota-foot">等待控制器数据</div><div class="progress-track"><span id="quota-progress"></span></div></article>
+            <article class="metric-card"><div class="metric-label">本月已预留容量</div><div class="metric-value" id="budget-value">—</div><div class="metric-foot" id="budget-foot">上限 —</div><div class="progress-track"><span id="budget-progress"></span></div></article>
+            <article class="metric-card"><div class="metric-label">待处理任务</div><div class="metric-value" id="pending-value">—</div><div class="metric-foot">排队与执行中的任务</div></article>
+            <article class="metric-card"><div class="metric-label">需要人工核查</div><div class="metric-value" id="review-value">—</div><div class="metric-foot">发布结果不确定时请先核对站点</div></article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel"><div class="panel-heading"><div><h2>NAS 执行端状态</h2><p class="muted">最近心跳与连接状态</p></div><span id="worker-status" class="status-chip neutral">读取中</span></div><div id="workers-list" class="worker-list"></div><div class="panel-divider"></div><div class="next-run"><div><span class="muted">下次计划运行</span><strong id="next-run">—</strong></div><button class="text-button" data-goto="rules">管理规则 →</button></div></section>
+            <section class="panel"><div class="panel-heading"><div><h2>最近事件</h2><p class="muted">控制器运行记录</p></div><span class="subtle-label">最新优先</span></div><div id="events-list" class="event-list"></div></section>
+          </div>
+          <section class="panel table-panel"><div class="panel-heading"><div><h2>最近任务</h2><p class="muted">已发布任务仍占用本月名额</p></div><button class="text-button" data-goto="tasks">查看全部 →</button></div><div id="recent-tasks"></div></section>
+        </section>
+
+        <section id="page-candidates" class="page" aria-labelledby="candidates-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow">手动审核</p><h1 id="candidates-heading">候选种子</h1><p class="muted">只有明确勾选并提交的候选项才会创建转种任务。</p></div><div class="heading-actions"><button class="button secondary" id="candidate-scan">扫描候选</button><button class="button primary" id="transfer-selected" disabled>批量转种 <span id="selected-count">0</span></button></div></div>
+          <div class="callout"><strong>安全提示</strong><span>受限、权限未知或目标重复检查未知的项目会被阻止。手动扫描只生成候选列表，不会自动发布；启用规则后的计划扫描可能创建转种任务。</span></div>
+          <div id="demo-label" class="demo-label" role="status" hidden><strong>模拟预览 · 非真实数据</strong><span>此列表不会保存、下载、发布或占用月度名额，不能提交转种任务。</span></div>
+          <section class="panel table-panel"><div class="panel-heading"><div><h2>可审核列表</h2><p id="candidate-summary" class="muted">尚未加载候选项</p></div><button id="candidate-refresh" class="button ghost small">重新加载</button></div><div id="candidates-table"></div></section>
+        </section>
+
+        <section id="page-tasks" class="page" aria-labelledby="tasks-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow">执行队列</p><h1 id="tasks-heading">转种任务</h1><p class="muted">发布状态不确定时，请人工核对目标站点后再操作。</p></div><button class="button secondary" id="tasks-refresh">刷新任务</button></div>
+          <div class="callout warning"><strong>重试规则</strong><span>仅安全阶段可重试；发布过或结果不确定的任务不会自动重复发布。</span></div>
+          <section class="panel table-panel"><div class="panel-heading"><div><h2>任务记录</h2><p id="task-summary" class="muted">载入中</p></div><label class="filter-label">状态筛选<select id="task-filter"><option value="all">全部状态</option><option value="active">进行中</option><option value="needs_review">需要核查</option><option value="failed">失败</option><option value="succeeded">已完成</option></select></label></div><div id="tasks-table"></div></section>
+        </section>
+
+        <section id="page-rules" class="page" aria-labelledby="rules-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow">自动化策略</p><h1 id="rules-heading">自动规则</h1><p class="muted">计划默认关闭，请先完成单种下载与发布验证。</p></div><span class="status-chip neutral" id="rule-state">读取中</span></div>
+          <div class="callout"><strong>计划行为</strong><span>按北京时间运行；启用时已错过本月计划会补执行一次。计划扫描会自动筛选入队，手动扫描只生成候选。</span></div>
+          <form id="rules-form" class="panel form-panel"><div class="panel-heading"><div><h2>候选与月度限制</h2><p class="muted">具体名额仍由控制器原子预留。</p></div></div><div class="form-grid">
+            <label class="toggle-row span-2"><span><strong>启用计划运行</strong><small>默认关闭；启用后按下方时间执行</small></span><input name="enabled" type="checkbox"><span class="switch" aria-hidden="true"></span></label>
+            <label>每月运行日<input name="day" type="number" min="1" max="31" required></label><label>运行时间<input name="hour" type="number" min="0" max="23" required aria-label="运行小时"></label><label>运行分钟<input name="minute" type="number" min="0" max="59" required></label>
+            <label>每月名额上限<input name="monthly_limit" type="number" min="1" max="100" required></label><label>每月容量上限（GiB）<input name="monthly_budget_gib" type="number" min="1" max="10240" required></label><label>候选扫描上限<input name="candidate_limit" type="number" min="1" max="500" required></label>
+            <label>最小种子数<input name="min_seeders" type="number" min="0" required></label><label>最小下载数<input name="min_leechers" type="number" min="0" required></label><label>来源最大年龄（天）<input name="source_max_age_days" type="number" min="1" required></label>
+            <label>最小种子大小（GiB）<input name="min_size_gib" type="number" min="1" max="1024" step="0.1" required></label><label>最大种子大小（GiB）<input name="max_size_gib" type="number" min="1" max="1024" step="0.1" required></label><label>每次发布间隔（秒）<input name="publish_interval_seconds" type="number" min="60" max="86400" required></label>
+            <label>下载最长时间（小时）<input name="max_download_hours" type="number" min="1" required></label><label>单次运行最长时间（小时）<input name="max_run_hours" type="number" min="1" required></label><label>官方种子策略<select name="official_policy"><option value="prefer">优先官方</option><option value="only">仅官方</option><option value="exclude">排除官方</option></select></label>
+            <fieldset class="span-3"><legend>允许的分类</legend><div class="checks"><label><input type="checkbox" name="categories" value="movie">电影</label><label><input type="checkbox" name="categories" value="tv">剧集</label><label><input type="checkbox" name="categories" value="other">其他</label></div></fieldset>
+          </div><div class="form-footer"><span id="rules-message" class="muted" aria-live="polite">北京时间 Asia/Shanghai</span><button class="button primary" type="submit">保存规则</button></div></form>
+        </section>
+
+        <section id="page-connections" class="page" aria-labelledby="connections-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow">执行端配置</p><h1 id="connections-heading">连接与执行端</h1><p class="muted">密钥只在此处写入，不会回显到表单或浏览器存储。</p></div></div>
+          <form id="settings-form" class="panel form-panel"><div class="panel-heading"><div><h2>站点与下载器连接</h2><p class="muted">密码留空表示保留当前配置；勾选清除后才会删除已保存密钥。</p></div></div><div class="form-grid">
+            <label>织梦 Cookie<input name="source_cookie" type="password" autocomplete="new-password" placeholder="留空保持不变"><small class="configured" data-secret="source_cookie">未配置</small></label><label>NovaHD Cookie<input name="target_cookie" type="password" autocomplete="new-password" placeholder="留空保持不变"><small class="configured" data-secret="target_cookie">未配置</small></label><label>PTNexus 密码<input name="ptnexus_password" type="password" autocomplete="new-password" placeholder="留空保持不变"><small class="configured" data-secret="ptnexus_password">未配置</small></label>
+            <label>织梦 RSS 地址<input name="source_rss_url" type="url" placeholder="留空保持不变"><small class="configured" data-secret="source_rss_url">未配置</small></label><label>qBittorrent 地址<input name="qb_url" type="url" placeholder="http://nas:8080"></label><label>qBittorrent 用户名<input name="qb_username" autocomplete="username"></label><label>qBittorrent 密码<input name="qb_password" type="password" autocomplete="new-password" placeholder="留空保持不变"><small class="configured" data-secret="qb_password">未配置</small></label><label>qBittorrent 保存路径<input name="qb_save_path" placeholder="/downloads"></label><label>媒体根目录<input name="media_root" placeholder="/media"></label><label>PTNexus 地址<input name="ptnexus_url" type="url" placeholder="https://..."></label><label>PTNexus 用户名<input name="ptnexus_username" autocomplete="username" placeholder="admin"></label><label>PTNexus 下载器 ID<input name="ptnexus_downloader_id" inputmode="numeric" placeholder="NAS 上 qBittorrent 的 ID"><small>用于 PTNexus 获取与发布任务</small></label>
+            <div class="span-3 clear-secrets"><strong>清除已保存密钥或 RSS 地址</strong><div class="checks"><label><input type="checkbox" name="clear_source_cookie">织梦 Cookie</label><label><input type="checkbox" name="clear_target_cookie">NovaHD Cookie</label><label><input type="checkbox" name="clear_source_rss_url">织梦 RSS 地址</label><label><input type="checkbox" name="clear_qb_password">qBittorrent 密码</label><label><input type="checkbox" name="clear_ptnexus_password">PTNexus 密码</label></div></div>
+          </div><div class="form-footer"><span id="settings-message" class="muted" aria-live="polite">连接信息由 NAS 执行端使用</span><button class="button primary" type="submit">保存连接</button></div></form>
+          <section class="panel worker-setup"><div class="panel-heading"><div><h2>NAS 执行端接入</h2><p class="muted">Compose 文件不含令牌。点击查看后，控制器会返回当前已配置令牌。</p></div></div><div class="worker-actions"><button id="compose-button" class="button secondary">下载执行端 Compose</button><button id="token-button" class="button ghost">查看执行端令牌</button></div><div id="token-output" class="token-output" hidden></div><p class="caution">令牌可访问执行端专用接口，请妥善保存到 NAS 密钥配置中，不要截图或分享。</p></section>
+        </section>
+      </main>
+      <footer class="app-footer"><span>PTMove <span id="app-version">v0.1.0</span></span><span>织梦 → NovaHD · 控制器与 NAS 执行端分离运行</span></footer>
+    </div>
+  </div>
+</body>
+</html>

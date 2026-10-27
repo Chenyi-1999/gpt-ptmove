@@ -1,0 +1,28 @@
+name: gpt-ptmove-nas
+services:
+  worker:
+    image: ptmove:0.1.0
+    build: .
+    command: [python, -m, ptmove.worker]
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env.nas
+    environment:
+      PTMOVE_WORKER_STATE_DIR: /state
+      TZ: Asia/Shanghai
+    volumes:
+      - ./worker-state:/state
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"

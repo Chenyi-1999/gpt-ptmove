@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "date": "2026-10-27",
+  "timezone": "Asia/Shanghai",
+  "host": "152.136.236.238",
+  "directory": "/opt/gpt-ptmove",
+  "container": "gpt-ptmove-controller-1",
+  "image": "ptmove:0.1.0",
+  "image_id": "sha256:1ed71625ab408c77655b334b0e6bc7254a9f910bd8369d3e4c77ba2f8c90ec12",
+  "architecture": "linux/amd64",
+  "image_archive_sha256": "3e79a6e8e667d5fca72437e26b429724bc2cb721a8c6f0fa634dd14025ee104b",
+  "listen": "127.0.0.1:18120",
+  "access": "SSH local forwarding, then http://127.0.0.1:18120",
+  "schedule_enabled": false,
+  "tests_local": 96,
+  "tests_linux_docker_network_none": 96,
+  "browser_verified": true,
+  "real_nas_tracker_publish_verified": false
+}

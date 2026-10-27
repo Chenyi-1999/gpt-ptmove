@@ -1,0 +1,28 @@
+name: gpt-ptmove
+services:
+  controller:
+    image: ptmove:0.1.0
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PTMOVE_ENV: production
+      PTMOVE_DATA_DIR: /data
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${PTMOVE_PORT:-18120}:8000"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 256m
+    cpus: 0.75
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
