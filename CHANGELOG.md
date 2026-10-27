@@ -37,3 +37,10 @@
 - Checks: first online Docker build was cancelled after slow PyPI downloads (~13 KiB/s); target Linux wheels staged on D and offline build succeeded on 152. Runtime healthy, auth/worker auth/restart rule+session persistence/unchanged quota passed. Image linux/amd64 ID sha256:1ed71625ab408c77655b334b0e6bc7254a9f910bd8369d3e4c77ba2f8c90ec12, about36MiB RAM. Existing services preserved; no global Docker/DNS/Nginx changes. Docker image exported on 152 with SHA256 recorded in docs/DEPLOYMENT.json.
 - Remaining: source/image release ZIP and Gitee push/tag pending at this record. Real NAS/trackers not validated; schedule remains disabled. The initial entry001 omitted its minute; exact historical minute was not recorded and is not invented here.
 - Git: not yet committed/pushed. Deployment: successful on152, loopback only. No81 server access.
+
+## PTM-20261027-006 — 2026-10-27 13:03:03 +08:00 — root
+
+- Purpose/files: .gitattributes and release coordination records; finalize cross-platform line endings and record verified deployment before tagging.
+- Checks: initial implementation commit 5a1ff4d435353ca2103cf3df80d01fbd703ff362 pushed successfully to origin/master. Runtime and actual browser checks remain as recorded in005/VALIDATION.md; no application code changed after those checks. Docker export copied directly to D staging and SHA256 matched 3e79a6e8e667d5fca72437e26b429724bc2cb721a8c6f0fa634dd14025ee104b.
+- Remaining: final release archive/tag and Gitee release page pending. User provided a remote qB endpoint; DNS-only investigation showed protected81, so no HTTP/API operation was performed and separate authorization rounds are pending. Credential was not written to files/log/Git. NAS-local qB configuration remains the intended execution route.
+- Git: implementation committed/pushed; this coordination entry not yet committed at writing. Deployment: healthy on152. Real NAS/tracker actions not validated and monthly schedule off.
