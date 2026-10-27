@@ -1,60 +1,73 @@
-# PTMove
+# PTMove Nexus
 
-支持通过JSON扩展NexusPHP站点的月度自动转种控制台，内置织梦（zmpt.cc）→ NovaHD（pt.novahd.top）。独立实现调度、筛选、配额、任务恢复和 NAS 执行端，通过 HTTP API 调用 PTNexus 进行站点发布；未复制或重新分发 PTNexus 源码。
+PTMove Nexus 是基于 [PTNexus](https://github.com/sqing33/PTNexus) Go + Vue 项目的改版，固定上游源码基线为 [`53eee1fed09121867f956c798c158c13a475d51f`](nexus/UPSTREAM.json)。它保留原生手动转种与设置页面，并增加可关闭的自动下载/转种、声明式站点 JSON 导入和独立机器 API。旧 Python 0.2 实现及其文档保留在仓库中作为历史版本，不是本版本的运行入口。
 
-## v0.2.0 功能
+本项目按 PTNexus 上游项目所附的用途和限制声明使用；本仓库不另行宣称 MIT 或其他开源许可证，也不表示获得了 PTNexus 作者的背书。使用者仍须遵守站点规则和适用法律。
 
-- [站点JSON导入](docs/SITE_PROFILES.md)：模板、Schema、预览、独立凭据和规则选择；旧任务冻结路线，旧库保留ID、额度与发布证据迁移。
-- [AI REST API](docs/AI_API.md)：独立可撤销密钥、read/write/publish权限、到期时间、事务幂等命令与OpenAPI。
+## 功能与安全默认值
 
-- 中文管理页面：规则、候选、批量入队、任务、事件和连接配置。
-- 默认每月 1 日 02:00（北京时间），最多 6 个、单个 1–10 GiB、预算 60 GiB，做种人数 ≥3，优先 NovaHD 缺少的作品，其次缺少的版本，同级优先官种。
-- 计划默认关闭。启用时若本月计划时间已过，会补执行一次；已有当月计划记录则不重复。手动扫描只产生候选，选择候选后才下载和发布。演示预览明确标记，不连接站点、不写入真实候选或配额。
-- NAS 执行端主动领取任务，qB 4.1+/5.x API 下载资源，检查全部文件完成后才发布。PTNexus 复用源站资料并处理媒体信息；目标种子校验与 Tracker 做种确认独立于上传成功。
-- 月度名额和资源体积预算原子预留；领取过的任务保留预算。预算按资源文件体积计算，保守计入失败任务的完整预留体积，不是网络流量计费器（协议开销和重传另计）。
-- 加密保存连接信息；管理员会话、CSRF 和独立执行端令牌；租约和发布检查点防止超时后盲目重复发布。
-- qB 5.2+ 可用原生 API Token（优先使用），无需用户名/密码；旧版继续使用账号登录。遵循 [qB 官方 Bearer 认证规范](https://github.com/qbittorrent/qBittorrent/wiki/API-Key-Authentication-%28%E2%89%A5v5.2.0%29)。
+- 保留 PTNexus 原有 Go 后端、Vue 管理界面和手动转种流程。
+- 自动化运行、定时计划和自动发布默认关闭，分别由设置页中的开关控制。首次配置时先检查站点映射、凭据、下载器和路径，再由管理员明确启用。
+- 默认计划为北京时间每月 1 日 02:00；每月最多 6 项，每项 1–10 GiB，月度资源预算 60 GiB。筛选优先官种，并优先目标站缺少的作品/版本。
+- 站点 JSON 是公开元数据声明，不包含 Cookie、RSS 或 API 密钥。导入时做严格格式校验；`announce_hosts` 必须明确填写，系统不会根据站点域名猜测 Tracker 域名。
+- 声明导入不等于站点已经可用。普通站点需要映射到 PTNexus 已有的原生 publisher，并验证该映射和真实页面行为；未知限制、查重结果或目标做种状态必须按未通过处理。
+- 独立机器 API 密钥提供 `read`、`write`、`publish` 范围，可设到期时间并撤销；写命令使用幂等请求键。一般变更要求 `write`；启用发布、已有待执行任务或明确入队/发布时还要求 `publish`。管理员可下载 `/api/machine-openapi`，机器 API 文档为 `/api/v1/openapi.json`。
+- qB Bearer Token 接入仅假设目标 qB API 兼容 Bearer API 网关；本改版没有验证真实 qB 原生 Token 支持，也不保证用户提供的 Token 可直接使用。请按实际网关文档配置并在隔离环境验证。
 
-## 部署控制台（152）
+## Docker 安装
 
-```sh
-git clone git@gitee.com:star1999/gpt-ptmove.git /opt/gpt-ptmove
-cd /opt/gpt-ptmove
-python3 scripts/init_deployment.py
-docker compose up -d --build
-docker compose ps
-```
-
-控制台通过 Docker 绑定服务器的 `0.0.0.0:18120`，部署后直接访问 `http://152.136.236.238:18120`。另一个终端可通过现有脚本获取初始控制台密码：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1 -ShowPassword
-```
-
-如需使用原有 SSH 隧道访问方式，可运行 `ssh -N -L 18120:127.0.0.1:18120 itemkeep-server` 并打开 `http://127.0.0.1:18120`。该隧道方式为可选项。
-
-## 接入 NAS
-
-见 [NAS_SETUP.md](docs/NAS_SETUP.md)。控制台已部署不等于 NAS 已接入：需要 qB 地址/账号、两站 Cookie、NAS 上的 PTNexus URL/账号与对应下载器 ID，并保证 PTNexus 可访问实际媒体路径。只给 qB API 不能让另一个容器直接读取媒体文件。
-
-候选转载限制和页面结构检查失败时跳过；验证码、登录失效、查重未知或发布结果不明时需要人工处理。官种识别使用站点标记和已知织梦组后缀（ZmWeb/ZmAudio/ZmPT），最终仍以站点标记和转载规则为准。支持配置常见NexusPHP页面的路径、选择器、官组、Tracker域名和PTNexus映射。JSON导入只验证格式；真实页面和PTNexus站点支持仍需要联调。
-
-## 验证
+先准备 Docker Compose 环境，并为本改版选择独立目录。不要复用旧 Python 版的目录、数据库、密钥或 NAS worker 状态目录。
 
 ```sh
-python -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -q
-docker build --target test -t ptmove-test:0.2.0 .
-docker run --rm --network none ptmove-test:0.2.0
+git clone https://gitee.com/star1999/gpt-ptmove.git
+cd gpt-ptmove/nexus
 ```
 
-测试覆盖配额并发、跨月、租约、发布不确定性、发布后修复、全部文件完成、qB 版本接口和鉴权。模拟适配器测试不代表已经在真实站点发种；实际验证状态见 [VALIDATION.md](docs/VALIDATION.md)。
+创建仅供该实例使用的 `.env.ptmove`。至少设置高熵、私有的 `JWT_SECRET`；不要提交该文件。`PTMOVE_BIND` 默认 `0.0.0.0`，若只需本机或反向代理访问，可设为 `127.0.0.1`。端口默认 `18120`。
 
-## 恢复与发布
+```sh
+umask 077
+cat > .env.ptmove <<'EOF'
+JWT_SECRET=替换为随机生成的长随机值
+PTMOVE_BIND=127.0.0.1
+PTMOVE_PORT=18120
+EOF
+mkdir -p data
+chmod 700 data
+docker compose --env-file .env.ptmove -f compose.ptmove.yaml up -d --build
+docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
+```
 
-保留 `.env`、整个 `data/`（特别是加密密钥）和 NAS `worker-state/`。只备份数据库、丢失加密密钥将无法恢复站点凭据和候选数据。停服后做一致性文件备份，或使用 SQLite Backup API；不要只复制正在写入的主数据库文件。
+首次安装的用户名为 `admin`；临时密码在容器启动日志中显示，首次登录后需修改。152 现有部署通过初始化工具保留原管理员密码。
 
-源码和镜像可分别通过 Git 标签及 Docker image ID 追溯。源代码历史发布 ZIP 生成到 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\YYYY-MM\`，附 SHA256 和恢复说明，不包含真实数据、凭据或 NAS 媒体；不称作完整备份。
+Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-PTNexus 是独立上游项目，有自己的用途声明和转种限制。使用其镜像/API 时遵守其声明和站点规则；此项目不绕过限制。
+部署目标 `http://152.136.236.238:18120` 当前尚未部署此 Go + Vue 版本；SSH 与网页访问此前均超时。不要将旧版仍在运行或旧版健康检查误认为新版本已上线。Gitee 仓库为 <https://gitee.com/star1999/gpt-ptmove>；此 fork 的 Git 提交、发布标签和 Gitee Release 尚未完成。
+
+## 初次配置
+
+1. 登录原生 PTNexus 设置页，确认管理员登录和现有手动转种功能正常。
+2. 在自动化页面检查初始状态：全局执行、计划执行和自动发布应保持关闭。配置来源站、目标站、下载器 ID、保存路径和筛选规则后，再分别决定是否启用。
+3. 在站点配置档案页下载 schema/模板并导入声明。声明仅支持有界的 NexusPHP 页面路径和选择器；导入显示 `declared/unverified`，不是连通性或兼容性证明。
+4. 为导入的站点单独录入 Cookie 和 RSS 凭据。JSON 导出不包含凭据；当前 Cookie 使用 PTNexus 原生兼容存储，RSS 及机器 API 幂等回复使用独立加密存储。保管 `data/` 中的 `machine-registry.key`，它与数据库备份必须配套。
+5. 确认目标站配置准确的 `announce_hosts`，且对应站点映射到已有原生 publisher。没有可信 Tracker 主机声明时，执行和自动发布会拒绝进行；不推测或自动补全此字段。
+6. 通过预览和小范围人工操作验证限制识别、查重和目标站行为。只有验证无误后才按需开启自动化。不要对不确定的上传结果盲目重试。
+7. AI/外部客户端使用独立机器密钥，不复用管理员 Cookie、JWT 或 NAS 内部令牌。对接写操作时给每个动作提供唯一的 `Idempotency-Key`；失效或权限不足的结果应停止并由管理员检查。
+
+## 数据备份、升级与回滚
+
+每个实例应单独备份 Compose 文件、`.env.ptmove`、完整 `data/` 和镜像版本/ID。`.env.ptmove` 与 `machine-registry.key` 含敏感材料，应限制访问并加密存放；数据库不能脱离加密密钥单独作为可恢复备份。计划备份时先停止本实例，再一致性复制整个 `data/`：
+
+```sh
+docker compose --env-file .env.ptmove -f compose.ptmove.yaml stop
+tar -czf ptmove-nexus-backup.tar.gz .env.ptmove compose.ptmove.yaml data
+docker compose --env-file .env.ptmove -f compose.ptmove.yaml start
+```
+
+升级前保留当前镜像 ID 与上述一致性备份，再切换到明确版本的 Docker 发布包。升级后检查容器健康、管理员登录、站点和密钥状态、任务及配额，再考虑启用计划。
+
+回滚必须将应用镜像、Compose 配置和同一时间点的数据库/密钥备份作为一组恢复，避免新旧 schema 混用。停止本实例，恢复旧镜像与备份的 `.env.ptmove`、`data/`，然后启动并核对健康状态。不要把新版本数据库单独交给旧版本运行。应用镜像及更新包应来自本项目 Gitee 发布；本 fork 禁用了上游在线覆盖更新器入口，避免原版更新覆盖改版代码。
+
+## 历史版本
+
+仓库根目录原有 Python 0.2 版文档和 `docs/` 仍保留，用于旧版维护和历史记录，不描述本 Go + Vue 运行时。新版本说明见 [`docs/PTNEXUS_FORK.md`](docs/PTNEXUS_FORK.md)；上游 Go 服务目录补充说明见 [`nexus/server/docs/PROJECT_STRUCTURE.md`](nexus/server/docs/PROJECT_STRUCTURE.md)。

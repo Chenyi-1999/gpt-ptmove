@@ -1,0 +1,18 @@
+services:
+  ptmove-nexus:
+    image: ptmove-nexus:0.3.0
+    build:
+      context: .
+      dockerfile: Dockerfile.ptmove
+    restart: unless-stopped
+    ports:
+      - "${PTMOVE_BIND:-0.0.0.0}:${PTMOVE_PORT:-18120}:5275"
+    env_file: ${PTMOVE_ENV_FILE:-.env.ptmove}
+    volumes:
+      - ${PTMOVE_DATA_DIR:-./data}:/app/data
+    mem_limit: 768m
+    cpus: 1.0
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
