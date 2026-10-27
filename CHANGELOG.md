@@ -116,3 +116,19 @@
 - Backup: D database ZIP GPT-PTMOVE__2026-10-27_175152__数据备份__升级0.2.0前数据库.zip SHA2560772f24357bf3b57f38972eb60049c05ddde06d5402226e155a44a08c543e1e3; CRC/perfilehash/SQLite integritycheck passed. Excludesplaintextcredentials/key; restore needs existing152key. Local archiveINDEX updated. Exported Dockerimage SHA25627a12ac309c638765f004f4e876a1a6f8c36332d7a30fcf945bcda792d140edc;D transfer verification ongoing.
 - Checks summary:163local and163Linuxnetwork-none tests passed; final static-only mobilelogout layer verified inbrowser. Sharedvisual-runtime scripts unavailable; existing standalone browserQA extended. No81 access, realNAS/download/publish remains unverified.
 - Git/release: changes tocommit/push/tagv0.2.0 next; source+image archive and Gitee formalrelease pending at writing.
+
+## PTM-20261027-016 — 2026-10-27 17:57:45 +08:00 — root
+
+- Purpose/files: CHANGELOG.md; linked commit/archive completion record.
+- Git: feature/docs commit9d8015d0242925e9254dfab6074222d28d4da328 pushed toGitee master; annotatedv0.2.0 tag pushed.152 trackedfiles/Git synchronized and clean atthatcommit; deployment remainshealthy0.2.0.
+- Archive: D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-10\GPT-PTMOVE__2026-10-27_175604__历史发布__v0.2.0.zip; source+linux/amd64Dockerimage, restore and SHA256 manifests, excludesaccounts/liveDB/media. ZIPCRC andeveryfilehash verified bypackage_release.py; overallSHA25679a2f9bcf51027c0ada007f645e617af16e5d031ee528f6b2f5ce7d7b1b861e5. Dockerarchive onD matches152 SHA25627a12ac309c638765f004f4e876a1a6f8c36332d7a30fcf945bcda792d140edc. ArchiveINDEX updated, historicalversions retained.
+- Browser publication: Gitee formalrelease form filled forv0.2.0 andverified52.6MiB archive selected; createaction submitted, finalpublication stillbeingverified. No additional applicationcode changes/testing/restart needed.
+- Remaining: formalreleaseconfirmation, finalmetadata commit/push/sync. RealNAS/trackerpublishing remainsunverified, scheduleoff, no81access.
+
+## PTM-20261027-017 — 2026-10-27 17:59:33 +08:00 — root
+
+- Purpose/files: CHANGELOG.md and docs/DEPLOYMENT.json; finalrelease confirmation.
+- Gitee: https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.2.0 visibly reports creation successful/latest, taggedcommit9d8015d and downloadable52.6MiB source/DockerZIP withthe verified filename. Browsernavigation observations timedout whileGitee loaded; fresh inventory/state then confirmedsuccess, no duplicatecreation attempted.
+- Deployment/validation:152 public18120 healthy at0.2.0, defaultscheduleoff, credentials/data preserved;163local+Linuxoffline tests and20browser screenshots already verified. TemporaryQA18121 removed. No newruntime changes/tests/rebuild/restart fromthis metadata record.
+- Git: featurecommit/tag already pushed; linkedrecords016/017 and releaseURL metadata will nowbe committed/pushed and synchronized to152. D release/database archives and indices verified; releaseZIP remains immutable atfeaturetag.
+- Remaining limits: realNAS/newsite/PTNexus download/publish verification notperformed; importedprofiles are declarations, HTTP API needs trustedsecurechannel/HTTPS for externalcredentials. No81 operations authorized or performed duringthis featurework.

@@ -24,5 +24,7 @@
   "site_profile_schema": 1,
   "worker_execution_schema": 2,
   "api_version": "v1",
-  "temporary_qa_container_removed": true
+  "temporary_qa_container_removed": true,
+  "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.2.0",
+  "release_commit": "9d8015d0242925e9254dfab6074222d28d4da328"
 }
