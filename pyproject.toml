@@ -1,6 +1,6 @@
 [project]
 name = "gpt-ptmove"
-version = "0.1.1"
+version = "0.2.0"
 description = "Monthly tracker migration controller and NAS worker"
 requires-python = ">=3.12"
 

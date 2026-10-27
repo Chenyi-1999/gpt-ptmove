@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
+from .sites import BUILTIN_PROFILES, SiteProfile, profile_for_base, profile_url, published_url_valid
 
 SOURCE = "https://zmpt.cc"
 TARGET = "https://pt.novahd.top"
@@ -59,6 +60,37 @@ def resolve_safe(url: str):
             safe_url("http://[" + addr[0] + "]" if ":" in addr[0] else "http://" + addr[0])
     except OSError as exc:
         raise AdapterError("连接地址无法解析") from exc
+
+
+class PinnedTransport(httpx.HTTPTransport):
+    """Connect to the address we checked; preserve the original TLS identity."""
+    def __init__(self, *args, public_only=False, **kwargs):
+        self.public_only = public_only
+        super().__init__(*args, **kwargs)
+
+    def handle_request(self, request):
+        original = request.url
+        safe_url(str(original))
+        try:
+            addresses = socket.getaddrinfo(original.host, original.port or (443 if original.scheme == "https" else 80), type=socket.SOCK_STREAM)
+        except OSError as exc:
+            raise AdapterError("连接地址无法解析") from exc
+        if not addresses:
+            raise AdapterError("连接地址无法解析")
+        for *_, address in addresses:
+            addr = ipaddress.ip_address(address[0])
+            mapped = addr.ipv4_mapped if isinstance(addr, ipaddress.IPv6Address) else addr
+            if str(mapped or addr) == "81.70.24.5":
+                raise AdapterError("受保护的服务器不允许作为连接目标")
+            if self.public_only and not (mapped or addr).is_global:
+                raise AdapterError("站点域名必须解析到公网地址")
+        request.extensions["sni_hostname"] = original.host
+        request.headers["Host"] = original.netloc.decode("ascii")
+        request.url = original.copy_with(host=addresses[0][4][0])
+        try:
+            return super().handle_request(request)
+        finally:
+            request.url = original
 
 
 def size_bytes(text: str) -> int:
@@ -128,12 +160,35 @@ def torrent_metadata(raw: bytes) -> dict:
         if total <= 0 or not pieces or len(pieces) % 20 or piece_length <= 0 or len(pieces) // 20 != (total + piece_length - 1) // piece_length:
             raise ValueError("unsupported v2-only/invalid torrent")
         start, stop = info_span[0]
+        announce = obj.get(b"announce", b"").decode("utf-8", "strict")
+        tiers = obj.get(b"announce-list", [])
+        if not isinstance(tiers, list) or any(not isinstance(t, list) for t in tiers):
+            raise ValueError("invalid announce list")
+        announces = list(dict.fromkeys([announce] + [u.decode("utf-8", "strict") for tier in tiers for u in tier]))
+        # A qB import must not cause unrelated webseed, DHT/bootstrap or tracker traffic.
+        if obj.get(b"url-list") or obj.get(b"httpseeds") or obj.get(b"nodes"):
+            raise ValueError("unsupported external torrent endpoints")
         return {"hash": hashlib.sha1(raw[start:stop]).hexdigest(), "name": name,
                 "size_bytes": total, "files": sorted(files), "pieces": pieces,
                 "piece_length": piece_length, "private": bool(info.get(b"private")),
-                "announce": obj.get(b"announce", b"").decode("utf-8", "replace")}
+                "announce": announce, "announces": announces}
     except (KeyError, IndexError, TypeError, ValueError, OverflowError) as exc:
         raise AdapterError("种子文件无效或暂不支持纯 v2 格式") from exc
+
+
+def verify_torrent_networks(raw, profile, resolve=False):
+    metadata = torrent_metadata(raw)
+    allowed = set(profile.get("announce_hosts", []))
+    if not metadata["private"] or not allowed or not metadata["announce"]:
+        raise AdapterError("种子必须为私有种子且配置Tracker域名")
+    for url in metadata["announces"]:
+        p = urlsplit(url)
+        safe_url(url)
+        if p.scheme != "https" or p.hostname not in allowed or p.port not in (None, 443):
+            raise AdapterError("种子含未允许的Tracker地址")
+        if resolve:
+            resolve_safe(url)
+    return metadata
 
 
 def same_payload(source: dict, target: dict) -> bool:
@@ -168,9 +223,36 @@ def _count(cell: Any) -> int:
     return int(text) if text.isdigit() else -1
 
 
-def parse_listing(html: str, base: str = SOURCE, limit: int = 50) -> list[dict]:
+def profile_torrent_id(url, profile, key="detail"):
+    """Inverse of an encoded template; never trust an ID from another origin."""
+    safe_url(url, urlsplit(profile["base_url"]).hostname)
+    actual, template = urlsplit(str(url)), urlsplit(profile["paths"][key])
+    identity = ""
+    def match_part(expected, value):
+        pattern = re.escape(expected).replace(re.escape("{id}"), r"([0-9]+)")
+        return re.fullmatch(pattern, value)
+    match = match_part(template.path, actual.path)
+    if not match:
+        return ""
+    if "{id}" in template.path:
+        identity = match[1]
+    params = parse_qs(actual.query, keep_blank_values=True)
+    for name, values in parse_qs(template.query, keep_blank_values=True).items():
+        if name not in params or len(values) != 1 or len(params[name]) != 1:
+            return ""
+        match = match_part(values[0], params[name][0])
+        if not match:
+            return ""
+        if "{id}" in values[0]:
+            identity = match[1]
+    return identity
+
+
+def parse_listing(html: str, base: str = SOURCE, limit: int = 50, profile=None) -> list[dict]:
+    profile = profile or profile_for_base(base) or SiteProfile(id="tracker", name="Tracker", base_url=base, roles=["source"]).model_dump()
+    selectors = profile["selectors"]
     soup = authenticated_html(html)
-    table = soup.select_one("table.torrents") or soup.select_one("table#torrenttable")
+    table = soup.select_one(selectors["table"])
     if not table:
         raise AdapterError("无法识别种子列表，已停止选种")
     headings = table.find("tr")
@@ -182,13 +264,13 @@ def parse_listing(html: str, base: str = SOURCE, limit: int = 50) -> list[dict]:
     si, li, zi = index("seeders", "做种", "种子数"), index("leechers", "下载数", "下载者"), index("size", "大小", "体积")
     items, seen = [], set()
     for row in table.find_all("tr"):
-        link = row.select_one('a[href*="details.php?id="]')
+        link = row.select_one(selectors["detail_link"])
         if not link:
             continue
         url = urljoin(base, link.get("href", ""))
         try:
             safe_url(url, urlsplit(base).hostname)
-            sid = parse_qs(urlsplit(url).query).get("id", [""])[0]
+            sid = profile_torrent_id(url, profile)
             if not sid.isdigit() or sid in seen:
                 continue
             seen.add(sid)
@@ -203,9 +285,9 @@ def parse_listing(html: str, base: str = SOURCE, limit: int = 50) -> list[dict]:
             items.append({"source_id": sid, "title": title, "size_bytes": size,
                           "seeders": _count(cells[si]) if si is not None and si < len(cells) else -1,
                           "leechers": _count(cells[li]) if li is not None and li < len(cells) else -1,
-                          "official": group.lower() in OFFICIAL_GROUPS or bool(re.search("官种|官方", text)),
-                          "release_group": group, "category": category, "detail_url": f"{base}/details.php?id={sid}",
-                          "download_url": f"{base}/download.php?id={sid}", "published_at": _date(text),
+                          "official": group.lower() in profile["official_groups"] or bool(re.search("官种|官方", text)),
+                          "release_group": group, "category": category, "detail_url": profile_url(profile, "detail", id=sid),
+                          "download_url": profile_url(profile, "download", id=sid), "published_at": _date(text),
                           "restricted": bool(RESTRICTED.search(text)), "permission_verified": False,
                           "target_exists": None, "target_work_exists": None, "metadata": {}})
         except (AdapterError, ValueError):
@@ -216,12 +298,15 @@ def parse_listing(html: str, base: str = SOURCE, limit: int = 50) -> list[dict]:
 
 
 class Tracker:
-    def __init__(self, base: str, cookie: str, client: httpx.Client | None = None):
-        self.base = base.rstrip("/")
-        self.host = urlsplit(base).hostname
+    def __init__(self, base: str | dict, cookie: str, client: httpx.Client | None = None):
+        self.profile = SiteProfile.model_validate(base).model_dump() if isinstance(base, dict) else profile_for_base(base)
+        if self.profile is None:
+            self.profile = SiteProfile(id="tracker", name="Tracker", base_url=base, roles=["source", "target"]).model_dump()
+        self.base = self.profile["base_url"]
+        self.host = urlsplit(self.base).hostname
         self.resolve = client is None
         self.last_request = 0.0
-        self.client = client or httpx.Client(timeout=45, follow_redirects=False, trust_env=False, transport=httpx.HTTPTransport(retries=2, trust_env=False),
+        self.client = client or httpx.Client(timeout=45, follow_redirects=False, trust_env=False, transport=PinnedTransport(retries=2, trust_env=False, public_only=True),
                                              headers={"User-Agent": "PTMove/0.1 (personal tracker migration)", "Cookie": cookie})
 
     def close(self):
@@ -251,14 +336,21 @@ class Tracker:
 
     def candidates(self, rss_url: str, limit: int) -> list[dict]:
         if not rss_url:
-            return parse_listing(self.get(self.base + "/torrents.php?sort=4&type=desc").decode("utf-8", "replace"), self.base, limit)
+            return parse_listing(self.get(profile_url(self.profile, "listing")).decode("utf-8", "replace"), self.base, limit, self.profile)
         feed = feedparser.parse(self.get(rss_url))
         if feed.bozo or not feed.entries:
             raise AdapterError("RSS 无法解析或没有条目")
         out = []
         for entry in feed.entries[:limit]:
             urls = [entry.get("link", "")] + [v.get("href", "") for v in entry.get("links", [])]
-            sid = next((parse_qs(urlsplit(u).query).get("id", [""])[0] for u in urls if parse_qs(urlsplit(u).query).get("id")), "")
+            sid = ""
+            for u in urls:
+                try:
+                    sid = profile_torrent_id(u, self.profile) or profile_torrent_id(u, self.profile, "download")
+                except AdapterError:
+                    continue
+                if sid:
+                    break
             if not sid.isdigit():
                 continue
             # RSS supplies IDs; authoritative classification/counts come from fresh detail HTML.
@@ -266,7 +358,7 @@ class Tracker:
             date = datetime(*parsed[:6], tzinfo=timezone.utc).isoformat() if parsed else None
             out.append({"source_id": sid, "title": entry.get("title", ""), "size_bytes": 0,
                         "seeders": -1, "leechers": -1, "official": False, "category": "other",
-                        "detail_url": f"{self.base}/details.php?id={sid}", "download_url": f"{self.base}/download.php?id={sid}",
+                        "detail_url": profile_url(self.profile, "detail", id=sid), "download_url": profile_url(self.profile, "download", id=sid),
                         "published_at": date, "restricted": False, "permission_verified": False,
                         "target_exists": None, "target_work_exists": None, "metadata": {}})
         return out
@@ -275,8 +367,8 @@ class Tracker:
         out = dict(candidate)
         html = self.get(out["detail_url"]).decode("utf-8", "replace")
         soup = authenticated_html(html)
-        title = soup.select_one("h1#top") or soup.select_one("h1")
-        description = soup.select_one("#kdescr") or soup.select_one("#description")
+        title = soup.select_one(self.profile["selectors"]["title"])
+        description = soup.select_one(self.profile["selectors"]["description"])
         # Restriction verification needs both detail identity and a recognizable metadata table.
         if not title or not description:
             raise AdapterError("详情页结构无法确认，已跳过该资源")
@@ -292,17 +384,17 @@ class Tracker:
         metadata_text = " ".join(f"{k}: {v}" for k, v in labels.items() if k in {"基本信息", "种子信息", "标签", "类型", "副标题", "大小", "体积", "文件大小", "种子名称"})
         def evidence(node):
             return " ".join([node.get_text(" ", strip=True)] + [str(x.get(k, "")) for x in [node, *node.find_all(True)] for k in ("alt", "title", "data-tag")])
-        tagged = " ".join(evidence(x) for x in soup.select(".tag, .tags, .torrent-tag, .label"))
+        tagged = " ".join(evidence(x) for x in soup.select(".tag, .tags, .torrent-tag, .label, " + self.profile["selectors"]["tags"]))
         # Some NexusPHP styles render forbidden labels as bare images in detail rows.
         metadata_text += " " + " ".join(evidence(row) for row in rows if row.find(["td", "th"]) and re.search("基本信息|种子信息|标签|副标题|种子名称", row.find(["td", "th"]).get_text(" ", strip=True)))
         check_text = " ".join([out["title"], metadata_text, tagged, description.get_text(" ", strip=True)])
         out["restricted"] = bool(RESTRICTED.search(check_text))
         out["restriction_reason"] = "详情页含禁转、限转或分集标记" if out["restricted"] else ""
         out["permission_verified"] = bool(metadata_text)  # parser failure never grants permission
-        out["official"] = group.lower() in OFFICIAL_GROUPS or bool(re.search("官种|官方", tagged))
+        out["official"] = group.lower() in self.profile["official_groups"] or bool(re.search("官种|官方", tagged))
         out["size_bytes"] = size_bytes(metadata_text) or out.get("size_bytes", 0)
         for field, pattern in (("seeders", r"(?:做种者?|seeders?)\D{0,6}(\d+)"), ("leechers", r"(?:下载者?|leechers?)\D{0,6}(\d+)")):
-            peer_text = " ".join(x.get_text(" ", strip=True) for x in soup.select("#peercount, #peers, .peers")) or soup.get_text(" ", strip=True)
+            peer_text = " ".join(x.get_text(" ", strip=True) for x in soup.select(self.profile["selectors"]["peers"])) or soup.get_text(" ", strip=True)
             match = re.search(pattern, peer_text, re.I)
             if match:
                 out[field] = int(match[1])
@@ -316,13 +408,15 @@ class Tracker:
         douban = re.search(r"douban\.com/subject/(\d+)", html)
         out["metadata"] = {"imdb": imdb[1] if imdb else "", "douban": douban[1] if douban else ""}
         # Authorized download link is fetched fresh and kept on the worker only; no passkey in UI.
-        links = soup.select('a[href*="download.php"]')
+        links = soup.select(self.profile["selectors"]["download_link"])
         for a in links:
             u = urljoin(self.base, a.get("href", ""))
-            if parse_qs(urlsplit(u).query).get("id", [""])[0] == str(out["source_id"]):
-                safe_url(u, self.host)
-                out["download_url"] = u
-                break
+            try:
+                if profile_torrent_id(u, self.profile, "download") == str(out["source_id"]):
+                    out["download_url"] = u
+                    break
+            except AdapterError:
+                continue
         if out["permission_verified"] and not out["restricted"]:
             metadata = torrent_metadata(self.torrent(out))
             out["size_bytes"] = metadata["size_bytes"]
@@ -335,19 +429,24 @@ class Tracker:
         metadata = candidate.get("metadata", {})
         work_key = metadata.get("imdb") or metadata.get("douban")
         query = work_key or candidate["title"]
-        html = self.get(self.base + "/torrents.php?" + urlencode({"search": query, "search_area": "4" if metadata.get("imdb") else "0", "search_mode": "0"})).decode("utf-8", "replace")
+        search_url = httpx.URL(profile_url(self.profile, "search", query=query))
+        # NexusPHP defaults to title search; an IMDb ID needs its identifier mode.
+        search_url = search_url.copy_set_param("search_area", "4" if metadata.get("imdb") else "0").copy_set_param("search_mode", "0")
+        html = self.get(str(search_url)).decode("utf-8", "replace")
         soup = authenticated_html(html)
-        table = soup.select_one("table.torrents") or soup.select_one("table#torrenttable")
+        table = soup.select_one(self.profile["selectors"]["table"])
         no_results = bool(re.search(r"没有种子|没有找到|未找到|无匹配|no torrents|nothing found|no results", soup.get_text(" ", strip=True), re.I))
         if not table and not no_results:
             return None, None
-        links = table.select('a[href*="details.php?id="]') if table else []
+        links = table.select(self.profile["selectors"]["detail_link"]) if table else []
         def release(t):
             return re.sub(r"[^\w]", "", t.lower())
         same = any(release(a.get("title") or a.get_text(" ", strip=True)) == release(candidate["title"]) for a in links)
         if same:
             return True, True
         if not links:
+            if not no_results:
+                return None, None
             # A title-only empty search proves release absence but not work absence.
             return False, False if work_key else None
         # Different title spelling is not proof that this release is absent.
@@ -377,12 +476,12 @@ class Tracker:
         else:
             p = urlsplit(candidate_or_url)
             safe_url(candidate_or_url, self.host)
-            sid = parse_qs(p.query).get("id", [""])[0]
+            sid = profile_torrent_id(candidate_or_url, self.profile)
             if not sid.isdigit():
                 raise AdapterError("发布详情链接缺少有效种子编号")
-            url = self.base + "/download.php?" + urlencode({"id": sid})
+            url = profile_url(self.profile, "download", id=sid)
         raw = self.get(url, MAX_TORRENT)
-        torrent_metadata(raw)
+        verify_torrent_networks(raw, self.profile, self.resolve)
         return raw
 
 
@@ -395,7 +494,7 @@ class QBittorrent:
             if not re.fullmatch(r"qbt_[A-Za-z0-9]{28}", api_key):
                 raise AdapterError("qB API Token 格式无效")
         self.resolve = client is None
-        self.client = client or httpx.Client(base_url=self.url, timeout=45, follow_redirects=False, trust_env=False, transport=httpx.HTTPTransport(retries=2, trust_env=False),
+        self.client = client or httpx.Client(base_url=self.url, timeout=45, follow_redirects=False, trust_env=False, transport=PinnedTransport(retries=2, trust_env=False),
                                              headers={"Referer": self.url + "/", "Origin": self.url})
         if self.key_mode:
             self.client.headers["Authorization"] = "Bearer " + api_key
@@ -457,14 +556,13 @@ class QBittorrent:
             raise AdapterError("qB 未接受种子文件")
         return metadata["hash"]
 
-    def add_target(self, raw: bytes, save_path: str) -> str:
+    def add_target(self, raw: bytes, save_path: str, profile=None) -> str:
         """Cross-seed an identical info hash without losing the source tracker.
 
         Only the authenticated target torrent's verified announce is added; no
         user-provided tracker list or unrelated torrent is modified.
         """
-        metadata = torrent_metadata(raw)
-        safe_url(metadata["announce"], "pt.novahd.top")
+        metadata = verify_torrent_networks(raw, profile or BUILTIN_PROFILES["novahd"], self.resolve)
         if self.info(metadata["hash"]):
             trackers = self.trackers(metadata["hash"])
             if not any(t.get("url") == metadata["announce"] for t in trackers):
@@ -493,7 +591,7 @@ class PTNexus:
         self.url = safe_url(url).rstrip("/")
         self.username, self.password = username or "admin", password
         self.resolve = client is None
-        self.client = client or httpx.Client(base_url=self.url, timeout=300, follow_redirects=False, trust_env=False, transport=httpx.HTTPTransport(retries=2, trust_env=False))
+        self.client = client or httpx.Client(base_url=self.url, timeout=300, follow_redirects=False, trust_env=False, transport=PinnedTransport(retries=2, trust_env=False))
 
     def close(self):
         self.client.close()
@@ -517,14 +615,18 @@ class PTNexus:
             raise AdapterError("PTNexus 未返回访问令牌")
         self.client.headers["Authorization"] = "Bearer " + result["token"]
 
-    def prepare(self, candidate: dict, save_path: str, downloader_id: str) -> dict:
+    def prepare(self, candidate: dict, save_path: str, downloader_id: str, source_profile=None, target_profile=None) -> dict:
+        source_profile = source_profile or BUILTIN_PROFILES["zmpt"]
+        target_profile = target_profile or BUILTIN_PROFILES["novahd"]
+        if not source_profile.get("ptnexus_site") or not target_profile.get("ptnexus_site"):
+            raise AdapterError("站点缺少PTNexus映射，请配置并验证其站点支持")
         if not downloader_id:
             raise AdapterError("请配置 PTNexus 中 NAS 下载器的 ID")
         self.call("POST", "/api/migrate/fetch_and_store", json={
-            "sourceSite": "zmpt", "searchTerm": str(candidate["source_id"]),
+            "sourceSite": source_profile["ptnexus_site"], "searchTerm": str(candidate["source_id"]),
             "torrentName": candidate["title"], "savePath": save_path,
             "downloaderId": downloader_id, "screenshotReviewMode": "background"})
-        result = self.call("GET", "/api/migrate/get_db_seed_info", params={"torrent_id": candidate["source_id"], "site_name": "zmpt"})
+        result = self.call("GET", "/api/migrate/get_db_seed_info", params={"torrent_id": candidate["source_id"], "site_name": source_profile["ptnexus_site"]})
         data = result.get("data")
         if not isinstance(data, dict) or not result.get("task_id"):
             raise AdapterError("PTNexus 发布参数尚未准备完成")
@@ -534,18 +636,17 @@ class PTNexus:
         tag_text = str(data.get("tags", "")) + str(data.get("standardized_params", {}).get("tags", ""))
         if RESTRICTED.search(tag_text):
             raise AdapterError("PTNexus 检测到不可转种标签")
-        return {"task_id": result["task_id"], "upload_data": data, "targetSite": "novahd",
-                "sourceSite": "zmpt", "savePath": save_path, "downloaderId": downloader_id,
+        return {"task_id": result["task_id"], "upload_data": data, "targetSite": target_profile["ptnexus_site"],
+                "sourceSite": source_profile["ptnexus_site"], "savePath": save_path, "downloaderId": downloader_id,
                 "auto_add_to_downloader": False, "auto_update_existing_torrent": False,
                 "auto_add_existing_to_downloader": False, "publish_scene": "multi_torrent"}
 
-    def publish(self, payload: dict) -> str:
+    def publish(self, payload: dict, target_profile=None) -> str:
         # Exactly one external POST. A timeout must be reconciled by the operator.
         result = self.call("POST", "/api/migrate/publish", json=payload)
         if result.get("is_existing_torrent"):
             raise AdapterError("发布时发现目标站已有该资源，请人工核实")
         url = result.get("url", "")
-        safe_url(url, "pt.novahd.top")
-        if not parse_qs(urlsplit(url).query).get("id", [""])[0].isdigit():
+        if not published_url_valid(url, target_profile or BUILTIN_PROFILES["novahd"]):
             raise AdapterError("PTNexus 未返回可确认的目标种子详情链接")
         return url

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "my-tracker",
+  "name": "My Tracker",
+  "base_url": "https://tracker.example.com",
+  "roles": [
+    "source",
+    "target"
+  ],
+  "engine": "nexusphp",
+  "ptnexus_site": null,
+  "official_groups": [],
+  "announce_hosts": [
+    "tracker.example.com"
+  ],
+  "paths": {
+    "listing": "/torrents.php",
+    "detail": "/details.php?id={id}",
+    "download": "/download.php?id={id}",
+    "search": "/torrents.php?search={query}"
+  },
+  "selectors": {
+    "table": "table.torrents, table#torrenttable",
+    "detail_link": "a[href*=\"details.php?id=\"]",
+    "title": "h1, #top, .torrent-title",
+    "description": "#kdescr, #description, .description",
+    "download_link": "a[href*=\"download.php\"]",
+    "tags": ".tag, .tags, .torrent-tag, .label",
+    "peers": "#peercount, #peers, .peers"
+  }
+}

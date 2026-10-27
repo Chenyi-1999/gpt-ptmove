@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
 from .db import Conflict, NotFound, Store, VERSION
@@ -19,13 +20,14 @@ from .models import Checkpoint, Completion, Enqueue, Heartbeat, Lease, Login, Pr
 from .policy import evaluate_candidates
 from .scheduler import tick
 from .security import Sessions
+from .ai import install_machine_api
 
 MAX_PAYLOAD = 4 * 1024 * 1024
 
 
 def create_app(data_dir=None, admin_password=None, secret_key=None, worker_token=None):
     """Inject configuration for isolated tests; production receives secrets via env."""
-    application = FastAPI(title="PTMove", version=VERSION, docs_url=None, redoc_url=None)
+    application = FastAPI(title="PTMove", version=VERSION, docs_url=None, redoc_url=None, openapi_url=None)
     application.state.store = None
     failures = defaultdict(deque)
     config = {
@@ -95,6 +97,15 @@ def create_app(data_dir=None, admin_password=None, secret_key=None, worker_token
     @application.exception_handler(NotFound)
     async def missing(_, exc):
         return JSONResponse({"detail": str(exc)}, status_code=404)
+
+    @application.exception_handler(RequestValidationError)
+    async def invalid_input(_, exc):
+        # Pydantic's default response includes the original password/Cookie input.
+        return JSONResponse({"detail": "输入格式无效，请检查字段类型、范围和JSON Schema"}, status_code=422)
+
+    @application.exception_handler(ValueError)
+    async def invalid_configuration(_, exc):
+        return JSONResponse({"detail": "配置无效，请检查站点、字段类型、范围和JSON Schema"}, status_code=422)
 
     def store():
         initialize()
@@ -254,7 +265,7 @@ def create_app(data_dir=None, admin_password=None, secret_key=None, worker_token
         return {"compose": """name: gpt-ptmove-nas
 services:
   worker:
-    image: ptmove:0.1.1
+    image: ptmove:0.2.0
     build: .
     command: [python, -m, ptmove.worker]
     restart: unless-stopped
@@ -291,7 +302,12 @@ services:
 
     @application.post("/api/worker/claim", dependencies=[Depends(worker)])
     def claim(body: WorkerIdentity, db=Depends(store)):
-        return db.claim(body.worker_id)
+        if body.execution_schema < 2:
+            raise HTTPException(409, "NAS执行端需要升级到0.2.0以支持站点快照")
+        result = db.claim(body.worker_id)
+        if result.get("job"):
+            result["job"]["payload"]["settings"] = db.route_settings(result["job"]["payload"]["route"])
+        return result
 
     @application.post("/api/worker/jobs/{job_id}/renew", dependencies=[Depends(worker)])
     def renew(job_id: int, body: Lease, db=Depends(store)):
@@ -310,6 +326,7 @@ services:
                 raise
             raise HTTPException(422, str(exc)) from None
 
+    install_machine_api(application, store, admin, session)
     static = Path(__file__).parent / "static"
     if static.is_dir():
         application.mount("/", StaticFiles(directory=static, html=True), name="static")

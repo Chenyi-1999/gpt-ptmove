@@ -1,7 +1,7 @@
 name: gpt-ptmove-nas
 services:
   worker:
-    image: ptmove:0.1.1
+    image: ptmove:0.2.0
     build: .
     command: [python, -m, ptmove.worker]
     restart: unless-stopped

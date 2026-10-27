@@ -2,9 +2,9 @@
 from datetime import datetime, timezone
 import math
 import re
-from urllib.parse import urlsplit
 
 from .models import Rule
+from .sites import BUILTIN_PROFILES, same_origin
 
 GIB = 1024 ** 3
 CANDIDATE_FIELDS = {"id", "source_id", "title", "size_bytes", "seeders", "leechers", "official", "category", "detail_url", "download_url", "restricted", "restriction_reason", "permission_verified", "target_exists", "target_work_exists", "info_hash", "release_group", "published_at", "selected", "reason", "rank", "metadata"}
@@ -18,16 +18,9 @@ def _number(value, default=-1):
         return default
 
 
-def _source_url(value):
-    try:
-        parsed = urlsplit(str(value or ""))
-        return parsed.scheme == "https" and parsed.hostname == "zmpt.cc" and parsed.username is None and parsed.port in (None, 443)
-    except ValueError:
-        return False
-
-
-def evaluate_candidates(items, rule):
+def evaluate_candidates(items, rule, source_profile=None):
     rule = Rule.model_validate(rule).model_dump() if not isinstance(rule, Rule) else rule.model_dump()
+    source_profile = source_profile or BUILTIN_PROFILES.get(rule["source_site"])
     evaluated = []
     now = datetime.now(timezone.utc)
     for raw in items[:2000]:
@@ -35,6 +28,9 @@ def evaluate_candidates(items, rule):
             continue
         item = {key: value for key, value in raw.items() if key in CANDIDATE_FIELDS}
         item["metadata"] = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+        item.update(source_site=rule["source_site"], target_site=rule["target_site"])
+        if "route_digest" in raw:
+            item["route_digest"] = raw["route_digest"]
         reasons = []
         size, seeders, leechers = (_number(raw.get(k)) for k in ("size_bytes", "seeders", "leechers"))
         if raw.get("permission_verified") is not True:
@@ -56,7 +52,7 @@ def evaluate_candidates(items, rule):
             reasons.append("仅限官种")
         if rule["official_policy"] == "exclude" and raw.get("official") is not False:
             reasons.append("排除官种")
-        if not _source_url(raw.get("detail_url")) or not _source_url(raw.get("download_url")):
+        if not source_profile or not same_origin(raw.get("detail_url"), source_profile) or not same_origin(raw.get("download_url"), source_profile):
             reasons.append("来源链接不可信或缺失")
         published_at = raw.get("published_at")
         if published_at:

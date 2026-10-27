@@ -2,7 +2,7 @@
   'use strict';
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const state = { csrf: '', dashboard: null, candidates: [], tasks: [], demo: false, timer: null, busy: false };
+  const state = { csrf: '', dashboard: null, candidates: [], tasks: [], sites: [], demo: false, timer: null, busy: false, importProfile: null, importExists: false, newApiToken: '' };
   const apiRoot = '/api';
   const labels = { queued:'排队中', leased:'已领取', downloading:'下载中', preparing:'准备中', publishing:'发布中', published:'已发布', seeding:'做种中', succeeded:'已完成', failed:'失败', needs_review:'需要核查', cancelled:'已取消', movie:'电影', tv:'剧集', other:'其他' };
 
@@ -29,8 +29,9 @@
     const type = response.headers.get('content-type') || '';
     return type.includes('application/json') ? response.json() : response;
   }
-  function expireSession() { state.csrf = ''; clearInterval(state.timer); $('#app-view').hidden = true; $('#login-view').hidden = false; $('#login-password').value = ''; }
-  function enterApp(csrf) { state.csrf = csrf || ''; $('#login-view').hidden = true; $('#app-view').hidden = false; refreshAll(); clearInterval(state.timer); state.timer = setInterval(() => { if (!document.hidden && !state.busy) { refreshDashboard(); refreshTasks(); } }, 30000); }
+  function clearApiToken() { state.newApiToken=''; $('#new-api-key').replaceChildren(); $('#new-api-key').hidden=true; }
+  function expireSession() { state.csrf = ''; clearApiToken(); $('#token-output').replaceChildren(); $('#token-output').hidden=true; $$('#sites-list input').forEach(n => { n.value=''; }); clearInterval(state.timer); $('#app-view').hidden = true; $('#login-view').hidden = false; $('#login-password').value = ''; }
+  function enterApp(csrf) { state.csrf = csrf || ''; $('#login-view').hidden = true; $('#app-view').hidden = false; refreshAll(); loadSites(); clearInterval(state.timer); state.timer = setInterval(() => { if (!document.hidden && !state.busy) { refreshDashboard(); refreshTasks(); } }, 30000); }
 
   async function init() {
     $('#login-view').hidden = false;
@@ -45,21 +46,23 @@
     finally { button.disabled = false; button.textContent = '登录管理台'; }
   });
   $('#logout-button').addEventListener('click', async () => { try { await request(`${apiRoot}/auth/logout`, { method:'POST' }); } catch (_) { /* Session expiry is also a logout. */ } expireSession(); });
+  $('#mobile-logout-button').addEventListener('click', () => $('#logout-button').click());
 
   function goTo(page, options = {}) {
-    const titles = { overview:'总览', candidates:'候选种子', tasks:'转种任务', rules:'自动规则', connections:'连接与执行端' };
+    if (page !== 'ai') clearApiToken();
+    const titles = { overview:'总览', candidates:'候选种子', tasks:'转种任务', rules:'自动规则', connections:'连接与执行端', sites:'站点管理', ai:'AI 接口' };
     $$('.page').forEach(p => { const active = p.id === `page-${page}`; p.classList.toggle('active', active); p.hidden = !active; });
     $$('.nav-item[data-page]').forEach(b => { const active = b.dataset.page === page; b.classList.toggle('active', active); if (active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
     text($('#page-title'), titles[page] || '总览');
-    if (options.load !== false) { if (page === 'candidates') refreshCandidates(); if (page === 'tasks') refreshTasks(); if (page === 'rules') loadRules(); if (page === 'connections') loadSettings(); }
+    if (options.load !== false) { if (page === 'candidates') refreshCandidates(); if (page === 'tasks') refreshTasks(); if (page === 'rules') loadRules(); if (page === 'connections') loadSettings(); if (page === 'sites') loadSites(); if (page === 'ai') refreshAiPage(); }
   }
   $$('.nav-item[data-page]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.page)));
   $$('[data-goto]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.goto)));
   $('#refresh-button').addEventListener('click', refreshAll);
 
-  async function refreshAll() { await Promise.allSettled([refreshDashboard(), refreshTasks()]); }
+  async function refreshAll() { await Promise.allSettled([refreshDashboard(), refreshTasks(), loadRules()]); }
   async function refreshDashboard() {
-    try { const [data, eventData] = await Promise.all([request(`${apiRoot}/dashboard`), request(`${apiRoot}/events`)]); state.dashboard = data; renderDashboard(data); renderEvents(eventData.items || []); text($('#app-version'), `v${data.version || '0.1.1'}`); }
+    try { const [data, eventData] = await Promise.all([request(`${apiRoot}/dashboard`), request(`${apiRoot}/events`)]); state.dashboard = data; renderDashboard(data); renderEvents(eventData.items || []); text($('#app-version'), `v${data.version || '0.2.0'}`); }
     catch (err) { showNotice(safeError(err), true); }
   }
   async function refreshTasks() {
@@ -96,7 +99,7 @@
   function taskRows(items, actions = false) { return items.map(task => {
     const candidate = task.candidate || {}; const title = el('div','title-cell',candidate.title || `任务 ${task.id || ''}`); title.append(el('div','secondary-line',`${task.month || '—'} · ${formatTime(task.created_at)}`));
     const cells = [title,statusNode(task.status),task.message || task.published_url || '—',formatBytes(task.downloaded_bytes || candidate.size_bytes)];
-    if (actions) { const group = el('div'); const canCancel = task.status === 'queued' && task.ever_claimed === false && !task.publish_attempted && !Number(task.downloaded_bytes); const activeStatuses = ['leased','downloading','preparing','publishing','seeding','succeeded']; const canRepair = Boolean(task.published_url) && !activeStatuses.includes(task.status) && task.message !== '等待补种修复'; const canRetry = task.status === 'failed' && !task.published_url && !task.publish_attempted; if (canCancel) group.append(actionButton('取消',async () => { if (confirm('确认取消此任务？只允许取消尚未领取的排队任务。')) await taskAction(task.id,'cancel'); },'button ghost small')); if (canRepair) group.append(actionButton('修复做种',async () => { if (confirm('确认安排已发布内容的补种修复？此操作不会重新发布。')) await taskAction(task.id,'retry'); },'button secondary small')); if (canRetry) group.append(actionButton('安全重试',async () => { if (confirm('确认安全重试此任务？')) await taskAction(task.id,'retry'); },'button secondary small')); if (task.status === 'needs_review' && !task.published_url && task.publish_attempted) group.append(actionButton('确认已发布链接',async () => await reconcileTask(task),'button secondary small')); if (task.status === 'needs_review' || task.publish_attempted && !task.published_url) group.append(el('span','subtle-label','请核对 NovaHD 发布结果')); cells.push(group); }
+    if (actions) { const group = el('div'); const canCancel = task.status === 'queued' && task.ever_claimed === false && !task.publish_attempted && !Number(task.downloaded_bytes); const activeStatuses = ['leased','downloading','preparing','publishing','seeding','succeeded']; const canRepair = Boolean(task.published_url) && !activeStatuses.includes(task.status) && task.message !== '等待补种修复'; const canRetry = task.status === 'failed' && !task.published_url && !task.publish_attempted; if (canCancel) group.append(actionButton('取消',async () => { if (confirm('确认取消此任务？只允许取消尚未领取的排队任务。')) await taskAction(task.id,'cancel'); },'button ghost small')); if (canRepair) group.append(actionButton('修复做种',async () => { if (confirm('确认安排已发布内容的补种修复？此操作不会重新发布。')) await taskAction(task.id,'retry'); },'button secondary small')); if (canRetry) group.append(actionButton('安全重试',async () => { if (confirm('确认安全重试此任务？')) await taskAction(task.id,'retry'); },'button secondary small')); if (task.status === 'needs_review' && !task.published_url && task.publish_attempted) group.append(actionButton('确认已发布链接',async () => await reconcileTask(task),'button secondary small')); if (task.status === 'needs_review' || task.publish_attempted && !task.published_url) group.append(el('span','subtle-label','请核对目标站发布结果')); cells.push(group); }
     return cells;
   }); }
   function actionButton(label, fn, cls) { const b = el('button',cls,label); b.type='button'; b.addEventListener('click',fn); return b; }
@@ -107,7 +110,7 @@
   function renderRecentTasks(items) { $('#recent-tasks').replaceChildren(table(['候选项目','状态','进度与结果','已下载'],taskRows(items),'暂无任务','任务创建后会显示在这里。')); }
   $('#tasks-refresh').addEventListener('click',refreshTasks); $('#task-filter').addEventListener('change',() => renderTasks(state.tasks));
   async function taskAction(id, action) { try { await request(`${apiRoot}/tasks/${encodeURIComponent(id)}/${action}`,{method:'POST',body:'{}'}); showNotice(action === 'cancel' ? '已提交取消请求。' : action === 'retry' ? '已提交安全任务处理请求。' : '任务已处理。'); await refreshTasks(); } catch (err) { showNotice(safeError(err),true); } }
-  async function reconcileTask(task) { const url = prompt('请粘贴你已在 NovaHD 核实的详情页链接。确认后只会安排补种修复，不会重新发布。'); if (!url) return; if (!confirm('确认此链接对应 NovaHD 上已发布的同一资源？')) return; try { await request(`${apiRoot}/tasks/${encodeURIComponent(task.id)}/reconcile`,{method:'POST',body:JSON.stringify({published_url:url.trim()})}); showNotice('已确认发布链接，并安排补种修复；不会重复发布。'); await refreshTasks(); } catch (_) { showNotice('链接无效或任务状态已变化。请核对 NovaHD 链接和任务状态后重试。',true); } }
+  async function reconcileTask(task) { const targetName = task.route?.target?.name || siteName(task.candidate?.target_site) || '目标站'; const url = prompt(`请粘贴你已在 ${targetName} 核实的详情页链接。确认后只会安排补种修复，不会重新发布。`); if (!url) return; if (!confirm(`确认此链接对应 ${targetName} 上已发布的同一资源？`)) return; try { await request(`${apiRoot}/tasks/${encodeURIComponent(task.id)}/reconcile`,{method:'POST',body:JSON.stringify({published_url:url.trim()})}); showNotice('已确认发布链接，并安排补种修复；不会重复发布。'); await refreshTasks(); } catch (_) { showNotice(`链接无效或任务状态已变化。请核对 ${targetName} 链接和任务状态后重试。`,true); } }
 
   async function refreshCandidates() {
     try { const data = await request(`${apiRoot}/candidates`); state.candidates = data.items || []; state.demo = false; $('#demo-label').hidden = true; text($('#candidate-summary'),`${data.total ?? state.candidates.length} 个候选项 · 仅手动选择后提交`); renderCandidates(); }
@@ -120,7 +123,7 @@
     else {
       const rows = state.candidates.map(c => {
         const check = document.createElement('input'); check.type='checkbox'; check.className='candidate-check'; check.setAttribute('aria-label',`选择 ${c.title || '未命名候选项'}`); check.disabled = state.demo || !canSelect(c); check.checked = false; check.dataset.id = c.id; check.addEventListener('change',updateSelectedCount);
-        const title = el('div','title-cell',c.title || '未命名'); title.append(el('div','secondary-line',c.release_group || c.source_id || '织梦候选'));
+        const title = el('div','title-cell',c.title || '未命名'); title.append(el('div','secondary-line',c.release_group || c.source_id || `${siteName($('#rules-form').elements.namedItem('source_site')?.value) || '来源站'}候选`));
         const reason = c.reason || (c.restricted ? c.restriction_reason || '受限内容' : c.permission_verified !== true ? '转种权限未知' : c.target_exists !== false || c.target_work_exists !== false ? '目标重复检查未通过' : '符合初步规则');
         const verdict = el('div'); verdict.append(el('span',`status-text ${canSelect(c) ? 'succeeded' : 'needs_review'}`,canSelect(c) ? '可选择' : '已阻止'),el('div','secondary-line',reason));
         return [check,title,formatBytes(c.size_bytes),`↑ ${c.seeders ?? 0} · ↓ ${c.leechers ?? 0}`,statusLabel(c.category),verdict];
@@ -136,13 +139,13 @@
   $('#transfer-selected').addEventListener('click',async () => { const selected = $$('.candidate-check:checked').map(c => c.dataset.id).filter(Boolean); const ids = selected.map(id => { const candidate = state.candidates.find(item => String(item.id) === id); return candidate ? candidate.id : id; }); if (!ids.length || state.demo) return; if (!confirm(`确认提交所选 ${ids.length} 项？控制器将再次检查权限、重复项与月度额度。`)) return; state.busy = true; $('#transfer-selected').disabled = true; try { const result = await request(`${apiRoot}/tasks`,{method:'POST',body:JSON.stringify({candidate_ids:ids})}); showNotice(`已提交 ${Number(result.queued || (result.items || []).length)} 项，跳过 ${Array.isArray(result.skipped) ? result.skipped.length : 0} 项。`); await Promise.all([refreshCandidates(),refreshTasks(),refreshDashboard()]); } catch (err) { showNotice(safeError(err),true); } finally { state.busy = false; updateSelectedCount(); } });
 
   async function loadRules() {
-    try { const rule = await request(`${apiRoot}/rules`); const form = $('#rules-form'); for (const [key,value] of Object.entries(rule)) { const field = form.elements.namedItem(key); if (!field) continue; if (key === 'categories') $$('input[name="categories"]',form).forEach(c => c.checked = (value || []).includes(c.value)); else if (field.type === 'checkbox') field.checked = Boolean(value); else if (field.type !== 'fieldset') field.value = value; }
-      const chip = $('#rule-state'); chip.className = `status-chip ${rule.enabled ? 'ok' : 'neutral'}`; text(chip,rule.enabled ? '计划已启用' : '计划已关闭');
+    try { await loadSites(); const rule = await request(`${apiRoot}/rules`); const form = $('#rules-form'); for (const [key,value] of Object.entries(rule)) { const field = form.elements.namedItem(key); if (!field) continue; if (key === 'categories') $$('input[name="categories"]',form).forEach(c => c.checked = (value || []).includes(c.value)); else if (field.type === 'checkbox') field.checked = Boolean(value); else if (field.type !== 'fieldset') field.value = value; }
+      const chip = $('#rule-state'); chip.className = `status-chip ${rule.enabled ? 'ok' : 'neutral'}`; text(chip,rule.enabled ? '计划已启用' : '计划已关闭'); updateRouteLabels();
     } catch (err) { showNotice(safeError(err),true); }
   }
   $('#rules-form').addEventListener('submit',async event => {
     event.preventDefault(); const form = event.currentTarget; const fd = new FormData(form); const body = {};
-    for (const key of ['enabled','day','hour','minute','monthly_limit','monthly_budget_gib','candidate_limit','min_seeders','min_leechers','source_max_age_days','min_size_gib','max_size_gib','publish_interval_seconds','max_download_hours','max_run_hours','official_policy']) { const field = form.elements.namedItem(key); if (!field) continue; body[key] = field.type === 'checkbox' ? field.checked : field.type === 'number' ? Number(fd.get(key)) : fd.get(key); }
+    for (const key of ['source_site','target_site','enabled','day','hour','minute','monthly_limit','monthly_budget_gib','candidate_limit','min_seeders','min_leechers','source_max_age_days','min_size_gib','max_size_gib','publish_interval_seconds','max_download_hours','max_run_hours','official_policy']) { const field = form.elements.namedItem(key); if (!field) continue; body[key] = field.type === 'checkbox' ? field.checked : field.type === 'number' ? Number(fd.get(key)) : fd.get(key); }
     body.categories = fd.getAll('categories');
     if (!body.categories.length) { text($('#rules-message'),'至少选择一个候选分类。'); return; }
     if (body.min_size_gib > body.max_size_gib) { text($('#rules-message'),'最大种子大小必须大于或等于最小值。'); form.elements.namedItem('max_size_gib').focus(); return; }
@@ -169,6 +172,140 @@
   });
   $('#compose-button').addEventListener('click',async () => { try { const data = await request(`${apiRoot}/worker-compose`); const blob = new Blob([data.compose || ''],{type:'text/yaml;charset=utf-8'}); const url = URL.createObjectURL(blob); const a = el('a'); a.href=url; a.download='ptmove-worker-compose.yml'; document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); showNotice('Compose 文件已下载；它不包含执行端令牌。'); } catch (err) { showNotice(safeError(err),true); } });
   $('#token-button').addEventListener('click',async () => { if (!confirm('显示当前已配置的执行端令牌？屏幕上将暂时显示令牌，请避免共享或截图。')) return; try { const data = await request(`${apiRoot}/worker-token`,{method:'POST',body:'{}'}); const box=$('#token-output'); box.replaceChildren(el('strong','','当前执行端令牌：'),el('div','',data.token || '控制器未返回令牌')); const copy=actionButton('复制令牌',async () => { try { await navigator.clipboard.writeText(data.token); copy.textContent='已复制'; } catch (_) { showNotice('无法访问剪贴板，请手动复制令牌。',true); } },'button secondary small'); box.append(copy); box.hidden=false; } catch (err) { showNotice(safeError(err),true); } });
+
+  function siteId(site) { return String(site.id ?? site.site_id ?? ''); }
+  function siteName(id) { const site = state.sites.find(item => siteId(item) === String(id)); return site ? String(site.name || siteNameFromUrl(site.base_url) || siteId(site)) : ''; }
+  function siteNameFromUrl(value) { try { return new URL(value).hostname; } catch (_) { return ''; } }
+  function updateRouteLabels() {
+    const source = $('#rules-form').elements.namedItem('source_site')?.value;
+    const target = $('#rules-form').elements.namedItem('target_site')?.value;
+    const sourceName = siteName(source) || '来源站'; const targetName = siteName(target) || '目标站';
+    ['sidebar-source-site','overview-source-site'].forEach(id => text($(`#${id}`),sourceName));
+    ['sidebar-target-site','overview-target-site'].forEach(id => text($(`#${id}`),targetName));
+    text($('#footer-route'),`${sourceName} → ${targetName} · 控制器与 NAS 执行端分离运行`);
+    text($('#legacy-source-cookie-label'),'默认织梦 Cookie'); text($('#legacy-clear-source-cookie'),'默认织梦 Cookie'); text($('#legacy-source-rss-label'),'默认织梦 RSS 地址');
+    text($('#legacy-target-cookie-label'),'默认 NovaHD Cookie'); text($('#legacy-clear-target-cookie'),'默认 NovaHD Cookie');
+  }
+  function fillSiteSelects(sourceValue, targetValue) {
+    for (const [fieldName, selected] of [['source_site',sourceValue],['target_site',targetValue]]) {
+      const select = $('#rules-form').elements.namedItem(fieldName); const previous = selected ?? select.value; select.replaceChildren();
+      state.sites.filter(site => (site.roles || []).includes(fieldName === 'source_site' ? 'source' : 'target')).forEach(site => { const option = el('option','',site.name || siteId(site)); option.value = siteId(site); select.append(option); });
+      if (previous && !state.sites.some(site => siteId(site) === String(previous))) { const option = el('option','',String(previous)); option.value=String(previous); select.append(option); }
+      if (previous) select.value = String(previous);
+    }
+    updateRouteLabels();
+  }
+  ['source_site','target_site'].forEach(name => $('#rules-form').elements.namedItem(name).addEventListener('change',updateRouteLabels));
+  async function loadSites() {
+    const list = $('#sites-list');
+    try {
+      const data = await request(`${apiRoot}/sites`); state.sites = Array.isArray(data.items) ? data.items : [];
+      const source = $('#rules-form').elements.namedItem('source_site').value || 'zmpt'; const target = $('#rules-form').elements.namedItem('target_site').value || 'novahd';
+      fillSiteSelects(source,target); renderSites(); text($('#sites-summary'),`${state.sites.length} 个站点配置`);
+    } catch (err) { state.sites=[]; fillSiteSelects('', ''); list.replaceChildren(el('div','table-empty',safeError(err))); text($('#sites-summary'),'站点列表读取失败'); }
+  }
+  function renderSites() {
+    const list=$('#sites-list'); list.replaceChildren();
+    if (!state.sites.length) { list.append(el('div','table-empty','尚未配置站点')); return; }
+    state.sites.forEach(site => {
+      const id=siteId(site); const card=el('article','site-card'); const head=el('div','site-card-heading'); const names=el('div');
+      names.append(el('h3','',site.name || id || '未命名站点'),el('p','muted',`${id} · ${site.base_url || site.url || '未提供站点地址'}`));
+      const flags=[]; if (site.builtin) flags.push('内置'); if (site.configured_secrets?.cookie) flags.push('Cookie 已配置'); if (site.configured_secrets?.rss_url) flags.push('RSS 已配置');
+      head.append(names,el('span','status-chip warn','声明配置，待实际验证')); card.append(head);
+      const mapping=site.mapping || site.ptnexus || {}; const details=el('div','site-metadata');
+      details.append(el('span','status-text',`引擎：${site.engine || site.adapter || 'NexusPHP'}`),el('span','status-text',`PTNexus：${site.ptnexus_site || mapping.site_id || mapping.site || site.ptnexus_site_id || '未映射'}`),el('span','subtle-label',flags.join(' · ') || '未配置站点凭据'));
+      card.append(details);
+      const actions=el('div','worker-actions site-card-actions');
+      actions.append(actionButton('导出公开配置',() => exportSite(id),'button secondary small'));
+      actions.append(actionButton('配置凭据',() => toggleCredentialEditor(card,site),'button ghost small'));
+      card.append(actions); list.append(card);
+    });
+  }
+  function toggleCredentialEditor(card,site) {
+    const current=$('.site-credential-form',card); if (current) { current.remove(); return; }
+    const id=siteId(site); const form=el('form','site-credential-form'); const grid=el('div','form-grid');
+    for (const [key,label,type] of [['cookie','站点 Cookie','password'],['rss_url','RSS 地址','url']]) {
+      const wrap=el('label','',label); const input=document.createElement('input'); input.name=key; input.type=type; input.autocomplete='off'; input.placeholder='留空保持不变'; wrap.append(input); grid.append(wrap);
+    }
+    const clearWrap=el('label','checks'); const clear=document.createElement('input'); clear.type='checkbox'; clear.name='clear_credentials'; clearWrap.append(clear,document.createTextNode('明确清除已保存的 Cookie 与 RSS 地址')); grid.append(clearWrap);
+    const footer=el('div','form-footer'); const msg=el('span','muted','凭据仅保存到该站点的凭据配置。'); const submit=document.createElement('button'); submit.className='button primary'; submit.type='submit'; submit.textContent='保存凭据'; footer.append(msg,submit); form.append(grid,footer);
+    form.addEventListener('submit',async event => {
+      event.preventDefault(); const body={}; const cookie=inputValue(form,'cookie'); const rss=inputValue(form,'rss_url');
+      if (clear.checked) { body.cookie=''; body.rss_url=''; } else { if (cookie) body.cookie=cookie; if (rss) body.rss_url=rss; }
+      submit.disabled=true;
+      try { await request(`${apiRoot}/sites/${encodeURIComponent(id)}/credentials`,{method:'PUT',body:JSON.stringify(body)}); showNotice('站点凭据已保存。'); await loadSites(); }
+      catch(err) { text(msg,safeError(err)); showNotice(safeError(err),true); submit.disabled=false; }
+    });
+    card.append(form);
+  }
+  function inputValue(root,name) { return root.elements.namedItem(name)?.value?.trim() || ''; }
+  async function exportSite(id) {
+    try { const data=await request(`${apiRoot}/sites/${encodeURIComponent(id)}/export`); downloadJson(data,`${id}-site.json`); }
+    catch(err) { showNotice(safeError(err),true); }
+  }
+  function downloadJson(data,filename) {
+    const blob=new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=el('a'); a.href=url; a.download=filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url),1000);
+  }
+  async function loadJsonEndpoint(path,filename) { try { const data=await request(`${apiRoot}${path}`); downloadJson(data,filename); } catch(err) { showNotice(safeError(err),true); } }
+  $('#sites-refresh').addEventListener('click',loadSites);
+  $('#site-schema-button').addEventListener('click',() => loadJsonEndpoint('/sites/schema','ptmove-site.schema.json'));
+  $('#site-template-button').addEventListener('click',() => loadJsonEndpoint('/sites/template','ptmove-site.template.json'));
+  $('#site-file').addEventListener('change',() => { state.importProfile=null; state.importExists=false; $('#site-import-button').disabled=true; $('#site-preview').hidden=true; });
+  $('#site-preview-button').addEventListener('click',async () => {
+    const file=$('#site-file').files?.[0]; state.importProfile=null; $('#site-import-button').disabled=true;
+    if (!file) { showNotice('请先选择站点 JSON 文件。',true); return; }
+    if (file.size>65536) { showNotice('JSON 文件不能超过 64 KiB。',true); return; }
+    try {
+      const profile=JSON.parse(await file.text()); if (!profile || Array.isArray(profile) || typeof profile!=='object') throw new Error('JSON 顶层必须是站点配置对象。');
+      const result=await request(`${apiRoot}/sites/preview`,{method:'POST',body:JSON.stringify(profile)}); state.importProfile=profile; state.importExists=Boolean(result.exists);
+      const preview=$('#site-preview'); preview.replaceChildren(el('strong','',result.exists ? '该站点 ID 已存在。' : '可以新增此站点。'),el('pre','',JSON.stringify(result,null,2)));
+      preview.hidden=false; $('#site-import-button').disabled=false;
+      text($('#site-import-button'),result.exists ? ($('#site-update-existing').checked ? '确认更新站点' : '只读冲突，需要选择允许更新') : '确认导入'); showNotice('站点配置预览完成，尚未保存。');
+    } catch(err) { showNotice(safeError(err),true); $('#site-preview').hidden=true; }
+  });
+  $('#site-update-existing').addEventListener('change',() => { if (state.importProfile) text($('#site-import-button'),state.importExists ? ($('#site-update-existing').checked ? '确认更新站点' : '只读冲突，需要选择允许更新') : '确认导入'); });
+  $('#site-import-button').addEventListener('click',async () => {
+    if (!state.importProfile) return;
+    if (state.importExists && !$('#site-update-existing').checked) { showNotice('该站点 ID 已存在；如确需覆盖，请勾选“允许更新同 ID 站点”后重新确认。',true); return; }
+    if (!confirm(state.importExists ? '确认使用该 JSON 更新现有站点配置？' : '确认导入该站点配置？')) return;
+    const button=$('#site-import-button'); button.disabled=true;
+    try { await request(`${apiRoot}/sites/import`,{method:'POST',body:JSON.stringify({profile:state.importProfile,update:$('#site-update-existing').checked})}); state.importProfile=null; $('#site-file').value=''; $('#site-preview').hidden=true; showNotice('站点配置已导入。'); await loadSites(); }
+    catch(err) { showNotice(safeError(err),true); button.disabled=false; }
+  });
+  function renderApiKeys(items) {
+    const host=$('#api-keys-list'); host.replaceChildren(); text($('#api-keys-summary'),`${items.length} 个密钥记录`);
+    if (!items.length) { host.append(el('div','table-empty','尚未签发 API 密钥')); return; }
+    const rows=items.map(item => {
+      const meta=el('div','key-meta'); meta.append(el('strong','',item.name || item.id),el('div','secondary-line',`权限：${Array.isArray(item.scopes) ? item.scopes.join(', ') : '—'} · 前缀：${item.prefix || '—'}`),el('div','secondary-line',`创建 ${formatTime(item.created_at)} · 到期 ${formatTime(item.expires_at)} · 最近使用 ${formatTime(item.last_used_at)}`));
+      if (item.revoked_at) meta.append(el('span','status-text failed',`已撤销 · ${formatTime(item.revoked_at)}`));
+      const action=item.revoked_at ? el('span','subtle-label','不可用') : actionButton('撤销',async () => { if (!confirm(`确定撤销“${item.name || item.id}”这个 API 密钥？已分发的 Token 将立即失效。`)) return; try { await request(`${apiRoot}/api-keys/${encodeURIComponent(item.id)}`,{method:'DELETE'}); showNotice('API 密钥已撤销。'); await loadApiKeys(); } catch(err) { showNotice(safeError(err),true); } },'button ghost small');
+      return [meta,action];
+    }); host.append(table(['密钥','操作'],rows,'',''));
+  }
+  async function loadApiKeys() { try { const data=await request(`${apiRoot}/api-keys`); renderApiKeys(data.items || []); } catch(err) { $('#api-keys-list').replaceChildren(el('div','table-empty',safeError(err))); text($('#api-keys-summary'),'读取失败'); } }
+  $('#api-key-form').addEventListener('submit',async event => {
+    event.preventDefault(); const form=event.currentTarget; const scopes=['read','write','publish'].filter(scope => form.elements.namedItem(`scope_${scope}`).checked);
+    if (!scopes.length) { text($('#api-key-message'),'至少选择一个权限。'); return; }
+    const submit=$('button[type="submit"]',form); submit.disabled=true; text($('#api-key-message'),'正在创建密钥…');
+    try { const result=await request(`${apiRoot}/api-keys`,{method:'POST',body:JSON.stringify({name:inputValue(form,'name'),scopes,expires_days:Number(inputValue(form,'expires_days'))})}); showNewApiToken(result.token); text($('#api-key-message'),'密钥已创建；完整 Token 只显示这一次。'); form.elements.namedItem('name').value=''; await loadApiKeys(); }
+    catch(err) { text($('#api-key-message'),safeError(err)); showNotice(safeError(err),true); }
+    finally { submit.disabled=false; }
+  });
+  function showNewApiToken(token) {
+    state.newApiToken=String(token || ''); const box=$('#new-api-key'); box.replaceChildren(el('strong','', '请立即保存此 Token；离开页面后无法再次查看。'));
+    const input=document.createElement('textarea'); input.className='secret-token'; input.readOnly=true; input.value=state.newApiToken; input.setAttribute('aria-label','新创建的 API Token'); input.addEventListener('focus',() => input.select()); box.append(input);
+    const copy=actionButton('复制 Token',async () => { try { await navigator.clipboard.writeText(state.newApiToken); copy.textContent='已复制'; } catch(_) { input.focus(); input.select(); showNotice('无法访问剪贴板，Token 已选中，可手动复制。',true); } },'button secondary small');
+    const hide=actionButton('隐藏并清除',() => { state.newApiToken=''; input.value=''; box.hidden=true; },'button ghost small'); box.append(copy,hide); box.hidden=false; input.focus(); input.select();
+  }
+  async function loadAiGuide() {
+    try { const data=await request(`${apiRoot}/ai-guide`); $('#ai-guide-text').value=[data.base_url ? `API Base URL: ${data.base_url}` : '',String(data.text || '')].filter(Boolean).join('\n\n'); $('#ai-guide-text').dataset.openapi=data.openapi_url || '/api/v1/openapi.json'; }
+    catch(err) { $('#ai-guide-text').value=safeError(err); }
+  }
+  async function downloadOpenApi() { try { const data=await request($('#ai-guide-text').dataset.openapi || '/api/v1/openapi.json'); downloadJson(data,'ptmove-openapi.json'); } catch(err) { showNotice(safeError(err),true); } }
+  async function refreshAiPage() { await Promise.allSettled([loadApiKeys(),loadAiGuide()]); }
+  $('#ai-refresh').addEventListener('click',refreshAiPage); $('#ai-guide-refresh').addEventListener('click',loadAiGuide);
+  $('#ai-guide-copy').addEventListener('click',async () => { const guide=$('#ai-guide-text'); try { await navigator.clipboard.writeText(guide.value); showNotice('API 使用说明已复制。'); } catch(_) { guide.focus(); guide.select(); showNotice('无法访问剪贴板，使用说明已选中，可手动复制。',true); } });
+  $('#ai-openapi-download').addEventListener('click',downloadOpenApi);
 
   init();
 })();

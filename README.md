@@ -1,8 +1,11 @@
 # PTMove
 
-织梦（zmpt.cc）→ NovaHD（pt.novahd.top）的月度自动转种控制台。独立实现调度、筛选、配额、任务恢复和 NAS 执行端，通过 HTTP API 调用 PTNexus 进行站点发布；未复制或重新分发 PTNexus 源码。
+支持通过JSON扩展NexusPHP站点的月度自动转种控制台，内置织梦（zmpt.cc）→ NovaHD（pt.novahd.top）。独立实现调度、筛选、配额、任务恢复和 NAS 执行端，通过 HTTP API 调用 PTNexus 进行站点发布；未复制或重新分发 PTNexus 源码。
 
-## v0.1.1 功能
+## v0.2.0 功能
+
+- [站点JSON导入](docs/SITE_PROFILES.md)：模板、Schema、预览、独立凭据和规则选择；旧任务冻结路线，旧库保留ID、额度与发布证据迁移。
+- [AI REST API](docs/AI_API.md)：独立可撤销密钥、read/write/publish权限、到期时间、事务幂等命令与OpenAPI。
 
 - 中文管理页面：规则、候选、批量入队、任务、事件和连接配置。
 - 默认每月 1 日 02:00（北京时间），最多 6 个、单个 1–10 GiB、预算 60 GiB，做种人数 ≥3，优先 NovaHD 缺少的作品，其次缺少的版本，同级优先官种。
@@ -34,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1 -ShowPasswor
 
 见 [NAS_SETUP.md](docs/NAS_SETUP.md)。控制台已部署不等于 NAS 已接入：需要 qB 地址/账号、两站 Cookie、NAS 上的 PTNexus URL/账号与对应下载器 ID，并保证 PTNexus 可访问实际媒体路径。只给 qB API 不能让另一个容器直接读取媒体文件。
 
-候选转载限制和页面结构检查失败时跳过；验证码、登录失效、查重未知或发布结果不明时需要人工处理。官种识别使用站点标记和已知织梦组后缀（ZmWeb/ZmAudio/ZmPT），最终仍以站点标记和转载规则为准。当前只实现这两个站的常见 NexusPHP 页面结构；真实账号页面变化需要联调适配。
+候选转载限制和页面结构检查失败时跳过；验证码、登录失效、查重未知或发布结果不明时需要人工处理。官种识别使用站点标记和已知织梦组后缀（ZmWeb/ZmAudio/ZmPT），最终仍以站点标记和转载规则为准。支持配置常见NexusPHP页面的路径、选择器、官组、Tracker域名和PTNexus映射。JSON导入只验证格式；真实页面和PTNexus站点支持仍需要联调。
 
 ## 验证
 
@@ -42,8 +45,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\open-console.ps1 -ShowPasswor
 python -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
-docker build --target test -t ptmove-test:0.1.1 .
-docker run --rm --network none ptmove-test:0.1.1
+docker build --target test -t ptmove-test:0.2.0 .
+docker run --rm --network none ptmove-test:0.2.0
 ```
 
 测试覆盖配额并发、跨月、租约、发布不确定性、发布后修复、全部文件完成、qB 版本接口和鉴权。模拟适配器测试不代表已经在真实站点发种；实际验证状态见 [VALIDATION.md](docs/VALIDATION.md)。

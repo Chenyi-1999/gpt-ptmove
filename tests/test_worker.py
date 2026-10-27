@@ -79,7 +79,7 @@ def execution(tmp_path, monkeypatch):
 
     class Tracker:
         def __init__(self, base, cookie):
-            self.base = base
+            self.base = base["base_url"] if isinstance(base, dict) else base
         def close(self):
             pass
         def inspect(self, item):
@@ -100,7 +100,7 @@ def execution(tmp_path, monkeypatch):
             return {"hash": info_hash, "progress": 1, "amount_left": 0, "state": "stalledUP", "save_path": "/media", "downloaded": 2 * 1024 ** 3}
         def add(self, raw, path):
             return torrent_metadata(raw)["hash"]
-        def add_target(self, raw, path):
+        def add_target(self, raw, path, profile=None):
             calls["add_target"] += 1
             if calls["fail_seed"]:
                 raise AdapterError("模拟目标下载器不可用")
@@ -123,7 +123,7 @@ def execution(tmp_path, monkeypatch):
             pass
         def prepare(self, *args):
             return {"task_id": "engine-ctx"}
-        def publish(self, payload):
+        def publish(self, payload, profile=None):
             calls["publish"] += 1
             if calls["fail_publish"]:
                 raise AdapterError("模拟发布超时")

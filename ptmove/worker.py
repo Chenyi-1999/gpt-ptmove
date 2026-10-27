@@ -21,7 +21,9 @@ import httpx
 
 from ptmove import __version__
 from ptmove.adapters import (AdapterError, PTNexus, QBittorrent, SOURCE, TARGET,
-                            Tracker, resolve_safe, safe_url, same_payload, torrent_metadata)
+                            PinnedTransport, Tracker, resolve_safe, safe_url, same_payload, torrent_metadata,
+                            verify_torrent_networks)
+from ptmove.sites import BUILTIN_PROFILES, profile_url
 
 log = logging.getLogger("ptmove.worker")
 
@@ -43,7 +45,7 @@ class Controller:
         self.worker_id = worker_id
         self.resolve = client is None
         self.url = url
-        self.client = client or httpx.Client(base_url=url.rstrip("/"), timeout=45, trust_env=False, transport=httpx.HTTPTransport(retries=2, trust_env=False),
+        self.client = client or httpx.Client(base_url=url.rstrip("/"), timeout=45, trust_env=False, transport=PinnedTransport(retries=2, trust_env=False),
                                              headers={"Authorization": "Bearer " + token})
 
     def call(self, method: str, path: str, **kwargs):
@@ -60,10 +62,10 @@ class Controller:
 
     def heartbeat(self):
         return self.call("POST", "/api/worker/heartbeat", json={"worker_id": self.worker_id,
-                         "version": __version__, "capabilities": {"qbittorrent": "4.1+/5.x", "ptnexus": True, "source": "zmpt", "target": "novahd"}})
+                         "version": __version__, "capabilities": {"qbittorrent": "4.1+/5.x", "ptnexus": True, "execution_schema": 2, "engine": "nexusphp"}})
 
     def claim(self):
-        return self.call("POST", "/api/worker/claim", json={"worker_id": self.worker_id}).get("job")
+        return self.call("POST", "/api/worker/claim", json={"worker_id": self.worker_id, "execution_schema": 2}).get("job")
 
     def config(self):
         return self.call("GET", "/api/worker/config")
@@ -160,7 +162,8 @@ class Executor:
     def scan(self, job: dict, settings: dict, keeper: LeaseKeeper):
         self.require(settings, "source_cookie", "target_cookie")
         rule = job["payload"]["rule"]
-        source, target = Tracker(SOURCE, settings["source_cookie"]), Tracker(TARGET, settings["target_cookie"])
+        route = job["payload"]["route"]
+        source, target = Tracker(route["source"], settings["source_cookie"]), Tracker(route["target"], settings["target_cookie"])
         try:
             items = source.candidates(settings.get("source_rss_url", ""), rule["candidate_limit"])
             results = []
@@ -169,7 +172,7 @@ class Executor:
                 try:
                     current = source.inspect(candidate)
                     current["target_exists"], current["target_work_exists"] = target.duplicates(current)
-                    current["download_url"] = f"{SOURCE}/download.php?id={current['source_id']}"
+                    current["download_url"] = profile_url(route["source"], "download", id=current["source_id"])
                     results.append(current)
                 except AdapterError as exc:
                     results.append({**candidate, "permission_verified": False, "restriction_reason": str(exc)})
@@ -211,6 +214,7 @@ class Executor:
     def transfer(self, job: dict, settings: dict, keeper: LeaseKeeper):
         payload = job["payload"]
         task, candidate, rule = payload["task"], payload["candidate"], payload["rule"]
+        route = payload["route"]
         task_id = str(task["id"])
         state = self.journal.load(task_id)
         url = state.get("published_url") or task.get("published_url") or ""
@@ -222,9 +226,11 @@ class Executor:
         if not str(settings.get("qb_api_key", "")).strip():
             self.require(settings, "qb_username", "qb_password")
         if not repair:
+            if not all(route[key].get("ptnexus_site") and route[key].get("announce_hosts") for key in ("source", "target")):
+                raise AdapterError("站点缺少PTNexus映射或Tracker域名，已在下载前停止")
             self.require(settings, "ptnexus_url", "ptnexus_password", "ptnexus_downloader_id")
-        source = Tracker(SOURCE, settings["source_cookie"])
-        target = Tracker(TARGET, settings["target_cookie"])
+        source = Tracker(route["source"], settings["source_cookie"])
+        target = Tracker(route["target"], settings["target_cookie"])
         qb = QBittorrent(settings["qb_url"], settings.get("qb_username", ""), settings.get("qb_password", ""),
                          api_key=settings.get("qb_api_key") or None)
         engine = None
@@ -237,11 +243,12 @@ class Executor:
                 current = source.inspect(candidate)
                 current["target_exists"], current["target_work_exists"] = target.duplicates(current)
                 from ptmove.policy import evaluate_candidates
-                evaluated = evaluate_candidates([current], rule)[0]
+                evaluated = evaluate_candidates([current], rule, route["source"])[0]
                 if not evaluated.get("selected"):
                     raise AdapterError("下载前复查未通过：" + evaluated.get("reason", "信息不确定"))
                 candidate = current
                 raw = source.torrent(candidate)
+                verify_torrent_networks(raw, route["source"])
                 meta = torrent_metadata(raw)
                 if meta["size_bytes"] > int(task.get("reserved_bytes", candidate["size_bytes"])):
                     raise AdapterError("实际种子体积超过预留下载预算，需重新选种")
@@ -261,13 +268,13 @@ class Executor:
                 save_path = info.get("save_path") or settings["qb_save_path"]
                 self.checkpoint(job, keeper, "preparing", "资源下载完成，正在准备媒体信息和发布资料", source_hash=source_hash,
                                 downloaded_bytes=min(meta["size_bytes"], int(info.get("downloaded", meta["size_bytes"]))))
-                prepared = engine.prepare(candidate, save_path, settings["ptnexus_downloader_id"])
+                prepared = engine.prepare(candidate, save_path, settings["ptnexus_downloader_id"], route["source"], route["target"])
                 # Wait throttle BEFORE final duplicate/restriction checks.
                 stamp = self._interval(rule, keeper)
                 candidate = source.inspect(candidate)
                 exists, work_exists = target.duplicates(candidate)
                 candidate.update(target_exists=exists, target_work_exists=work_exists)
-                if not evaluate_candidates([candidate], rule)[0].get("selected"):
+                if not evaluate_candidates([candidate], rule, route["source"])[0].get("selected"):
                     raise AdapterError("发布前复查未通过，已停止发布")
                 # Both checkpoints must succeed before a single external upload POST.
                 self.checkpoint(job, keeper, "publishing", "已记录发布意图，提交一次发布请求", publish_attempted=True)
@@ -275,7 +282,7 @@ class Executor:
                 self.journal.save(task_id, state)
                 stamp.write_text(str(time.time()), "ascii")
                 keeper.check()
-                url = engine.publish(prepared)
+                url = engine.publish(prepared, route["target"])
                 state["published_url"] = url
                 self.journal.save(task_id, state)
                 self.checkpoint(job, keeper, "published", "目标站已确认发布，开始添加目标种子", published_url=url)
@@ -291,11 +298,12 @@ class Executor:
                 save_path = info.get("save_path") or settings["qb_save_path"]
                 qb.verify_files(source_hash, meta)
             target_raw = target.torrent(url)
+            verify_torrent_networks(target_raw, route["target"])
             target_meta = torrent_metadata(target_raw)
             if not same_payload(meta, target_meta):
                 raise AdapterError("目标种子文件清单或分片与源资源不同，需要人工核实")
             keeper.check()
-            target_hash = qb.add_target(target_raw, save_path)
+            target_hash = qb.add_target(target_raw, save_path, route["target"])
             state.update(target_hash=target_hash, published_url=url)
             self.journal.save(task_id, state)
             self.checkpoint(job, keeper, "seeding", "目标种子已添加，正在完整校验数据", published_url=url, target_hash=target_hash)
@@ -309,7 +317,7 @@ class Executor:
             while time.monotonic() < deadline:
                 keeper.check()
                 info = qb.info(target_hash)
-                tracker_ok = any(urlsplit(t.get("url", "")).hostname == "pt.novahd.top" and t.get("status") == 2 for t in qb.trackers(target_hash))
+                tracker_ok = any(urlsplit(t.get("url", "")).hostname in route["target"]["announce_hosts"] and t.get("status") == 2 for t in qb.trackers(target_hash))
                 if info and info.get("state") in {"uploading", "stalledUP", "forcedUP"} and float(info.get("progress", 0)) >= 1 and tracker_ok:
                     self.controller.job(job, "complete", success=True, result={"status": "succeeded", "message": "目标数据校验完成，Tracker 已确认做种",
                                         "published_url": url, "source_hash": source_hash, "target_hash": target_hash})
@@ -326,7 +334,7 @@ class Executor:
     def execute(self, job: dict):
         with LeaseKeeper(self.controller, job) as keeper:
             try:
-                config = self.controller.config()
+                config = {"settings": job["payload"]["settings"]} if "settings" in job["payload"] else self.controller.config()
                 if job["kind"] == "scan":
                     self.scan(job, config["settings"], keeper)
                 elif job["kind"] in {"transfer", "seed_repair"}:

@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class Rule(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    source_site: str = Field("zmpt", pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    target_site: str = Field("novahd", pattern=r"^[a-z][a-z0-9_-]{0,63}$")
     enabled: bool = False
     day: int = Field(1, ge=1, le=31)
     hour: int = Field(2, ge=0, le=23)
@@ -26,6 +28,8 @@ class Rule(BaseModel):
 
     @model_validator(mode="after")
     def coherent(self):
+        if self.source_site == self.target_site:
+            raise ValueError("source and target sites must differ")
         if self.min_size_gib > self.max_size_gib:
             raise ValueError("minimum size exceeds maximum size")
         if self.max_download_hours > self.max_run_hours:
@@ -73,6 +77,7 @@ class Reconcile(BaseModel):
 
 class WorkerIdentity(BaseModel):
     worker_id: str = Field(min_length=1, max_length=128, pattern=r"^[\w.:-]+$")
+    execution_schema: int = Field(1, ge=1, le=100)
 
 
 class Heartbeat(WorkerIdentity):
