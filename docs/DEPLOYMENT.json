@@ -34,5 +34,17 @@
   "real_nas_tracker_publish_verified": false,
   "protected_81_access_performed": false,
   "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.0",
-  "release_status": "pending Git commit and formal publication"
+  "release_url_status": "planned; formal release not submitted",
+  "release_commit": "0e160b8a1c1803adc3110cff6d4b333294691889",
+  "git_master_pushed": true,
+  "git_tag": "v0.3.0",
+  "git_tag_pushed": true,
+  "release_published": false,
+  "release_status": "formal publication pending: browser URL safety check stopped attachment file chooser before upload or submission",
+  "release_archive": "GPT-PTMOVE__2026-10-27_233335__历史发布__Nexus-v0.3.0.zip",
+  "release_archive_bytes": 379295851,
+  "release_archive_sha256": "85ed96c129ebcd9bbe9b52d385b377ebcc2607e91df710ba0b8ce86cafda9e73",
+  "release_attachment_parts": 5,
+  "release_parts_reassembly_verified": true,
+  "canary_removed": true
 }

@@ -1,16 +1,26 @@
 # PTNexus 改版续接记录
 
-当前状态：已从本断点恢复，在 152:18120 完成 0.3.0 Docker 部署与验证；Git 提交及正式发布收尾中。原服务器不可达的历史状态已解除，以下步骤保留作为续接与回滚记录。
+当前状态（2026-10-27 23:47，Asia/Shanghai）：152:18120 已运行并验证 0.3.0；代码和标签已推送。正式 Gitee 发行版尚未提交，停在附件上传前的文件选择窗口。浏览器工具无法确认该窗口对应的网址，安全检查中止了操作，本轮不得改用其他浏览器控制方式绕过。
 
-- 工作目录：`C:\Users\50578\Desktop\GPT-PTMOVE\.local\worktrees\261027-ptnexus-automation-a901`
-- 开发分支：`worktree-lite/261027-ptnexus-automation-a901`，保留未提交文件；基础 master 为 `a7332dc`。
+- 主工作目录：`C:\Users\50578\Desktop\GPT-PTMOVE`，分支 `master`。原功能 worktree 已合并，不能继续使用旧分支作为断点。
+- 功能提交：`0e160b8a1c1803adc3110cff6d4b333294691889`；master 和附注标签 `v0.3.0` 已推送并核验。后续只补充发布记录，不移动标签。
 - 上游：PTNexus Go 分支提交 `53eee1fed09121867f956c798c158c13a475d51f`；原生项目位于 `nexus/`，旧 Python 0.2 保留。
 - 入口：`nexus/Dockerfile.ptmove`、`nexus/compose.ptmove.yaml`；不能使用根目录旧 Dockerfile 部署新版本。
 - 实现：可启停自动下载/转种、原设置页配置、站点 JSON 导入/导出与凭据分离、独立 AI API/OpenAPI。
-- 已验证：Windows Go1.23.12 全量测试（count=1）、Vue 类型检查、新增界面十文件 Oxlint/ESLint、Vite 生产编译、Linux/amd64 CGO=0 交叉编译（只编译未运行）、六项执行一致性缺陷独立复查。Vite 仍提示原共享 chunk 偏大。没有启动本地应用服务器。
-- 未验证：152 Docker/Linux 运行、浏览器交互、真实 NAS/站点发布、qB Token 网关兼容性。81 服务器不在本次操作授权范围。
+- 已验证：Windows Go 全量测试；152 Docker/Linux 全量 Go 测试及程序构建；Vue 类型、完整静态检查和生产构建；10 组隔离 API 测试及 15 张 PC/mobile 页面截图；生产 6 组只读 API 及 6 张只读截图；重启后账号、密钥和配置持久性。浏览器控制台错误为 0。六项执行一致性缺陷已独立复查。Vite 仍提示原共享 chunk 偏大。没有启动本地应用服务器。
+- 线上镜像：`ptmove-nexus:0.3.0`，ID `sha256:915180c7b9981e19cf48de50275d2812c9824f10e0936b4e21c7204b639c12c7`；容器 `ptmove-nexus-ptmove-nexus-1`；独立目录 `/opt/gpt-ptmove-nexus`。旧 `/opt/gpt-ptmove` 容器已停止并保留。自动化、计划和发布均关闭，原管理密码保留。
+- 临时验证项目 `ptmove-nexus-canary` 已关闭；仅其 `canary-data` 和 `.env.canary` 已删除，18121 不再提供该服务，正式数据保留。
+- 未验证：真实 NAS/站点下载和发布、qB Token 网关及 NAS 媒体代理兼容性。81 服务器不在本次操作授权范围。
 
-## 服务器恢复后的顺序
+## 下次直接续接
+
+1. 用户关闭系统文件选择窗口并在新一轮回复后，重新读取浏览器控制文档；仅继续 Edge 中 Gitee 新发行版页面。标题、说明及已存在的 `v0.3.0` 标签已填好；先核实页面现状，不重复创建标签或提交发行版。不要操作另一个受保护 qB 标签页。
+2. 附件位于 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-10\staging\gitee-v0.3.0-parts\`，上传 `PTMove-Nexus-v0.3.0.part01.zip` 至 `part05.zip` 共五个文件，每个小于 100 MiB。使用浏览器文档支持的文件上传 API，避免无法绑定网址的原生文件选择窗口。五个附件均完成后按已有用户授权提交，核验正式页面和五个下载链接。
+3. 分片还原：全部解压至同一目录后运行 `python3 join_release_parts.py`，或在 Linux 拼接 `PTMove-Nexus-v0.3.0.zip.???`。完整历史发布 ZIP 大小 379295851 字节，SHA256 `85ed96c129ebcd9bbe9b52d385b377ebcc2607e91df710ba0b8ce86cafda9e73`。已实际还原并验证 ZIP CRC、所有清单文件哈希和上游符号链接模式。
+4. 完整源码和 Docker 历史发布包为 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-10\GPT-PTMOVE__2026-10-27_233335__历史发布__Nexus-v0.3.0.zip`。Docker tar SHA256 `7873108de81bd084a58335bd135ecebaa19ed3f5049a553b24af675269908af3`，本机与 152 一致。没有运行时数据库、账号、密钥或媒体。旧快照保留，21:42 的源码快照漏原生入口，不能独立重建；最终发布包已修正。
+5. 正式发行版创建成功后，再追加 CHANGELOG 和发布状态，提交并推送记录；保留 `v0.3.0` 原指向不变。无需因文档记录重建或重启已验证镜像。预定发行版地址：<https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.0>，目前尚未发布。
+
+## 已执行的部署顺序（历史参考，不要重复执行）
 
 1. `ssh itemkeep-server` 检查 `/opt/gpt-ptmove-nexus` 的项目状态。先通过挂载来源识别本任务之前启动的 Go/Node 构建容器，确认结果或仅停止这些容器；不得按镜像名批量停止其他构建。两个旧 SSH 构建会话曾失去响应，完成状态未知。
 2. 重新同步最终源码；之前已传的 `nexus-source-dev.tar` 早于最终修复，不能直接部署。Docker 上下文必须排除 `.env*`、`data/`、缓存及密钥。低并发构建，控制资源，保留其他服务。
