@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ func (h *MachineHandler) RegisterAdmin(g *gin.RouterGroup) {
 func (h *MachineHandler) RegisterV1(g *gin.RouterGroup) {
 	g.Use(h.authenticate)
 	g.GET("/openapi.json", h.OpenAPI)
+	g.GET("/connection", h.Connection)
 	g.GET("/dashboard", h.Dashboard)
 	g.GET("/rules", h.Rules)
 	g.GET("/sites", h.Sites)
@@ -68,6 +70,26 @@ func (h *MachineHandler) RegisterV1(g *gin.RouterGroup) {
 	g.POST("/tasks/:id/retry", h.Retry)
 	g.POST("/tasks/:id/reconcile", h.Reconcile)
 }
+
+// Connection returns key metadata and API entry points without consulting domain services.
+func (h *MachineHandler) Connection(c *gin.Context) {
+	p := machinePrincipal(c)
+	scopes := make([]string, 0, len(p.Scopes))
+	for scope := range p.Scopes {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{
+		"service":            "ptmove-nexus",
+		"api_version":        "v1",
+		"key":                gin.H{"id": p.ID, "name": p.Name, "scopes": scopes, "expires_at": p.ExpiresAt.UTC().Format(time.RFC3339)},
+		"management":         []string{"automation", "site_profiles"},
+		"openapi_url":        "/api/v1/openapi.json",
+		"idempotency_header": "Idempotency-Key",
+	})
+}
+
 func (h *MachineHandler) authenticate(c *gin.Context) {
 	header := c.GetHeader("Authorization")
 	if !strings.HasPrefix(header, "Bearer ") || strings.Count(header, " ") != 1 {
@@ -92,6 +114,7 @@ func machinePrincipal(c *gin.Context) *migrationflow.MachinePrincipal {
 
 // ListKeys 返回机器密钥公开元数据。
 func (h *MachineHandler) ListKeys(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	keys, e := h.keys.ListKeys()
 	if e != nil {
 		c.JSON(500, gin.H{"error": "cannot list keys"})
@@ -102,6 +125,7 @@ func (h *MachineHandler) ListKeys(c *gin.Context) {
 
 // CreateKey 创建一次显示的机器密钥；到期日必须明确给出。
 func (h *MachineHandler) CreateKey(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	var body struct {
 		Name      string   `json:"name"`
 		Scopes    []string `json:"scopes"`

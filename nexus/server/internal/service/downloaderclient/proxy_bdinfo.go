@@ -74,7 +74,7 @@ func (d Downloader) StartBDInfoByProxy(remotePath, taskID, callbackBaseURL strin
 	}
 	request.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := d.proxyHTTPClient(10 * time.Minute)
 	response, err := client.Do(request)
 	if err != nil {
 		logx.Warnf(proxyBDInfoLogModule, "提交BDInfo任务失败 task_id=%s remote_path=%s err=%v", trimmedTaskID, compactProxyBody(trimmedPath), err)

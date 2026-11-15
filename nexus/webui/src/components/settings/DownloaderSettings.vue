@@ -43,7 +43,11 @@
             </el-tag>
             <div class="header-controls">
               <div class="downloader-color-controls">
-                <el-popover trigger="click" placement="bottom-start" popper-class="downloader-color-popover">
+                <el-popover
+                  trigger="click"
+                  placement="bottom-start"
+                  popper-class="downloader-color-popover"
+                >
                   <template #reference>
                     <button
                       type="button"
@@ -141,7 +145,7 @@
                 <el-input
                   v-model="downloader.proxy_port"
                   type="number"
-                  placeholder="9090"
+                  placeholder="19090"
                   class="proxy-port-input"
                   :min="1"
                   :max="65535"
@@ -175,6 +179,51 @@
                   />
                 </span>
               </el-tooltip>
+            </div>
+          </el-form-item>
+          <el-form-item v-if="downloader.use_proxy" label="代理用途">
+            <div class="api-token-field">
+              <el-checkbox
+                v-model="downloader.proxy_media_only"
+                @change="resetConnectionStatus(downloader.id)"
+                >仅媒体代理（NAS Docker 程序）</el-checkbox
+              >
+              <span class="credential-hint"
+                >截图、MediaInfo 走 NAS；qB
+                列表、统计及发布前检查直连下载器。旧版全功能代理可取消勾选。</span
+              >
+            </div>
+          </el-form-item>
+          <el-form-item v-if="downloader.use_proxy" label="代理 Token">
+            <div class="api-token-field">
+              <el-input
+                v-model="downloader.proxy_token"
+                type="password"
+                show-password
+                autocomplete="new-password"
+                placeholder="留空保留已配置 Token；NAS 程序至少 32 字符"
+                @input="onProxyTokenInput(downloader)"
+              />
+              <span class="api-token-status">{{
+                downloader.clear_proxy_token
+                  ? '待清除'
+                  : downloader.proxy_token_configured && !downloader.proxy_token
+                    ? '已配置'
+                    : downloader.proxy_token
+                      ? '待保存'
+                      : '未配置'
+              }}</span>
+              <el-checkbox
+                v-if="downloader.proxy_token_configured"
+                v-model="downloader.clear_proxy_token"
+                @change="onClearProxyTokenChange(downloader)"
+                >明确清除代理 Token</el-checkbox
+              >
+              <span class="credential-hint"
+                >使用独立的 PTMOVE_PROXY_TOKEN，不是 qB API Token。NAS 运行
+                nexus/proxy/compose.nas.yaml；代理端口填映射端口（默认 19090），媒体路径须与 NAS
+                只读挂载路径一致。跨机器连接请使用可信专网或加密隧道。</span
+              >
             </div>
           </el-form-item>
           <el-form-item label="主机地址">
@@ -214,14 +263,29 @@
                 placeholder="留空保留已配置 Token"
                 @input="onApiKeyInput(downloader)"
               />
-              <span class="api-token-status">{{ downloader.clear_api_key ? '待清除' : downloader.api_key_configured && !downloader.api_key ? '已配置' : downloader.api_key ? '待保存' : '未配置' }}</span>
-              <el-checkbox v-if="downloader.api_key_configured" v-model="downloader.clear_api_key" @change="onClearApiKeyChange(downloader)">
+              <span class="api-token-status">{{
+                downloader.clear_api_key
+                  ? '待清除'
+                  : downloader.api_key_configured && !downloader.api_key
+                    ? '已配置'
+                    : downloader.api_key
+                      ? '待保存'
+                      : '未配置'
+              }}</span>
+              <el-checkbox
+                v-if="downloader.api_key_configured"
+                v-model="downloader.clear_api_key"
+                @change="onClearApiKeyChange(downloader)"
+              >
                 明确清除 Token
               </el-checkbox>
             </div>
           </el-form-item>
           <el-form-item v-if="downloader.type === 'qbittorrent'" label="认证提示">
-            <span class="credential-hint">已配置 API Token 或填写新 Token 时，用户名和密码可留空；留空 Token 会保留当前凭据。</span>
+            <span class="credential-hint"
+              >已配置 API Token 或填写新 Token 时，用户名和密码可留空；留空 Token
+              会保留当前凭据。</span
+            >
           </el-form-item>
         </el-form>
       </el-card>
@@ -298,6 +362,10 @@ type DownloaderConfig = {
   api_key_configured: boolean
   clear_api_key: boolean
   use_proxy: boolean
+  proxy_token: string
+  proxy_token_configured: boolean
+  clear_proxy_token: boolean
+  proxy_media_only: boolean
   proxy_port: number
   color: string
   path_mappings: PathMapping[]
@@ -361,7 +429,10 @@ const hslToHex = (h: number, s: number, l: number) => {
   else if (hp >= 5 && hp < 6) [r1, g1, b1] = [c, 0, x]
 
   const m = lig - c / 2
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
   return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`
 }
 
@@ -440,10 +511,19 @@ const fetchSettings = async () => {
         api_key: '',
         api_key_configured: record.api_key_configured === true,
         clear_api_key: false,
+        proxy_token: '',
+        proxy_token_configured: record.proxy_token_configured === true,
+        clear_proxy_token: false,
+        proxy_media_only: record.proxy_media_only === true,
         use_proxy: typeof record.use_proxy === 'boolean' ? record.use_proxy : false,
         proxy_port:
-          typeof record.proxy_port === 'number' ? record.proxy_port : Number(record.proxy_port) || 9090,
-        color: typeof record.color === 'string' && record.color.trim() ? record.color : deriveDownloaderColor(id),
+          typeof record.proxy_port === 'number'
+            ? record.proxy_port
+            : Number(record.proxy_port) || 9090,
+        color:
+          typeof record.color === 'string' && record.color.trim()
+            ? record.color
+            : deriveDownloaderColor(id),
         path_mappings: pathMappings,
         enable_ratio_limiter:
           typeof record.enable_ratio_limiter === 'boolean' ? record.enable_ratio_limiter : false,
@@ -467,7 +547,11 @@ const fetchSettings = async () => {
 const settingsPayload = () => ({
   ...settings.value,
   downloaders: settings.value.downloaders.map((downloader) =>
-    Object.fromEntries(Object.entries(downloader).filter(([key]) => key !== 'api_key_configured')),
+    Object.fromEntries(
+      Object.entries(downloader).filter(
+        ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
+      ),
+    ),
   ),
 })
 
@@ -501,8 +585,12 @@ const addDownloader = () => {
     api_key: '',
     api_key_configured: false,
     clear_api_key: false,
+    proxy_token: '',
+    proxy_token_configured: false,
+    clear_proxy_token: false,
+    proxy_media_only: true,
     use_proxy: false,
-    proxy_port: 9090,
+    proxy_port: 19090,
     color: deriveDownloaderColor(id),
     path_mappings: [], // 初始化空的路径映射数组
     enable_ratio_limiter: false, // 默认关闭出种限速
@@ -537,15 +625,23 @@ const resetConnectionStatus = (downloaderId: string) => {
 
 const testConnection = async (downloader: DownloaderConfig) => {
   resetConnectionStatus(downloader.id)
-  const hasToken = Boolean(downloader.api_key.trim()) || (downloader.api_key_configured && !downloader.clear_api_key)
-  if (downloader.type === 'qbittorrent' && !hasToken && (!downloader.username.trim() || !downloader.password.trim())) {
+  const hasToken =
+    Boolean(downloader.api_key.trim()) ||
+    (downloader.api_key_configured && !downloader.clear_api_key)
+  if (
+    downloader.type === 'qbittorrent' &&
+    !hasToken &&
+    (!downloader.username.trim() || !downloader.password.trim())
+  ) {
     ElMessage.warning('请填写用户名和密码，或提供 qBittorrent API Token。')
     return
   }
   testingConnectionId.value = downloader.id
   try {
     const testConfig = Object.fromEntries(
-      Object.entries(downloader).filter(([key]) => key !== 'api_key_configured' && key !== 'clear_api_key'),
+      Object.entries(downloader).filter(
+        ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
+      ),
     )
     const response = await axios.post(`${API_BASE_URL}/test_connection`, testConfig)
     const result = response.data as { success?: boolean; message?: string }
@@ -567,6 +663,16 @@ const testConnection = async (downloader: DownloaderConfig) => {
 
 const onApiKeyInput = (downloader: DownloaderConfig) => {
   downloader.clear_api_key = false
+  resetConnectionStatus(downloader.id)
+}
+
+const onProxyTokenInput = (downloader: DownloaderConfig) => {
+  downloader.clear_proxy_token = false
+  resetConnectionStatus(downloader.id)
+}
+
+const onClearProxyTokenChange = (downloader: DownloaderConfig) => {
+  if (downloader.clear_proxy_token) downloader.proxy_token = ''
   resetConnectionStatus(downloader.id)
 }
 
@@ -786,12 +892,12 @@ const savePathMappings = async () => {
   height: 32px;
 }
 
-.proxy-port-input :deep(input[type="number"]) {
+.proxy-port-input :deep(input[type='number']) {
   -moz-appearance: textfield;
 }
 
-.proxy-port-input :deep(input[type="number"]::-webkit-inner-spin-button),
-.proxy-port-input :deep(input[type="number"]::-webkit-outer-spin-button) {
+.proxy-port-input :deep(input[type='number']::-webkit-inner-spin-button),
+.proxy-port-input :deep(input[type='number']::-webkit-outer-spin-button) {
   -webkit-appearance: none;
   margin: 0;
 }

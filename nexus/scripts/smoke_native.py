@@ -138,7 +138,7 @@ class Smoke:
 
     def baseline(self, credentials):
         health = self.client.request("GET", "/health")
-        check(health.get("version") == "0.3.0" and health.get("service") == "ptmove-nexus", "wrong native service/version")
+        check(health.get("version") == "0.3.1" and health.get("service") == "ptmove-nexus", "wrong native service/version")
         for path in ("/api/automation/settings", "/api/site-profiles", "/api/machine-keys", "/api/machine-openapi"):
             self.client.request("GET", path, expected=401)
         self.passed("native health and administrator isolation")
@@ -222,11 +222,15 @@ class Smoke:
             out = self.admin("POST", "/api/machine-keys", {"name": self.prefix + "-" + name, "scopes": scopes, "expires_at": expires}, expected=201)
             self.keys[name] = out
             check(isinstance(out.get("token"), str) and re.fullmatch(r"ptn_[0-9a-f]{64}", out["token"]), "key creation did not return one-time token")
-            check(set(out.get("key", {})) == {"id", "name", "scopes", "expires_at", "created_at", "revoked"}, "unexpected key metadata")
+            check(set(out.get("key", {})) == {"id", "name", "scopes", "expires_at", "created_at", "revoked", "status"}, "unexpected key metadata")
+            check(out["key"]["status"] == "active", "new key is not active")
         listed = self.admin("GET", "/api/machine-keys")
         no_secrets(listed, "key list exposed secret material")
         for name in self.keys:
             self.machine(name, "GET", "/dashboard")
+            identity = self.machine(name, "GET", "/connection")
+            check(identity.get("key", {}).get("id") == self.keys[name]["key"]["id"], "connection identity mismatch")
+            no_secrets(identity, "connection exposed secret material")
         self.client.request("GET", "/api/machine-keys", token=self.keys["read"]["token"], expected=401)
         self.passed("one-time machine keys, public metadata and reverse authentication isolation")
         # Scope regressions must still restore an unexpectedly accepted patch.

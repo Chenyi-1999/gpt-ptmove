@@ -13,6 +13,8 @@ PTMove Nexus 是基于 [PTNexus](https://github.com/sqing33/PTNexus) Go + Vue �
 - 声明导入不等于站点已经可用。普通站点需要映射到 PTNexus 已有的原生 publisher，并验证该映射和真实页面行为；未知限制、查重结果或目标做种状态必须按未通过处理。
 - 独立机器 API 密钥提供 `read`、`write`、`publish` 范围，可设到期时间并撤销；写命令使用幂等请求键。一般变更要求 `write`；启用发布、已有待执行任务或明确入队/发布时还要求 `publish`。管理员可下载 `/api/machine-openapi`，机器 API 文档为 `/api/v1/openapi.json`。
 - qB Bearer Token 接入仅假设目标 qB API 兼容 Bearer API 网关；本改版没有验证真实 qB 原生 Token 支持，也不保证用户提供的 Token 可直接使用。请按实际网关文档配置并在隔离环境验证。
+- API 管理提供密钥权限预设、有效／过期／撤销状态、同源只读连接测试和不含真实凭据的 AI 接入包，见 [API 管理与接入](docs/API_MANAGEMENT.md)。
+- 截图缺失时可使用 NAS 端 Docker 媒体代理，远程截帧并上传 Pixhost；支持 Linux amd64／arm64 构建。目录只读、独立认证，截图待确认时阻止自动发布，见 [远程补截图](docs/REMOTE_SCREENSHOTS.md)。
 
 ## Docker 安装
 
@@ -42,7 +44,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-部署目标 `http://152.136.236.238:18120` 当前尚未部署此 Go + Vue 版本；SSH 与网页访问此前均超时。不要将旧版仍在运行或旧版健康检查误认为新版本已上线。Gitee 仓库为 <https://gitee.com/star1999/gpt-ptmove>；此 fork 的 Git 提交、发布标签和 Gitee Release 尚未完成。
+原生 Go + Vue 0.3.1 已部署到 `http://152.136.236.238:18120`，API 管理入口为 `/settings/api`。部署与测试状态见 [DEPLOYMENT.json](docs/DEPLOYMENT.json) 及 CHANGELOG 最新记录。Gitee 仓库为 <https://gitee.com/star1999/gpt-ptmove>；正式发行版的附件发布状态单独记录，Git 标签不等于附件已发布。
 
 ## 初次配置
 

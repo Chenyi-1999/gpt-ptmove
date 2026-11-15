@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -74,6 +75,8 @@ func (s *SettingsService) GetSettingsMasked() map[string]any {
 		downloader["password"] = ""
 		downloader["api_key_configured"] = strings.TrimSpace(toString(downloader["api_key"], "")) != ""
 		downloader["api_key"] = ""
+		downloader["proxy_token_configured"] = strings.TrimSpace(toString(downloader["proxy_token"], "")) != ""
+		downloader["proxy_token"] = ""
 	}
 
 	if cookieCloud, ok := current["cookiecloud"].(map[string]any); ok {
@@ -108,6 +111,7 @@ func (s *SettingsService) UpdateSettings(newConfig map[string]any) error {
 		updated := toSlice(rawDownloaders)
 		currentPasswords := map[string]string{}
 		currentKeys := map[string]string{}
+		currentProxyTokens := map[string]string{}
 		for _, raw := range toSlice(current["downloaders"]) {
 			downloader, ok := raw.(map[string]any)
 			if !ok {
@@ -119,6 +123,7 @@ func (s *SettingsService) UpdateSettings(newConfig map[string]any) error {
 			}
 			currentPasswords[id] = toString(downloader["password"], "")
 			currentKeys[id] = toString(downloader["api_key"], "")
+			currentProxyTokens[id] = toString(downloader["proxy_token"], "")
 		}
 
 		for index, raw := range updated {
@@ -139,6 +144,16 @@ func (s *SettingsService) UpdateSettings(newConfig map[string]any) error {
 			} else if strings.TrimSpace(toString(downloader["api_key"], "")) == "" {
 				downloader["api_key"] = currentKeys[id]
 			}
+			if toBool(downloader["clear_proxy_token"], false) {
+				downloader["proxy_token"] = ""
+			} else if strings.TrimSpace(toString(downloader["proxy_token"], "")) == "" {
+				downloader["proxy_token"] = currentProxyTokens[id]
+			}
+			if token := toString(downloader["proxy_token"], ""); token != "" && len(strings.TrimSpace(token)) < 32 {
+				return fmt.Errorf("代理 Token 至少需要 32 个字符")
+			}
+			delete(downloader, "clear_proxy_token")
+			delete(downloader, "proxy_token_configured")
 			delete(downloader, "clear_api_key")
 			delete(downloader, "api_key_configured")
 			updated[index] = downloader
@@ -223,16 +238,18 @@ func (s *SettingsService) DownloaderConfigs() []map[string]any {
 			continue
 		}
 		result = append(result, map[string]any{
-			"id":         toString(downloader["id"], ""),
-			"name":       toString(downloader["name"], ""),
-			"type":       toString(downloader["type"], ""),
-			"host":       toString(downloader["host"], ""),
-			"username":   toString(downloader["username"], ""),
-			"password":   toString(downloader["password"], ""),
-			"api_key":    toString(downloader["api_key"], ""),
-			"enabled":    toBool(downloader["enabled"], true),
-			"use_proxy":  toBool(downloader["use_proxy"], false),
-			"proxy_port": toIntWithDefault(downloader["proxy_port"], 9090),
+			"id":               toString(downloader["id"], ""),
+			"name":             toString(downloader["name"], ""),
+			"type":             toString(downloader["type"], ""),
+			"host":             toString(downloader["host"], ""),
+			"username":         toString(downloader["username"], ""),
+			"password":         toString(downloader["password"], ""),
+			"api_key":          toString(downloader["api_key"], ""),
+			"enabled":          toBool(downloader["enabled"], true),
+			"use_proxy":        toBool(downloader["use_proxy"], false),
+			"proxy_port":       toIntWithDefault(downloader["proxy_port"], 9090),
+			"proxy_token":      toString(downloader["proxy_token"], ""),
+			"proxy_media_only": toBool(downloader["proxy_media_only"], false),
 		})
 	}
 	return result

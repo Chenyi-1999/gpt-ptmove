@@ -243,7 +243,7 @@ func (d Downloader) requestProxyScreenshots(
 	}
 	request.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 20 * time.Minute}
+	client := d.proxyHTTPClient(20 * time.Minute)
 	response, err := client.Do(request)
 	if err != nil {
 		logx.Warnf(proxyScreenshotLogModule, "请求截图失败 remote_path=%s err=%v", compactProxyBody(trimmedPath), err)

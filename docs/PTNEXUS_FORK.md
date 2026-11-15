@@ -58,6 +58,8 @@ JSON 中不允许放 Cookie、RSS 或其他秘密。管理员应从 UI 的凭据
 
 ## 独立机器 API
 
+0.3.1 的完整管理入口为 **设置 → API 管理**（`/settings/api`，兼容旧 `/settings/ai`），支持权限预设、过期状态、只读连接测试和无秘密的 AI 接入包。新增 `GET /api/v1/connection` 返回当前机器密钥公开身份；说明见 [API_MANAGEMENT.md](API_MANAGEMENT.md)。下载器端媒体代理、缺图回填与确认后恢复见 [REMOTE_SCREENSHOTS.md](REMOTE_SCREENSHOTS.md)。
+
 管理员在 `/api/machine-keys` 创建、列出和撤销机器密钥；仅创建结果显示一次明文。密钥使用期最长一年，必须有 `read` 范围，并可按需增加 `write` 和 `publish`。访问 `/api/machine-openapi` 可下载当前 OpenAPI 文档；机器 Bearer API 的 OpenAPI 端点是 `/api/v1/openapi.json`。机器 API 只接受独立 Bearer key，不接受浏览器 JWT、Cookie 或 NAS 内部令牌作为回退认证。
 
 机器 API 可读取规则、档案、任务和运行记录，也可更新规则、导入档案、管理档案凭据、预览/扫描、入队及管理任务。写命令要求 `Idempotency-Key`；同一密钥仅对相同 method、path 和规范化 JSON 请求体重放缓存结果，不同请求体冲突。涉及发布的操作要求 `publish`；设置更新在启用自动化/自动发布或存在待执行任务时，需要同时具备 `write` 与 `publish`。读取状态使用 read；扫描和离线声明预览命令需要 write 与幂等键；显式选择候选或入队需要 publish。启用期间修改站点声明或凭据也同时要求 write 与 publish。撤销或过期的 key 不能重放旧响应。

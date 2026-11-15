@@ -94,7 +94,7 @@ func (d Downloader) FetchMediaInfoByProxy(remotePath, contentName string) (strin
 	}
 	request.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Minute}
+	client := d.proxyHTTPClient(15 * time.Minute)
 	response, err := client.Do(request)
 	if err != nil {
 		logx.Warnf(proxyMediaLogModule, "请求MediaInfo失败 remote_path=%s err=%v", compactProxyBody(trimmedPath), err)

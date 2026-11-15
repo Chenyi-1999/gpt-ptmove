@@ -17,11 +17,22 @@ def command(args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 
-def compose(root, kind, *args):
+def compose(root, kind, *args, image=None):
+    if kind not in {"canary", "production"}:
+        raise ValueError("Unknown native deployment kind")
     env_file = ".env.canary" if kind == "canary" else ".env.ptmove"
     project = "ptmove-nexus-canary" if kind == "canary" else "ptmove-nexus"
+    environment = os.environ.copy()
+    # Do not inherit interpolation variables that can redirect an upgrade or its rollback.
+    environment.update({
+        "PTMOVE_ENV_FILE": str(root / env_file),
+        "PTMOVE_DATA_DIR": str(root / ("canary-data" if kind == "canary" else "data")),
+        "PTMOVE_BIND": "0.0.0.0",
+        "PTMOVE_PORT": "18121" if kind == "canary" else "18120",
+        "PTMOVE_IMAGE": image or "ptmove-nexus:" + (root / "VERSION").read_text().strip(),
+    })
     command(["docker", "compose", "--project-name", project, "--env-file", env_file,
-             "-f", "compose.ptmove.yaml", *args], cwd=root)
+             "-f", "compose.ptmove.yaml", *args], cwd=root, env=environment)
 
 
 def prepare(root, kind):
@@ -50,24 +61,47 @@ def prepare(root, kind):
         if not password:
             raise SystemExit("Existing administrator password unavailable; no credentials changed")
         command(["docker", "run", "--rm", "--network=none", "--memory=128m", "--cpus=0.25", "-i",
-                 "-v", f"{data}:/app/data", "ptmove-nexus:0.3.0", "--initialize-admin"],
+                 "-v", f"{data}:/app/data", "ptmove-nexus:" + (root / "VERSION").read_text().strip(), "--initialize-admin"],
                 input=json.dumps({"username": "admin", "password": password}), text=True)
     compose(root, kind, "config", "--quiet")
     print(f"Prepared {kind}: independent runtime data; existing administrator password preserved")
 
 
-def health(port):
+def health(port, version="0.3.1"):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for _ in range(20):
         try:
             with opener.open(f"http://127.0.0.1:{port}/health", timeout=2) as response:
                 data = json.load(response)
-                if data.get("version") == "0.3.0" and data.get("service") == "ptmove-nexus":
+                if data.get("version") == version and data.get("service") == "ptmove-nexus":
                     return data
         except Exception:
             pass
         time.sleep(2)
     raise RuntimeError("Native health did not report the expected version")
+
+
+def upgrade(root):
+    """Upgrade only the existing native project, retaining its data and rollback image."""
+    health(18121)
+    current = json.loads(subprocess.check_output(["docker", "inspect", "ptmove-nexus-ptmove-nexus-1"]))[0]
+    labels = current["Config"].get("Labels", {})
+    if labels.get("com.docker.compose.project") != "ptmove-nexus" or labels.get("com.docker.compose.service") != "ptmove-nexus":
+        raise SystemExit("Native container ownership mismatch; upgrade refused")
+    expected_data = (root / "data").resolve()
+    if not any(m.get("Destination") == "/app/data" and Path(m.get("Source", "")).resolve() == expected_data for m in current["Mounts"]):
+        raise SystemExit("Native data mount mismatch; upgrade refused")
+    previous_image = current["Image"]
+    previous_version = json.loads(subprocess.check_output(["curl", "--fail", "--silent", "--max-time", "5", "http://127.0.0.1:18120/health"]))["version"]
+    prepare(root, "production")
+    try:
+        compose(root, "production", "up", "-d", "--no-build")
+        health(18120)
+    except Exception:
+        compose(root, "production", "up", "-d", "--no-build", image=previous_image)
+        health(18120, previous_version)
+        raise
+    print("Native upgrade healthy on18120; previous image and runtime data retained")
 
 
 def cutover(root):
@@ -91,7 +125,7 @@ def cutover(root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["prepare-canary", "start-canary", "prepare-production", "cutover", "stop-canary"])
+    parser.add_argument("action", choices=["prepare-canary", "start-canary", "prepare-production", "upgrade", "cutover", "stop-canary"])
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     if root != Path("/opt/gpt-ptmove-nexus") or os.name != "posix":
@@ -108,6 +142,8 @@ def main():
         compose(root, "canary", "down")
     elif args.action == "cutover":
         cutover(root)
+    elif args.action == "upgrade":
+        upgrade(root)
 
 
 if __name__ == "__main__":

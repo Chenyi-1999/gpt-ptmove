@@ -303,7 +303,7 @@ func loadDownloadersConfig() ([]seedingLimitDownloader, error) {
 			Password: toStringAny(item["password"]),
 			APIKey:   toStringAny(item["api_key"]),
 			Enabled:  toBoolAny(item["enabled"], true),
-			UseProxy: toBoolAny(item["use_proxy"], false),
+			UseProxy: toBoolAny(item["use_proxy"], false) && !toBoolAny(item["proxy_media_only"], false),
 		}
 		if downloader.ID == "" || downloader.Type == "" || downloader.Host == "" {
 			continue

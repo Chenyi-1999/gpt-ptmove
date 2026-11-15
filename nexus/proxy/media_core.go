@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"math"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,11 +57,16 @@ func withMountedISOIfNeeded(inputPath string, scene string, fn func(resolvedPath
 }
 
 func executeCommand(name string, args ...string) (string, error) {
+	if name == "ffprobe" || name == "ffmpeg" {
+		args = append([]string{"-protocol_whitelist", "file,pipe"}, args...)
+	}
 	resolvedName, err := resolveToolCommandPath(name)
 	if err != nil {
 		return "", err
 	}
-	cmd := exec.Command(resolvedName, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, resolvedName, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -70,9 +78,15 @@ func executeCommand(name string, args ...string) (string, error) {
 }
 
 func executeCommandWithTimeout(timeout time.Duration, name string, args ...string) (string, error) {
+	if name == "ffprobe" || name == "ffmpeg" {
+		args = append([]string{"-protocol_whitelist", "file,pipe"}, args...)
+	}
 	resolvedName, err := resolveToolCommandPath(name)
 	if err != nil {
 		return "", err
+	}
+	if timeout > 2*time.Minute {
+		timeout = 2 * time.Minute
 	}
 	cmd := exec.Command(resolvedName, args...)
 	var stdout, stderr bytes.Buffer
@@ -100,9 +114,15 @@ func executeCommandWithTimeout(timeout time.Duration, name string, args ...strin
 }
 
 func executeCommandWithTimeoutAndStderr(timeout time.Duration, name string, args ...string) (string, string, error) {
+	if name == "ffprobe" || name == "ffmpeg" {
+		args = append([]string{"-protocol_whitelist", "file,pipe"}, args...)
+	}
 	resolvedName, err := resolveToolCommandPath(name)
 	if err != nil {
 		return "", "", err
+	}
+	if timeout > 2*time.Minute {
+		timeout = 2 * time.Minute
 	}
 	cmd := exec.Command(resolvedName, args...)
 	var stdout, stderr bytes.Buffer
@@ -143,7 +163,7 @@ func getVideoDuration(videoPath string) (float64, error) {
 
 func takeScreenshot(videoPath, outputPath string, timePoint float64, subtitleSID int) error {
 	args := []string{
-		"--no-audio",
+		"--no-audio", "--no-config", "--load-scripts=no", "--ytdl=no", "--sub-auto=no", "--audio-file-auto=no", "--access-references=no", "--demuxer-lavf-o=protocol_whitelist=file",
 		fmt.Sprintf("--start=%.2f", timePoint),
 		"--frames=1",
 		"--screenshot-high-bit-depth=yes",
@@ -244,13 +264,15 @@ func takePreviewScreenshotWithSubtitle(videoPath, outputPath string, timePoint f
 }
 
 func convertPngToOptimizedPng(sourcePath, destPath string) error {
-	const maxUploadSize = 10 * 1024 * 1024
+	const maxUploadSize = 10_000_000
 
 	ffprobePath, err := resolveToolCommandPath("ffprobe")
 	if err != nil {
 		return err
 	}
-	checkCmd := exec.Command(ffprobePath, "-v", "error", "-show_streams", sourcePath)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	checkCmd := exec.CommandContext(ctx, ffprobePath, "-protocol_whitelist", "file,pipe", "-v", "error", "-show_streams", sourcePath)
 	output, err := checkCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffprobe inspection failed: %v", err)
@@ -397,7 +419,9 @@ func inspectSubtitleStreams(videoPath string) (subtitleInspectionResult, error) 
 		return subtitleInspectionResult{}, err
 	}
 
-	cmd := exec.Command(ffprobePath, "-v", "quiet", "-print_format", "json", "-show_entries", "stream=index,codec_name,disposition:stream_tags=language,title", "-select_streams", "s", videoPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, ffprobePath, "-protocol_whitelist", "file,pipe", "-v", "quiet", "-print_format", "json", "-show_entries", "stream=index,codec_name,disposition:stream_tags=language,title", "-select_streams", "s", videoPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		text := strings.TrimSpace(string(out))
@@ -598,6 +622,9 @@ func sanitizeSelectedScreenshotTimes(values []float64, duration float64) []float
 			continue
 		}
 		clean = append(clean, value)
+		if len(clean) >= 5 {
+			break
+		}
 	}
 	sort.Float64s(clean)
 	return clean
@@ -657,6 +684,9 @@ func markRecommendedPreviewCandidates(candidates []ScreenshotPreviewCandidate, w
 func generatePreviewCandidates(videoPath string, duration float64, count int, currentSubtitleSID int, selectedCandidate subtitleStreamCandidate, hasSelectedCandidate bool) ([]ScreenshotPreviewCandidate, error) {
 	const previewMinCount = 5
 	if count <= 0 {
+		count = 12
+	}
+	if count > 12 {
 		count = 12
 	}
 	if count < previewMinCount {
@@ -779,6 +809,9 @@ func findTargetVideoFile(path string, contentName string) (string, error) {
 			log.Printf("warning: failed to visit %s: %v", filePath, walkErr)
 			return nil
 		}
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
 		if fileInfo.IsDir() {
 			return nil
 		}
@@ -878,114 +911,108 @@ func findTargetVideoFile(path string, contentName string) (string, error) {
 	return videoFiles[0].path, nil
 }
 
-func uploadToPixhost(imagePath string) (string, error) {
-	apiURLs := []string{
-		"https://api.pixhost.to/images",
-		"http://pt-nexus-proxy.sqing33.dpdns.org/https://api.pixhost.to/images",
-		"http://pt-nexus-proxy.1395251710.workers.dev/https://api.pixhost.to/images",
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= 3; attempt++ {
-		for _, apiURL := range apiURLs {
-			showURL, statusCode, err := uploadToPixhostDirectStream(imagePath, apiURL)
-			if err == nil && strings.TrimSpace(showURL) != "" {
-				return strings.TrimSpace(showURL), nil
-			}
-			if err != nil {
-				lastErr = err
-			} else if statusCode > 0 {
-				lastErr = fmt.Errorf("pixhost HTTP %d", statusCode)
-			}
-		}
-		if attempt < 3 {
-			time.Sleep(2 * time.Second)
-		}
-	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("pixhost upload failed")
-	}
-	return "", lastErr
+type pixhostImage struct {
+	ShowURL      string `json:"show_url"`
+	ThumbnailURL string `json:"th_url"`
+	ImageURL     string `json:"image_url"`
 }
 
-func uploadToPixhostDirectStream(imagePath string, apiURL string) (string, int, error) {
-	pr, pw := io.Pipe()
-	writer := multipart.NewWriter(pw)
+func uploadToPixhost(imagePath string) (pixhostImage, error) {
+	client := &http.Client{Timeout: 180 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return uploadPixhostImage(imagePath, client)
+}
 
-	var writeErr error
-	go func() {
-		defer func() {
-			if writeErr == nil {
-				_ = pw.Close()
-			}
-		}()
-		defer writer.Close()
-
-		file, err := os.Open(imagePath)
-		if err != nil {
-			writeErr = err
-			_ = pw.CloseWithError(err)
-			return
-		}
-		defer file.Close()
-
-		part, err := writer.CreateFormFile("img", filepath.Base(imagePath))
-		if err != nil {
-			writeErr = err
-			_ = pw.CloseWithError(err)
-			return
-		}
-		if _, err := io.Copy(part, file); err != nil {
-			writeErr = err
-			_ = pw.CloseWithError(err)
-			return
-		}
-		if err := writer.WriteField("content_type", "0"); err != nil {
-			writeErr = err
-			_ = pw.CloseWithError(err)
-			return
-		}
-	}()
-
-	req, err := http.NewRequest(http.MethodPost, apiURL, pr)
+func uploadPixhostImage(imagePath string, client *http.Client) (pixhostImage, error) {
+	file, err := os.Open(imagePath)
 	if err != nil {
-		_ = pr.Close()
-		return "", 0, err
+		return pixhostImage{}, errorsNewUpload()
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 10_000_000 {
+		return pixhostImage{}, fmt.Errorf("Pixhost image must be between 1 byte and 10 MB")
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("img", filepath.Base(imagePath))
+	if err != nil {
+		return pixhostImage{}, errorsNewUpload()
+	}
+	if _, err = io.Copy(part, io.LimitReader(file, 10_000_000+1)); err != nil {
+		return pixhostImage{}, errorsNewUpload()
+	}
+	_ = writer.WriteField("content_type", "0")
+	_ = writer.WriteField("max_th_size", "500")
+	_ = writer.Close()
+	req, err := http.NewRequest(http.MethodPost, "https://api.pixhost.to/images", &body)
+	if err != nil {
+		return pixhostImage{}, errorsNewUpload()
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-
-	client := &http.Client{Timeout: 180 * time.Second}
+	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		_ = pr.Close()
-		if writeErr != nil {
-			return "", 0, writeErr
-		}
-		return "", 0, err
+		return pixhostImage{}, errorsNewUpload()
 	}
 	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", resp.StatusCode, err
-	}
 	if resp.StatusCode != http.StatusOK {
-		return "", resp.StatusCode, fmt.Errorf("pixhost HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		return pixhostImage{}, fmt.Errorf("Pixhost upload failed (HTTP %d)", resp.StatusCode)
 	}
-
-	parsed := map[string]any{}
-	if err := json.Unmarshal(respBody, &parsed); err != nil {
-		return "", resp.StatusCode, fmt.Errorf("failed to parse pixhost response: %w", err)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024+1))
+	if err != nil || len(raw) > 64*1024 {
+		return pixhostImage{}, errorsNewUpload()
 	}
-	showURL := strings.TrimSpace(toStringAny(parsed["show_url"], ""))
-	if showURL == "" {
-		if dataMap, ok := parsed["data"].(map[string]any); ok {
-			showURL = strings.TrimSpace(toStringAny(dataMap["show_url"], ""))
+	var result pixhostImage
+	if json.Unmarshal(raw, &result) != nil || !validPixhostURL(result.ShowURL, "pixhost.to") || !validPixhostURL(result.ThumbnailURL, "pixhost.to") {
+		return pixhostImage{}, fmt.Errorf("invalid Pixhost response")
+	}
+	if result.ImageURL != "" && !validPixhostURL(result.ImageURL, "pixhost.to") {
+		return pixhostImage{}, fmt.Errorf("invalid Pixhost image URL")
+	}
+	if result.ImageURL == "" {
+		if !strings.HasPrefix(result.ShowURL, "https://pixhost.to/show/") {
+			return pixhostImage{}, fmt.Errorf("invalid Pixhost show URL")
+		}
+		pageReq, _ := http.NewRequest(http.MethodGet, result.ShowURL, nil)
+		page, err := client.Do(pageReq)
+		if err != nil {
+			return pixhostImage{}, fmt.Errorf("Pixhost full image resolution failed")
+		}
+		defer page.Body.Close()
+		if page.StatusCode != 200 {
+			return pixhostImage{}, fmt.Errorf("Pixhost full image resolution failed")
+		}
+		body, err := io.ReadAll(io.LimitReader(page.Body, 1024*1024+1))
+		if err != nil || len(body) > 1024*1024 {
+			return pixhostImage{}, fmt.Errorf("Pixhost page too large")
+		}
+		patterns := []*regexp.Regexp{regexp.MustCompile(`(?is)<img[^>]+id=["']image["'][^>]*src=["']([^"']+)["']`), regexp.MustCompile(`(?is)<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']`)}
+		for _, pattern := range patterns {
+			if match := pattern.FindStringSubmatch(string(body)); len(match) > 1 {
+				candidate := html.UnescapeString(match[1])
+				if validPixhostURL(candidate, "pixhost.to") && strings.Contains(candidate, "/images/") {
+					result.ImageURL = candidate
+					break
+				}
+			}
+		}
+		if result.ImageURL == "" {
+			return pixhostImage{}, fmt.Errorf("Pixhost full image URL not found")
 		}
 	}
-	if showURL == "" {
-		return "", resp.StatusCode, fmt.Errorf("pixhost response did not include show_url")
+	return result, nil
+}
+
+func errorsNewUpload() error { return fmt.Errorf("Pixhost upload failed") }
+func validPixhostURL(raw, domain string) bool {
+	parsed, err := url.Parse(raw)
+	return err == nil && parsed.Scheme == "https" && parsed.User == nil && parsed.Port() == "" && (parsed.Hostname() == domain || strings.HasSuffix(parsed.Hostname(), "."+domain)) && !strings.ContainsAny(raw, "[]\r\n")
+}
+
+func (image pixhostImage) bbcode() string {
+	if image.ImageURL != "" {
+		return "[url=" + image.ShowURL + "][img]" + image.ImageURL + "[/img][/url]"
 	}
-	return showURL, resp.StatusCode, nil
+	// The API supplies the actual thumbnail and full-resolution page; never invent an imgNN host.
+	return "[url=" + image.ShowURL + "][img]" + image.ThumbnailURL + "[/img][/url]"
 }

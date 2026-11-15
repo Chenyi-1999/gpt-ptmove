@@ -227,7 +227,7 @@ func registerRoutes(
 	logsHandler *handler.LogsHandler,
 ) {
 	engine.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "服务正常", "service": "ptmove-nexus", "version": "0.3.0", "upstream": "53eee1fed09121867f956c798c158c13a475d51f"})
+		c.JSON(http.StatusOK, gin.H{"status": "服务正常", "service": "ptmove-nexus", "version": forkVersion, "upstream": "53eee1fed09121867f956c798c158c13a475d51f"})
 	})
 	// 背景图静态访问放在 /api 外，避免 CSS background-image 请求缺少 JWT
 	engine.GET("/backgrounds/:name", settingsHandler.ServeBackgroundImage)

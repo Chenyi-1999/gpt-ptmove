@@ -23,7 +23,7 @@
         </el-menu-item>
         <el-menu-item index="/settings/automation"><el-icon><Refresh /></el-icon><span>自动化</span></el-menu-item>
         <el-menu-item index="/settings/site-profiles"><el-icon><Connection /></el-icon><span>站点配置</span></el-menu-item>
-        <el-menu-item index="/settings/ai"><el-icon><Key /></el-icon><span>AI 接口</span></el-menu-item>
+        <el-menu-item index="/settings/api"><el-icon><Key /></el-icon><span>API 管理</span></el-menu-item>
       </el-menu>
     </el-aside>
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -163,16 +164,139 @@ func TestMachineOpenAPIOnlyDocumentsMachineSurface(t *testing.T) {
 	if _, ok := paths["/api/v1/sites/import"]; !ok {
 		t.Fatal("import route undocumented")
 	}
+	if _, ok := paths["/api/v1/connection"]; !ok {
+		t.Fatal("connection route undocumented")
+	}
+	operationIDs := map[string]string{}
 	for path, raw := range paths {
 		if !strings.HasPrefix(path, "/api/v1/") {
 			t.Fatalf("global admin API exposed in OpenAPI: %s", path)
 		}
 		for method, op := range raw.(map[string]any) {
+			operation := op.(map[string]any)
+			operationID, ok := operation["operationId"].(string)
+			if !ok || operationID == "" {
+				t.Fatalf("missing operationId for %s %s", method, path)
+			}
+			if previous, exists := operationIDs[operationID]; exists {
+				t.Fatalf("operationId %q collides for %s and %s", operationID, previous, method+" "+path)
+			}
+			operationIDs[operationID] = method + " " + path
 			b, _ := json.Marshal(op)
 			if method != "get" && !strings.Contains(string(b), "Idempotency-Key") {
 				t.Fatalf("missing command invariant in %s", path)
 			}
 		}
+	}
+}
+
+type connectionMachinePort struct {
+	machinePortFixture
+	calls atomic.Int32
+}
+
+func (p *connectionMachinePort) GetSettings() map[string]any {
+	p.calls.Add(1)
+	return p.machinePortFixture.GetSettings()
+}
+func (p *connectionMachinePort) ListTasks() (map[string]any, int) {
+	p.calls.Add(1)
+	return p.machinePortFixture.ListTasks()
+}
+func (p *connectionMachinePort) ListRuns() (map[string]any, int) {
+	p.calls.Add(1)
+	return p.machinePortFixture.ListRuns()
+}
+func (p *connectionMachinePort) Preview(context.Context, map[string]any) (map[string]any, int) {
+	p.calls.Add(1)
+	return map[string]any{}, 200
+}
+func (p *connectionMachinePort) Run(context.Context, map[string]any) (map[string]any, int) {
+	p.calls.Add(1)
+	return map[string]any{}, 200
+}
+
+func TestMachineConnectionIdentityAuthAndIsolation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "connection.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, _ := db.DB()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	service, err := migrationflow.NewMachineAPIService(&repository.Store{DB: db, DBType: "sqlite"}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := &connectionMachinePort{}
+	router := gin.New()
+	NewMachineHandler(service, nil, port).RegisterV1(router.Group("/api/v1"))
+	created, err := service.CreateKey("agent-key", []string{"read", "write"}, time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := created["token"].(string)
+	request := func(auth string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/connection", nil)
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		req.Header.Set("Cookie", "session=browser-session")
+		req.Header.Set("X-API-Key", "NAS-key")
+		req.Header.Set("Content-Type", "application/json")
+		res := httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		return res
+	}
+	for _, auth := range []string{"", "Bearer not-a-machine-key"} {
+		if response := request(auth); response.Code != http.StatusUnauthorized {
+			t.Fatalf("fallback authentication accepted: auth %q got %d", auth, response.Code)
+		}
+	}
+	response := request("Bearer " + token)
+	if response.Code != http.StatusOK || response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("connection response: status=%d cache=%q body=%s", response.Code, response.Header().Get("Cache-Control"), response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), token) {
+		t.Fatal("connection response exposed the bearer token")
+	}
+	var replayCount int64
+	if err := db.Model(&repository.MachineReplayRow{}).Count(&replayCount).Error; err != nil || replayCount != 0 {
+		t.Fatalf("connection wrote replay state: count=%d error=%v", replayCount, err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["service"] != "ptmove-nexus" || body["api_version"] != "v1" || body["openapi_url"] != "/api/v1/openapi.json" || body["idempotency_header"] != "Idempotency-Key" {
+		t.Fatalf("unexpected connection identity: %#v", body)
+	}
+	key := body["key"].(map[string]any)
+	createdKey := created["key"].(map[string]any)
+	if key["id"] != createdKey["id"] || key["name"] != "agent-key" || key["expires_at"] != createdKey["expires_at"] {
+		t.Fatalf("connection key metadata differs: %#v", key)
+	}
+	if got, want := key["scopes"], []any{"read", "write"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("connection scopes = %#v, want %#v", got, want)
+	}
+	if got, want := body["management"], []any{"automation", "site_profiles"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("management = %#v, want %#v", got, want)
+	}
+	if calls := port.calls.Load(); calls != 0 {
+		t.Fatalf("connection called automation port %d times", calls)
+	}
+	if err := service.RevokeKey(createdKey["id"].(string)); err != nil {
+		t.Fatal(err)
+	}
+	if response := request("Bearer " + token); response.Code != http.StatusUnauthorized {
+		t.Fatalf("revoked key accepted by connection: %d", response.Code)
+	}
+	if err := db.Model(&repository.MachineKeyRow{}).Where("id = ?", createdKey["id"]).Updates(map[string]any{"revoked": false, "expires_at": time.Now().Add(-time.Minute).Unix()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if response := request("Bearer " + token); response.Code != http.StatusUnauthorized {
+		t.Fatalf("expired key accepted by connection: %d", response.Code)
 	}
 }
 

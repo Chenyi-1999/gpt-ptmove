@@ -65,7 +65,7 @@ func (d Downloader) FetchEpisodeCountByProxy(remotePath string) (int, int, error
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 3 * time.Minute}
+	client := d.proxyHTTPClient(3 * time.Minute)
 	resp, err := client.Do(req)
 	if err != nil {
 		logx.Warnf(proxyEpisodeCountLogModule, "请求集数统计失败 remote_path=%s err=%v", compactProxyBody(trimmedPath), err)

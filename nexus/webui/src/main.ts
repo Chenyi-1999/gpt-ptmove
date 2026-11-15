@@ -107,10 +107,31 @@ const setupDesktopExternalNavigation = (): void => {
   )
 }
 
-// fetch 全局包装：为所有 /api 请求自动附加 Bearer Token，并在 401 时跳转登录
+// fetch authentication wrapper (also exercised by scripts/test_fetch_auth.cjs).
+const getSameOriginAPIPath = (url: string): string | null => {
+  try {
+    const parsed = new URL(url, window.location.href)
+    if (parsed.origin !== window.location.origin) return null
+    return parsed.pathname === '/api' || parsed.pathname.startsWith('/api/')
+      ? parsed.pathname
+      : null
+  } catch {
+    return null
+  }
+}
+
 const originalFetch = window.fetch.bind(window)
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url
+  const apiPath = getSameOriginAPIPath(url)
+  if (apiPath === '/api/v1' || apiPath?.startsWith('/api/v1/')) {
+    // Machine keys have independent authentication. Preserve native credentials/redirect
+    // semantics, which DesktopRequest cannot represent, and never borrow the admin JWT.
+    return originalFetch(input, init)
+  }
+
+  const handlesAdminSession =
+    apiPath !== null && apiPath !== '/api/auth' && !apiPath.startsWith('/api/auth/')
   const token = localStorage.getItem('token')
 
   // 合并并设置 Authorization 头
@@ -121,7 +142,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
       init?.headers ||
       {},
   )
-  if (token && url.startsWith('/api') && !mergedHeaders.has('Authorization')) {
+  if (token && apiPath !== null && !mergedHeaders.has('Authorization')) {
     mergedHeaders.set('Authorization', `Bearer ${token}`)
   }
 
@@ -159,7 +180,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     const respHeaders = new Headers(desktopResp.headers || {})
     const resp = new Response(respBytes, { status: desktopResp.status, headers: respHeaders })
 
-    if (resp.status === 401 && !url.startsWith('/api/auth/')) {
+    if (resp.status === 401 && handlesAdminSession) {
       const current = router.currentRoute.value
       const redirect = encodeURIComponent(current.fullPath)
       router.replace(`/login?redirect=${redirect}`)
@@ -168,13 +189,14 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   }
 
   const resp = await originalFetch(finalInput, typeof input === 'string' || input instanceof URL ? finalInit : undefined)
-  if (resp.status === 401 && !url.startsWith('/api/auth/')) {
+  if (resp.status === 401 && handlesAdminSession) {
     const current = router.currentRoute.value
     const redirect = encodeURIComponent(current.fullPath)
     router.replace(`/login?redirect=${redirect}`)
   }
   return resp
 }
+// End fetch authentication wrapper.
 
 // Axios 全局拦截：为所有请求附加 Bearer Token，并处理 401
 axios.interceptors.request.use((config) => {

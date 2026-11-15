@@ -253,7 +253,7 @@
         </el-menu-item>
         <el-menu-item index="/settings/automation" class="mobile-settings-sub-item">自动化</el-menu-item>
         <el-menu-item index="/settings/site-profiles" class="mobile-settings-sub-item">站点配置</el-menu-item>
-        <el-menu-item index="/settings/ai" class="mobile-settings-sub-item">AI 接口</el-menu-item>
+        <el-menu-item index="/settings/api" class="mobile-settings-sub-item">API 管理</el-menu-item>
       </el-menu>
 
       <div class="drawer-actions">
@@ -410,7 +410,8 @@ const routeTitleMap: Record<string, string> = {
   '/settings': '设置',
   '/settings/automation': '自动化设置',
   '/settings/site-profiles': '站点配置',
-  '/settings/ai': 'AI 接口',
+  '/settings/api': 'API 管理',
+  '/settings/ai': 'API 管理',
   '/seed-maintenance': '维护种子信息',
 }
 

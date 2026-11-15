@@ -9,6 +9,8 @@ import (
 	"github.com/pt-nexus/server/internal/repository"
 	acquireautomation "github.com/pt-nexus/server/internal/service/acquire/automation"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
+	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
+	"gorm.io/gorm"
 )
 
 // automationQueueEnabled 让自动化队列独立于原生手动队列开关，但必须同时启用模块和自动发布。
@@ -18,6 +20,51 @@ func (s *MigrateService) automationQueueEnabled() bool {
 	}
 	v, err := s.automation.settings(s.automation.repo)
 	return err == nil && v.Enabled && v.AutoPublish
+}
+
+// beginAutomationPublish 在上传授权事务内重读审核状态，只刷新截图字段并返回实际发送的同一份数据。
+// 审核、队列或尝试围栏失败则整体回滚；不访问网络，不刷新冻结的路由和其他发布字段。
+func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTask) (map[string]any, error) {
+	var upload map[string]any
+	err := s.automation.repo.BeginPublishPrepared(queue.ID, s.automation.now(), func(tx *gorm.DB, task repository.AutomationTask) error {
+		var snapshot automationSnapshot
+		if json.Unmarshal([]byte(task.Snapshot), &snapshot) != nil {
+			return errors.New("自动任务快照损坏")
+		}
+		store := &repository.Store{DB: tx}
+		current := &MigrateService{repo: repository.NewMigrateRepository(store)}
+		row, err := current.automationSeedForPublish(task, snapshot)
+		if err != nil {
+			return err
+		}
+		if json.Unmarshal([]byte(queue.UploadDataJSON), &upload) != nil || upload == nil {
+			return errors.New("自动发布字段快照无效")
+		}
+		screenshots := processingshared.ToString(row["screenshots"], "")
+		upload["screenshots"] = screenshots
+		upload["screenshot_review_status"] = row["screenshot_review_status"]
+		if intro, ok := upload["intro"].(map[string]any); ok {
+			intro["screenshots"] = screenshots
+		}
+		if complete, ok := upload["complete_publish_params"].(map[string]any); ok {
+			if intro, ok := complete["intro"].(map[string]any); ok {
+				intro["screenshots"] = screenshots
+			}
+		}
+		raw, err := json.Marshal(upload)
+		if err != nil {
+			return err
+		}
+		updated := tx.Model(&repository.PublishQueueTask{}).Where("id = ? AND status = ? AND upload_data_json = ?", queue.ID, repository.PublishQueueStatusRunning, queue.UploadDataJSON).Updates(map[string]any{"upload_data_json": string(raw), "updated_at": s.automation.now().Format(repository.PublishQueueTimeLayout)})
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != 1 {
+			return repository.ErrAutomationFence
+		}
+		return nil
+	})
+	return upload, err
 }
 
 // prepareAutomationQueue 在任何上传标记前重新校验站点冻结、完整下载、限制和目标缺失。
@@ -38,6 +85,9 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 		return errors.New("自动任务快照损坏")
 	}
 	if err = a.validateFrozen(snapshot); err != nil {
+		return err
+	}
+	if _, err = s.automationSeedForPublish(task, snapshot); err != nil {
 		return err
 	}
 	d, err := a.downloader(task.DownloaderID)

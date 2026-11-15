@@ -12,10 +12,13 @@ import zipfile
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=Path)
+    parser.add_argument("--extra-image", type=Path, action="append", default=[], help="Additional verified Docker archives, e.g. NAS amd64/arm64")
     parser.add_argument("--release", action="store_true")
     args = parser.parse_args()
     if args.release and not args.image:
         parser.error("a release archive requires the verified Docker image; use source snapshot otherwise")
+    if args.extra_image and not args.image:
+        parser.error("additional Docker archives require --image")
     root = Path(__file__).resolve().parents[1]
     archive_root = Path("D:/A_GPT/GPT-BackUp/GPT-PTMOVE")
     if not Path("D:/").exists():
@@ -34,14 +37,19 @@ def main():
     modes = {entry.split("\t", 1)[1]: entry.split(" ", 1)[0] for entry in index_entries if "\t" in entry}
     manifest = {}
     image = args.image.resolve() if args.image else None
-    if image and (image.drive.upper() != "D:" or not image.is_file()):
+    images = ([image] if image else []) + [path.resolve() for path in args.extra_image]
+    if any(path.drive.upper() != "D:" or not path.is_file() for path in images):
         raise SystemExit("Docker archive must already exist on D:")
+    if len({path.name for path in images}) != len(images):
+        raise SystemExit("Docker archive names must be unique")
     with zipfile.ZipFile(target, "x", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for name in sorted(set(filter(None, names))):
             source = root / name
             if not source.is_file() and not source.is_symlink():
                 continue
             parts = Path(name).parts
+            if "dist" in parts or name == "nexus/proxy/pt-nexus-box-proxy":
+                continue  # Rebuildable Git delivery products are supplied in the Docker archives.
             if any(p in {".local", "data", "node_modules", ".venv", "dist", "__pycache__"} for p in parts) or source.name.startswith(".env") and source.name != ".env.example" or source.suffix in {".key", ".pem", ".torrent"}:
                 raise SystemExit("Unsafe source archive entry: " + name)
             data = os.readlink(source).encode("utf-8") if source.is_symlink() else source.read_bytes()
@@ -53,11 +61,14 @@ def main():
                 archive.writestr(info, data)
             else:
                 archive.writestr("source/" + name, data)
-        if image:
-            with image.open("rb") as stream:
-                manifest["docker/" + image.name] = hashlib.file_digest(stream, "sha256").hexdigest()
-            archive.write(image, "docker/" + image.name)
+        for docker_image in images:
+            with docker_image.open("rb") as stream:
+                manifest["docker/" + docker_image.name] = hashlib.file_digest(stream, "sha256").hexdigest()
+            archive.write(docker_image, "docker/" + docker_image.name)
         restore = {"version": version, "created_at": now.isoformat(), "source_path": str(root), "scope": "Tracked and non-ignored source, including uncommitted changes; no live credentials, databases, SDK/cache or media", "docker_included": bool(image), "release_verified": bool(args.release), "restore": "Restore source/; use nexus/compose.ptmove.yaml with --env-file .env.ptmove. Runtime .env.ptmove and data/ (including machine-registry.key and internal-api.key) require a separate secured backup. Python0.2 data cannot be used as native Go data. A source snapshot is not a Docker release."}
+        restore["docker_archives"] = [path.name for path in images]
+        restore["source_excluded_build_products"] = ["nexus/webui/dist", "nexus/proxy/pt-nexus-box-proxy"]
+        restore["docker_restore"] = "Load only the NAS archive matching the NAS architecture; use compose.nas.yaml for NAS and compose.ptmove.yaml for controller. Configure independent tokens/instance settings; archives contain no live credentials."
         archive.writestr("RESTORE.json", json.dumps(restore, ensure_ascii=False, indent=2))
         archive.writestr("SHA256SUMS.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     with zipfile.ZipFile(target) as archive:

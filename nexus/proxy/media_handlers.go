@@ -166,14 +166,13 @@ func screenshotHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			showURL, err := uploadToPixhost(finalPngPath)
+			image, err := uploadToPixhost(finalPngPath)
 			if err != nil {
 				log.Printf("screenshot %d failed during upload: %v", i+1, err)
 				continue
 			}
 
-			directURL := strings.Replace(showURL, "https://pixhost.to/show/", "https://img2.pixhost.to/images/", 1)
-			uploadedURLs = append(uploadedURLs, directURL)
+			uploadedURLs = append(uploadedURLs, image.bbcode())
 		}
 
 		if len(uploadedURLs) == 0 {
@@ -185,7 +184,7 @@ func screenshotHandler(w http.ResponseWriter, r *http.Request) {
 
 		var bbcodeBuilder strings.Builder
 		for _, url := range uploadedURLs {
-			bbcodeBuilder.WriteString(fmt.Sprintf("[img]%s[/img]\n", url))
+			bbcodeBuilder.WriteString(url + "\n")
 		}
 
 		response = ScreenshotResponse{

@@ -28,7 +28,7 @@ RUN python fetch_native_assets.py /out/bdinfo
 FROM debian:bookworm-slim
 ARG APT_MIRROR=http://deb.debian.org
 LABEL org.opencontainers.image.title="PTMOVE Nexus" \
-      org.opencontainers.image.version="0.3.0" \
+      org.opencontainers.image.version="0.3.1" \
       org.opencontainers.image.source="https://gitee.com/star1999/gpt-ptmove" \
       org.opencontainers.image.base.name="sqing33/PTNexus@53eee1fed09121867f956c798c158c13a475d51f"
 RUN sed -i "s|http://deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \

@@ -34,7 +34,7 @@ type TorrentSnapshot struct {
 // 失败场景：连接失败、认证失败、RPC 异常、响应解析失败时返回错误。
 // 副作用：会向下载器发起网络请求。
 func (d Downloader) FetchTorrents() ([]TorrentSnapshot, error) {
-	if d.Type == "qbittorrent" && d.UseProxy {
+	if d.Type == "qbittorrent" && d.UseProxy && !d.ProxyMediaOnly {
 		return d.fetchQBTorrentsByProxy()
 	}
 
@@ -99,7 +99,7 @@ func (d Downloader) fetchQBTorrentsByProxy() ([]TorrentSnapshot, error) {
 	}
 	request.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := d.proxyHTTPClient(10 * time.Minute)
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("代理请求失败: %w", err)

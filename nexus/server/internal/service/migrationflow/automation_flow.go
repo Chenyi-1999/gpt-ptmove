@@ -17,6 +17,7 @@ import (
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
+	"gorm.io/gorm"
 )
 
 // authorizedTask 在每个新的外部动作前检查租约、模块开关和冻结站点声明。
@@ -176,10 +177,23 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		if s.authorizedTask(task, snapshot) != nil {
 			return
 		}
-		result, status := s.migrate.FetchAndStore(map[string]any{"sourceSite": snapshot.Source.NativeName(), "searchTerm": task.SourceID, "torrentName": task.Title, "savePath": task.SavePath, "downloaderId": task.DownloaderID})
-		if status >= 400 || !processingshared.ToBool(result["success"]) {
-			s.failTask(task, "原生资料处理失败，请查看原生日志", false)
+		// 已生成待确认截图时不重复抓取；确认后的重试直接复用人工审核的原生资料。
+		stored, storedErr := s.migrate.repo.GetSeedParameter(task.SourceID, snapshot.Source.NativeName())
+		if storedErr != nil && !errors.Is(storedErr, gorm.ErrRecordNotFound) {
+			s.failTask(task, "原生资料读取失败，未重新抓取", false)
 			return
+		}
+		if storedErr == nil && strings.ToLower(strings.TrimSpace(processingshared.ToString(stored["screenshot_review_status"], ""))) != processingshared.ScreenshotReviewStatusNone {
+			if _, err := s.migrate.automationSeedForPublish(task, snapshot); err != nil {
+				s.failTask(task, err.Error(), false)
+				return
+			}
+		} else {
+			result, status := s.migrate.FetchAndStore(map[string]any{"sourceSite": snapshot.Source.NativeName(), "searchTerm": task.SourceID, "torrentName": task.Title, "savePath": task.SavePath, "downloaderId": task.DownloaderID})
+			if status >= 400 || !processingshared.ToBool(result["success"]) {
+				s.failTask(task, "原生资料处理失败，请查看原生日志", false)
+				return
+			}
 		}
 		if s.authorizedTask(task, snapshot) != nil {
 			return
@@ -187,6 +201,10 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		lookup, err := processingpersist.LookupSeedForMigration(processingpersist.DBSeedLookupInput{TorrentID: task.SourceID, SiteName: snapshot.Source.NativeName()}, s.migrate.repo)
 		if err != nil || !strings.EqualFold(lookup.Hash, task.InfoHash) {
 			s.failTask(task, "原生资料对应载荷不一致", false)
+			return
+		}
+		if _, err = s.migrate.automationSeedForPublish(task, snapshot); err != nil {
+			s.failTask(task, err.Error(), false)
 			return
 		}
 		if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"state": "ready", "message": "资料已就绪，等待独立自动发布开关"}, s.now()); err != nil {
@@ -203,13 +221,16 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 			return
 		}
 		if err = s.enqueueNative(task, snapshot); err != nil {
-			s.failTask(task, "原生队列交接失败，未尝试上传", false)
+			s.failTask(task, "原生队列交接失败，未尝试上传："+err.Error(), false)
 		}
 	}
 }
 
 // enqueueNative 从持久原生资料重建上下文，并在一个事务内关联唯一队列行。
 func (s *AutomationService) enqueueNative(task repository.AutomationTask, snapshot automationSnapshot) error {
+	if _, err := s.migrate.automationSeedForPublish(task, snapshot); err != nil {
+		return err
+	}
 	lookup, err := processingpersist.LookupSeedForMigration(processingpersist.DBSeedLookupInput{TorrentID: task.SourceID, SiteName: snapshot.Source.NativeName()}, s.migrate.repo)
 	if err != nil {
 		return err

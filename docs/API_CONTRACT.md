@@ -51,6 +51,8 @@ Settings keys: `source_cookie`, `target_cookie`, `source_rss_url`, `qb_url`, `qb
 
 ## File ownership
 
+Native Go/Vue 0.3.1 API management is documented in [API_MANAGEMENT.md](API_MANAGEMENT.md) and authenticated `/api/v1/openapi.json`. The Python interface descriptions above are retained for the legacy 0.2 service. Native `/api/v1/connection` checks a dedicated machine key without business effects; native administrator key management uses `/api/machine-keys`.
+
 Backend agent owns `ptmove/api.py`, `ptmove/db.py`, `ptmove/models.py`, `ptmove/policy.py`, `ptmove/security.py`, `ptmove/scheduler.py`, `tests/test_controller.py`, `tests/test_policy.py`. Export FastAPI `app` from api.py, Store from db.py. Policy exports `evaluate_candidates(items, rule)` -> list enriched/ranked dicts.
 
 Frontend agent owns `ptmove/static/*` only. Root owns worker/adapters, packaging, docs, integration tests and CHANGELOG.md; root appends consolidated child records to avoid races.

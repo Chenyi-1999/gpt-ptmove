@@ -21,15 +21,18 @@ const (
 )
 
 type downloaderConfig struct {
-	ID        string
-	Name      string
-	Type      string
-	Host      string
-	Username  string
-	Password  string
-	Enabled   bool
-	UseProxy  bool
-	ProxyPort int
+	ID             string
+	Name           string
+	Type           string
+	Host           string
+	Username       string
+	Password       string
+	Enabled        bool
+	UseProxy       bool
+	APIKey         string
+	ProxyToken     string
+	ProxyMediaOnly bool
+	ProxyPort      int
 }
 
 // Service 负责周期性采集下载器速度与累计流量，并批量写入 traffic_stats。
@@ -247,13 +250,16 @@ func (s *Service) collectTrafficRecords() []repository.TrafficStatRecord {
 
 func (s *Service) fetchDownloaderStats(d downloaderConfig) (downloaderclient.TrafficStats, error) {
 	client := downloaderclient.Downloader{
-		ID:       d.ID,
-		Name:     d.Name,
-		Type:     d.Type,
-		Host:     d.Host,
-		Username: d.Username,
-		Password: d.Password,
-		Enabled:  d.Enabled,
+		ID:             d.ID,
+		Name:           d.Name,
+		Type:           d.Type,
+		Host:           d.Host,
+		Username:       d.Username,
+		Password:       d.Password,
+		Enabled:        d.Enabled,
+		APIKey:         d.APIKey,
+		ProxyToken:     d.ProxyToken,
+		ProxyMediaOnly: d.ProxyMediaOnly,
 	}
 	if d.UseProxy && d.Type == "qbittorrent" {
 		return client.FetchProxyTrafficStats(d.ProxyPort)
@@ -349,15 +355,18 @@ func parseEnabledDownloaders(settings map[string]any) []downloaderConfig {
 		}
 
 		result = append(result, downloaderConfig{
-			ID:        downloaderID,
-			Name:      toString(item["name"], downloaderID),
-			Type:      downloaderType,
-			Host:      host,
-			Username:  toString(item["username"], ""),
-			Password:  toString(item["password"], ""),
-			Enabled:   true,
-			UseProxy:  toBool(item["use_proxy"], false),
-			ProxyPort: toInt(item["proxy_port"], 9090),
+			ID:             downloaderID,
+			Name:           toString(item["name"], downloaderID),
+			Type:           downloaderType,
+			Host:           host,
+			Username:       toString(item["username"], ""),
+			Password:       toString(item["password"], ""),
+			Enabled:        true,
+			UseProxy:       toBool(item["use_proxy"], false),
+			ProxyPort:      toInt(item["proxy_port"], 9090),
+			APIKey:         toString(item["api_key"], ""),
+			ProxyToken:     toString(item["proxy_token"], ""),
+			ProxyMediaOnly: toBool(item["proxy_media_only"], false),
 		})
 	}
 	return result

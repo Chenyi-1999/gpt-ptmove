@@ -73,9 +73,13 @@ const router = createRouter({
           component: () => import('../components/settings/SiteProfilesSettings.vue'),
         },
         {
-          path: 'ai',
-          name: 'settings-ai',
+          path: 'api',
+          name: 'settings-api',
           component: () => import('../components/settings/AISettings.vue'),
+        },
+        {
+          path: 'ai',
+          redirect: { name: 'settings-api' },
         },
       ],
     },

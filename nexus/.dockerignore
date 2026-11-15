@@ -38,6 +38,16 @@ server/pt_stats.db-journal
 **/.env
 **/.env.*
 **/data/
+canary-data/
+backups/
+media-agent-qa/
+**/*.db
+**/*.db-*
+*-before.json
+*-qa-report.json
+deployment.json
+Dockerfile.qa-*
+buildkit.ptmove.toml
 **/node_modules/
 **/*.key
 **/*.sqlite*

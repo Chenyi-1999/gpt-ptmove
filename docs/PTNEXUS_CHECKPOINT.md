@@ -1,5 +1,17 @@
 # PTNexus 改版续接记录
 
+## 当前 0.3.1（2026-11-16）
+
+152:18120 已升级并验证 0.3.1，原账号、规则、任务、JWT 和实例密钥保留。API 管理为 `/settings/api`，兼容旧 `/settings/ai`；密钥状态、权限预设、同源连接测试、AI 接入包和稳定 OpenAPI 已完成。原自动化、计划和发布开关保持关闭。
+
+NAS 媒体代理提供 Linux amd64 与 arm64 Docker 镜像；amd64 已通过真实 FFmpeg/mpv 截图、预览、MediaInfo 和一张合成测试图的真实 Pixhost 上传。ARM64 已使用隔离 BuildKit/QEMU 构建并验证 Docker load，未在物理 ARM NAS 上运行。真实 NAS 地址及目录未提供，没有执行 NAS 安装或 81 服务器访问。
+
+源码开发使用独立 worktree `261115-api-management-b101`，以忽略文件 `.local/PTNEXUS_RESUME.json` 和最新 CHANGELOG 为准；主工作目录为 `C:\Users\50578\Desktop\GPT-PTMOVE`。交付阶段剩余：D 盘三个镜像归档及完整性校验、Git 提交/合并/推送、更新完成记录。软件已在线，勿重复运行旧 0.2→0.3 初次切换；原生服务升级应使用 `nexus/scripts/deploy_native.py upgrade`。
+
+说明：[API 管理](API_MANAGEMENT.md)、[远程补截图](REMOTE_SCREENSHOTS.md)。正式 Gitee 发行版附件仍需单独发布；以下 0.3.0 记录仅供历史参考，不作为当前部署状态。
+
+## 历史 0.3.0 断点
+
 当前状态（2026-10-27 23:47，Asia/Shanghai）：152:18120 已运行并验证 0.3.0；代码和标签已推送。正式 Gitee 发行版尚未提交，停在附件上传前的文件选择窗口。浏览器工具无法确认该窗口对应的网址，安全检查中止了操作，本轮不得改用其他浏览器控制方式绕过。
 
 - 主工作目录：`C:\Users\50578\Desktop\GPT-PTMOVE`，分支 `master`。原功能 worktree 已合并，不能继续使用旧分支作为断点。

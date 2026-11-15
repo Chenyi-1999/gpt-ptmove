@@ -154,6 +154,7 @@ func TestAutomationNativePrecheckFailuresEndTaskWithoutUpload(t *testing.T) {
 func TestAutomaticUploadBoundaryRechecksDisableWithoutResettingAttempt(t *testing.T) {
 	a, m, db := automationNativeFixture(t)
 	task := automationDownloadTask(t, a, db)
+	screenshots := automationReviewSeed(t, db, task, "none", 3)
 	queueID := int64(19)
 	if err := db.Model(&repository.AutomationTask{}).Where("id = ?", task.ID).Updates(map[string]any{"queue_id": queueID, "state": "publishing", "publish_attempted": true}).Error; err != nil {
 		t.Fatal(err)
@@ -167,7 +168,8 @@ func TestAutomaticUploadBoundaryRechecksDisableWithoutResettingAttempt(t *testin
 	if err := a.repo.SaveSettings(string(raw), false, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	queue := repository.PublishQueueTask{ID: queueID, Trigger: "automation"}
+	upload, _ := json.Marshal(map[string]any{"screenshots": screenshots})
+	queue := repository.PublishQueueTask{ID: queueID, Trigger: "automation", UploadDataJSON: string(upload)}
 	if err := m.authorizeAutomationUpload(queue); err != nil {
 		t.Fatalf("valid attempt was blocked: %v", err)
 	}

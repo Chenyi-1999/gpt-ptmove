@@ -21,8 +21,10 @@ import (
 
 // MachinePrincipal 表示已经认证的独立机器密钥。
 type MachinePrincipal struct {
-	ID     string
-	Scopes map[string]bool
+	ID        string
+	Name      string
+	ExpiresAt time.Time
+	Scopes    map[string]bool
 }
 
 // MachineAPIService 只接受独立 Bearer 密钥；持久事务保证幂等回复与业务状态一起提交。
@@ -92,7 +94,13 @@ func (s *MachineAPIService) CreateKey(name string, scopes []string, expires time
 func machineKeyView(row repository.MachineKeyRow) map[string]any {
 	var scopes []string
 	json.Unmarshal([]byte(row.Scopes), &scopes)
-	return map[string]any{"id": row.ID, "name": row.Name, "scopes": scopes, "expires_at": time.Unix(row.ExpiresAt, 0).UTC().Format(time.RFC3339), "created_at": time.Unix(row.CreatedAt, 0).UTC().Format(time.RFC3339), "revoked": row.Revoked}
+	status := "active"
+	if row.Revoked {
+		status = "revoked"
+	} else if row.ExpiresAt <= time.Now().Unix() {
+		status = "expired"
+	}
+	return map[string]any{"id": row.ID, "name": row.Name, "scopes": scopes, "expires_at": time.Unix(row.ExpiresAt, 0).UTC().Format(time.RFC3339), "created_at": time.Unix(row.CreatedAt, 0).UTC().Format(time.RFC3339), "revoked": row.Revoked, "status": status}
 }
 
 // ListKeys 返回不含哈希和明文的密钥元数据。
@@ -135,7 +143,7 @@ func (s *MachineAPIService) Authenticate(token string) (*MachinePrincipal, error
 func principal(row repository.MachineKeyRow) *MachinePrincipal {
 	var scopes []string
 	json.Unmarshal([]byte(row.Scopes), &scopes)
-	p := &MachinePrincipal{ID: row.ID, Scopes: map[string]bool{}}
+	p := &MachinePrincipal{ID: row.ID, Name: row.Name, ExpiresAt: time.Unix(row.ExpiresAt, 0).UTC(), Scopes: map[string]bool{}}
 	for _, v := range scopes {
 		p.Scopes[v] = true
 	}

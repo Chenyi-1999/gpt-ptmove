@@ -209,9 +209,7 @@ func RunParallelFetchRepairs(input ParallelFetchRepairInput, deps FetchRepairDep
 	if strings.TrimSpace(introResult.Body) != "" {
 		merged.ReviewData.Body = introResult.Body
 	}
-	if strings.TrimSpace(screenshotResult.Screens) != "" {
-		merged.ReviewData.Screens = screenshotResult.Screens
-	}
+	merged.ReviewData.Screens = mergeRepairedScreenshots(merged.ReviewData.Screens, screenshotResult)
 	merged.ScreenshotReviewStatus = processingshared.NormalizeScreenshotReviewStatus(screenshotResult.ScreenshotReviewStatus)
 	merged.ScreenshotPreviewRequired = screenshotResult.ScreenshotPreviewRequired
 
@@ -353,6 +351,14 @@ func runScreenshotsRepairTask(input ParallelFetchRepairInput, deps FetchRepairDe
 		ScreenshotReviewStatus:    processingshared.NormalizeScreenshotReviewStatus(reviewStatus),
 		ScreenshotPreviewRequired: previewRequired,
 	}
+}
+
+// mergeRepairedScreenshots 让已判定待审查的空结果清除失效截图；异常任务的零值仍保留原稿。
+func mergeRepairedScreenshots(original string, result screenshotsRepairResult) string {
+	if strings.TrimSpace(result.Screens) != "" || processingshared.NeedsScreenshotManualReview(result.ScreenshotReviewStatus) {
+		return result.Screens
+	}
+	return original
 }
 
 func repairPosterDuringFetch(
@@ -610,8 +616,10 @@ func repairScreenshotsDuringFetch(
 		RootConfig:  deps.RootConfig,
 	})
 	if previewDecisionErr != nil {
-		logx.Warnf(fetchRepairScreenshotLogModule, "截图字幕流探测失败，继续按自动重建处理 task_id=%s err=%v", taskID, previewDecisionErr)
-	} else if usePendingReview {
+		logx.Warnf(fetchRepairScreenshotLogModule, "截图字幕流探测失败，标记为待人工确认 task_id=%s err=%v", taskID, previewDecisionErr)
+		usePendingReview = true
+	}
+	if usePendingReview {
 		reviewStatus = processingshared.ScreenshotReviewStatusPending
 		if mode == processingshared.ScreenshotReviewModeInteractive {
 			previewRequired = true
@@ -634,7 +642,10 @@ func repairScreenshotsDuringFetch(
 		RootConfig:  deps.RootConfig,
 	})
 	if err == nil && len(generatedURLs) > 0 {
-		reviewData.Screens = ToBBCodeImages(generatedURLs)
+		reviewData.Screens = ToBBCodeImages(append(validURLs, generatedURLs...))
+		if len(ExtractImageURLsFromText(reviewData.Screens)) < fetchMinValidScreenshots {
+			reviewStatus = processingshared.ScreenshotReviewStatusPending
+		}
 		logx.Infof(fetchRepairScreenshotLogModule, "截图自动重建成功 generated_count=%d", len(generatedURLs))
 		if processingshared.NeedsScreenshotManualReview(reviewStatus) {
 			emitLog(deps, taskID, "修复截图", "截图自动重建成功，请在审查时人工确认字幕时间点", "warning")
@@ -648,12 +659,13 @@ func repairScreenshotsDuringFetch(
 		reviewData.Screens = ToBBCodeImages(validURLs)
 		logx.Warnf(fetchRepairScreenshotLogModule, "截图自动重建失败，回退保留可用截图 valid_count=%d err=%v", len(validURLs), err)
 		emitLog(deps, taskID, "修复截图", "截图重建失败，已回退保留可用截图", "warning")
-		return processingshared.ScreenshotReviewStatusNone, false
+		return processingshared.ScreenshotReviewStatusPending, false
 	}
 
+	reviewData.Screens = ""
 	logx.Warnf(fetchRepairScreenshotLogModule, "截图自动重建失败且无可用回退截图 err=%v", err)
 	emitLog(deps, taskID, "修复截图", "截图自动重建失败，未获得可用截图", "warning")
-	return processingshared.ScreenshotReviewStatusNone, false
+	return processingshared.ScreenshotReviewStatusPending, false
 }
 
 func filterReachableImageURLsConcurrently(urls []string, workers int) []string {

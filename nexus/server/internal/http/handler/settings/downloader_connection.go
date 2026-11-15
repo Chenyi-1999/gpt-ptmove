@@ -1,16 +1,12 @@
 package settings
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pt-nexus/server/internal/platform/logx"
@@ -63,6 +59,16 @@ func (h *Handler) TestConnection(c *gin.Context) {
 			}
 		}
 	}
+	proxyToken := strings.TrimSpace(handlerToString(payload["proxy_token"], ""))
+	if proxyToken == "" && !handlerToBool(payload["clear_proxy_token"], false) {
+		for _, saved := range h.settings.DownloaderConfigs() {
+			if handlerToString(saved["id"], "") == handlerToString(payload["id"], "") {
+				proxyToken = handlerToString(saved["proxy_token"], "")
+				break
+			}
+		}
+	}
+	mediaOnly := handlerToBool(payload["proxy_media_only"], false)
 	useProxy := handlerToBool(payload["use_proxy"], false)
 	proxyPort := handlerToInt(payload["proxy_port"], 9090)
 
@@ -77,21 +83,23 @@ func (h *Handler) TestConnection(c *gin.Context) {
 	}
 
 	downloader := downloaderclient.Downloader{
-		ID:        handlerToString(payload["id"], ""),
-		Name:      name,
-		Type:      typ,
-		Host:      strings.TrimSpace(host),
-		Username:  username,
-		Password:  password,
-		APIKey:    apiKey,
-		Enabled:   true,
-		UseProxy:  useProxy,
-		ProxyPort: proxyPort,
+		ID:             handlerToString(payload["id"], ""),
+		Name:           name,
+		Type:           typ,
+		Host:           strings.TrimSpace(host),
+		Username:       username,
+		Password:       password,
+		APIKey:         apiKey,
+		Enabled:        true,
+		UseProxy:       useProxy,
+		ProxyPort:      proxyPort,
+		ProxyToken:     proxyToken,
+		ProxyMediaOnly: mediaOnly,
 	}
 
 	switch typ {
 	case "qbittorrent":
-		if useProxy {
+		if useProxy && !mediaOnly {
 			if _, err := downloader.FetchProxyTrafficStats(proxyPort); err != nil {
 				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
 				return
@@ -103,6 +111,12 @@ func (h *Handler) TestConnection(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, false)})
 			return
 		}
+		if useProxy && mediaOnly {
+			if err := downloader.ProbeMediaProxy(); err != nil {
+				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
+				return
+			}
+		}
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 连接测试成功", name)})
 		return
 	case "transmission":
@@ -110,6 +124,12 @@ func (h *Handler) TestConnection(c *gin.Context) {
 		if _, err := downloader.FetchVersion(); err != nil {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, false)})
 			return
+		}
+		if useProxy && mediaOnly {
+			if err := downloader.ProbeMediaProxy(); err != nil {
+				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
+				return
+			}
 		}
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 连接测试成功", name)})
 		return
@@ -216,7 +236,7 @@ func resolveDownloaderVersion(cfg map[string]any) (string, error) {
 	if typ == "" {
 		return "", errors.New("缺少下载器类型配置")
 	}
-	if typ == "qbittorrent" && handlerToBool(cfg["use_proxy"], false) {
+	if typ == "qbittorrent" && handlerToBool(cfg["use_proxy"], false) && !handlerToBool(cfg["proxy_media_only"], false) {
 		stats, err := getProxyDownloaderStats(cfg)
 		if err != nil {
 			return "", err
@@ -235,6 +255,7 @@ func resolveDownloaderVersion(cfg map[string]any) (string, error) {
 		Host:     strings.TrimSpace(handlerToString(cfg["host"], "")),
 		Username: handlerToString(cfg["username"], ""),
 		Password: handlerToString(cfg["password"], ""),
+		APIKey:   handlerToString(cfg["api_key"], ""),
 		Enabled:  true,
 	}
 	if downloader.Host == "" {
@@ -243,71 +264,13 @@ func resolveDownloaderVersion(cfg map[string]any) (string, error) {
 	return downloader.FetchVersion()
 }
 
-func getProxyDownloaderStats(clientConfig map[string]any) (map[string]any, error) {
-	hostValue := strings.TrimSpace(handlerToString(clientConfig["host"], ""))
-	if hostValue == "" {
-		return nil, errors.New("缺少 host 配置")
-	}
-
-	parsedURL, err := parseHostURL(hostValue)
+func getProxyDownloaderStats(cfg map[string]any) (map[string]any, error) {
+	d := downloaderclient.Downloader{ID: handlerToString(cfg["id"], ""), Type: handlerToString(cfg["type"], ""), Host: handlerToString(cfg["host"], ""), Username: handlerToString(cfg["username"], ""), Password: handlerToString(cfg["password"], ""), APIKey: handlerToString(cfg["api_key"], ""), ProxyToken: handlerToString(cfg["proxy_token"], ""), ProxyMediaOnly: handlerToBool(cfg["proxy_media_only"], false)}
+	stats, err := d.FetchProxyTrafficStats(handlerToInt(cfg["proxy_port"], 9090))
 	if err != nil {
-		return nil, fmt.Errorf("解析 host 失败: %w", err)
+		return nil, err
 	}
-
-	proxyIP := strings.TrimSpace(parsedURL.Hostname())
-	if proxyIP == "" {
-		proxyIP = extractHostFallback(hostValue)
-	}
-	if proxyIP == "" {
-		return nil, errors.New("无法解析代理地址")
-	}
-
-	proxyPort := handlerToInt(clientConfig["proxy_port"], 9090)
-	proxyBaseURL := fmt.Sprintf("http://%s:%d", proxyIP, proxyPort)
-
-	originPort := parsedURL.Port()
-	if strings.TrimSpace(originPort) == "" {
-		originPort = "8080"
-	}
-	proxyDownloaderConfig := map[string]any{
-		"id":       handlerToString(clientConfig["id"], ""),
-		"type":     handlerToString(clientConfig["type"], ""),
-		"host":     "http://127.0.0.1:" + originPort,
-		"username": handlerToString(clientConfig["username"], ""),
-		"password": handlerToString(clientConfig["password"], ""),
-	}
-
-	payload, err := json.Marshal([]map[string]any{proxyDownloaderConfig})
-	if err != nil {
-		return nil, fmt.Errorf("构造代理请求失败: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, proxyBaseURL+"/api/stats/server", bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("创建代理请求失败: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("代理请求失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("代理返回异常: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	statsData := make([]map[string]any, 0)
-	if err := json.Unmarshal(body, &statsData); err != nil {
-		return nil, fmt.Errorf("解析代理响应失败: %w", err)
-	}
-	if len(statsData) == 0 {
-		return nil, errors.New("代理返回空统计信息")
-	}
-	return statsData[0], nil
+	return map[string]any{"version": stats.Version, "download_speed": stats.DownloadSpeed, "upload_speed": stats.UploadSpeed, "total_upload": stats.TotalUpload, "total_download": stats.TotalDownload}, nil
 }
 
 func parseHostURL(hostValue string) (*url.URL, error) {

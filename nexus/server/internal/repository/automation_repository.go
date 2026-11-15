@@ -310,6 +310,12 @@ func (r *AutomationRepository) Enqueue(task AutomationTask, queue *PublishQueueT
 
 // BeginPublish 在调用原生发布前持久化尝试标记。失效配置、重复领取、取消均拒绝。
 func (r *AutomationRepository) BeginPublish(queueID int64, now time.Time) error {
+	return r.BeginPublishPrepared(queueID, now, nil)
+}
+
+// BeginPublishPrepared 在同一授权事务中准备当前发布字段，再持久化不可回退的尝试标记。
+// prepare 只能通过 tx 读写本地数据库；失败时字段更新与尝试标记一同回滚，禁止执行外部动作。
+func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time, prepare func(tx *gorm.DB, task AutomationTask) error) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var settings AutomationSettingsRecord
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&settings, 1).Error; err != nil {
@@ -326,12 +332,20 @@ func (r *AutomationRepository) BeginPublish(queueID int64, now time.Time) error 
 		if err := tx.First(&task, "queue_id = ?", queueID).Error; err != nil {
 			return err
 		}
+		if task.State != "queued_publish" || task.PublishAttempted {
+			return ErrAutomationFence
+		}
 		var n int64
 		if err := tx.Model(&AutomationTask{}).Where("id <> ? AND source = ? AND target = ? AND (source_id = ? OR info_hash = ?) AND publish_attempted = ?", task.ID, task.Source, task.Target, task.SourceID, task.InfoHash, true).Count(&n).Error; err != nil {
 			return err
 		}
 		if n > 0 {
 			return ErrAutomationDuplicate
+		}
+		if prepare != nil {
+			if err := prepare(tx, task); err != nil {
+				return err
+			}
 		}
 		result := tx.Model(&AutomationTask{}).Where("queue_id = ? AND state = ? AND publish_attempted = ?", queueID, "queued_publish", false).Updates(map[string]any{"publish_attempted": true, "state": "publishing", "updated_at": now.UnixMilli()})
 		if result.Error != nil {

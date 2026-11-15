@@ -68,7 +68,7 @@ func (d Downloader) FetchBDInfoProgressByProxy(taskID string) (ProxyBDInfoTaskSt
 		return ProxyBDInfoTaskStatus{}, &ProxyAPIError{StatusCode: 500, Message: "创建请求失败: " + err.Error()}
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := d.proxyHTTPClient(30 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return ProxyBDInfoTaskStatus{}, &ProxyAPIError{StatusCode: 500, Message: "代理请求失败: " + err.Error()}

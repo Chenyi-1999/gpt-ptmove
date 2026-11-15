@@ -837,11 +837,17 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
 			return
 		}
-		if err := s.automation.repo.BeginPublish(taskID, time.Now()); err != nil {
-			s.failAutomationBeforePublish(taskRecord, "自动发布授权或尝试标记失败，禁止上传")
-			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, "自动发布授权或尝试标记失败，禁止上传", "")
+		prepared, err := s.beginAutomationPublish(taskRecord)
+		if err != nil {
+			reason := "自动发布授权或尝试标记失败，禁止上传：" + err.Error()
+			s.failAutomationBeforePublish(taskRecord, reason)
+			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, reason, "")
 			return
 		}
+		uploadData = prepared
+		payload["upload_data"] = uploadData
+		encoded, _ := json.Marshal(uploadData)
+		taskRecord.UploadDataJSON = string(encoded)
 	}
 	if taskRecord.Trigger == "automation" {
 		payload[automationUploadGuardKey] = func(path string) error {

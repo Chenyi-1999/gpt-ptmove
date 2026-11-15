@@ -4,39 +4,19 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"time"
 )
 
 func main() {
-	port := ":9090"
-	if len(os.Args) > 1 {
-		port = strings.TrimSpace(os.Args[1])
-		if port == "" {
-			port = ":9090"
-		}
-		if !strings.HasPrefix(port, ":") {
-			port = ":" + port
-		}
+	policy, err := loadMediaPolicy(os.Getenv("PTMOVE_PROXY_TOKEN"), os.Getenv("PTMOVE_MEDIA_ROOTS"))
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	http.HandleFunc("/api/torrents/all", allTorrentsHandler)
-	http.HandleFunc("/api/stats/server", statsHandler)
-	http.HandleFunc("/api/torrents/upload-limit/batch", uploadLimitBatchHandler)
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSONResponse(w, r, http.StatusOK, map[string]string{
-			"status":  "ok",
-			"message": "pt-nexus-box-proxy is healthy",
-		})
-	})
-	http.HandleFunc("/api/media/screenshot", screenshotHandler)
-	http.HandleFunc("/api/media/mediainfo", mediainfoHandler)
-	RegisterBDInfoRoutes()
-	http.HandleFunc("/api/file/check", fileCheckHandler)
-	http.HandleFunc("/api/file/batch-check", batchFileCheckHandler)
-	http.HandleFunc("/api/media/episode-count", episodeCountHandler)
-
-	log.Printf("pt-nexus-box-proxy listening on %s", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatalf("server exited: %v", err)
+	address := os.Getenv("PTMOVE_LISTEN")
+	if address == "" {
+		address = "127.0.0.1:19090"
 	}
+	server := &http.Server{Addr: address, Handler: newMediaHandler(policy), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 25 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	log.Printf("PTMove media agent 0.3.1 listening on %s", address)
+	log.Fatal(server.ListenAndServe())
 }

@@ -38,7 +38,7 @@ func OpenMediaSession(rawPath string, scene string) (*MediaSession, error) {
 	if info.IsDir() || !isISOFileInput(trimmedPath) {
 		return newPassthroughMediaSession(trimmedPath), nil
 	}
-	return openISOSession(trimmedPath, normalizeMediaScene(scene))
+	return nil, errors.New("ISO mounting is disabled; expose an extracted read-only media directory")
 }
 
 func newPassthroughMediaSession(path string) *MediaSession {
