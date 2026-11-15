@@ -58,6 +58,27 @@ Compose 会把该绝对目录以相同路径只读挂载进代理。若 qB 自�
 
 在 amd64 或 arm64 NAS 上运行 Compose 会按本机平台构建。跨平台示例：
 
+如果使用已经打包的 Docker 镜像，先加载与 NAS 架构对应的归档，再用 `--no-build` 启动。ARM64 归档带独立标签，需要先改为 Compose 使用的本机标签：
+
+amd64 NAS：
+
+```sh
+docker load -i ptmove-media-agent-0.3.1-linux-amd64.tar.gz
+```
+
+arm64 NAS：
+
+```sh
+docker load -i ptmove-media-agent-0.3.1-linux-arm64.tar.gz
+docker tag ptmove-media-agent:0.3.1-arm64 ptmove-media-agent:0.3.1
+```
+
+完成对应架构的加载并编辑 `.env` 后启动：
+
+```sh
+docker compose --env-file .env -f compose.nas.yaml up -d --no-build
+```
+
 ```sh
 docker buildx build --platform linux/amd64 -f Dockerfile.nas --load -t ptmove-media-agent:0.3.1 .
 docker buildx build --platform linux/arm64 -f Dockerfile.nas --load -t ptmove-media-agent:0.3.1-arm64 .

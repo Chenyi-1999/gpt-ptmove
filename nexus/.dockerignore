@@ -41,6 +41,7 @@ server/pt_stats.db-journal
 canary-data/
 backups/
 media-agent-qa/
+transfer031/
 **/*.db
 **/*.db-*
 *-before.json

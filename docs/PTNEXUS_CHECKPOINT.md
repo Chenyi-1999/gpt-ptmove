@@ -6,9 +6,20 @@
 
 NAS 媒体代理提供 Linux amd64 与 arm64 Docker 镜像；amd64 已通过真实 FFmpeg/mpv 截图、预览、MediaInfo 和一张合成测试图的真实 Pixhost 上传。ARM64 已使用隔离 BuildKit/QEMU 构建并验证 Docker load，未在物理 ARM NAS 上运行。真实 NAS 地址及目录未提供，没有执行 NAS 安装或 81 服务器访问。
 
-源码开发使用独立 worktree `261115-api-management-b101`，以忽略文件 `.local/PTNEXUS_RESUME.json` 和最新 CHANGELOG 为准；主工作目录为 `C:\Users\50578\Desktop\GPT-PTMOVE`。交付阶段剩余：D 盘三个镜像归档及完整性校验、Git 提交/合并/推送、更新完成记录。软件已在线，勿重复运行旧 0.2→0.3 初次切换；原生服务升级应使用 `nexus/scripts/deploy_native.py upgrade`。
+功能已合并为 `ed0bcc6a39223993368d3489db7172bb1678bf72`；master 和附注标签 `v0.3.1` 已推送并核验。原功能 worktree 已移除，不应从旧分支继续。主工作目录为 `C:\Users\50578\Desktop\GPT-PTMOVE`；交付记录在独立 worktree 完成，合并后从主工作目录续接，以忽略文件 `.local/PTNEXUS_RESUME.json` 和最新 CHANGELOG 为准。不要移动已有发布标签。
+
+三个 Docker 归档已全部下载到 D 盘并校验，包含主程序 amd64、NAS 代理 amd64 和 arm64。历史发布包 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-11\GPT-PTMOVE__2026-11-16_011943__历史发布__Nexus-v0.3.1.zip` 包含源码和三个镜像，741 项清单哈希及 ZIP CRC 均通过，整体 SHA256 为 `cd9e93dd58d0988e1a91f1092ecee7bc034c8d4e4853858acd22655184fe5c1f`。01:18:41 的早期包保留；01:19:43 包还包含打包器版本标签动态化修正，作为本次交付包。所有归档均不含运行时账号、数据库、密钥或媒体，不是完整运行数据备份。
+
+152 的 canary、截图测试及临时 TLS 传输容器均已移除；传输私钥目录也已清理。正式服务保持健康；仅文档和归档记录更新，无需再次构建或重启。勿重复运行旧 0.2→0.3 初次切换；原生服务升级应使用 `nexus/scripts/deploy_native.py upgrade`。
 
 说明：[API 管理](API_MANAGEMENT.md)、[远程补截图](REMOTE_SCREENSHOTS.md)。正式 Gitee 发行版附件仍需单独发布；以下 0.3.0 记录仅供历史参考，不作为当前部署状态。
+
+## 当前续接步骤（0.3.1）
+
+1. Gitee 网页登录已过期，已打开登录页并请用户自行登录；未填写凭据、上传附件或创建正式发行版。用户完成登录后，在同一个浏览器会话继续 `https://gitee.com/star1999/gpt-ptmove/releases/new`，选择已有 `v0.3.1`，使用 [发行说明](RELEASE-v0.3.1.md)。不得把标签已推送写成正式发行版已发布。
+2. 完整包及 NAS 独立安装源码包在 D 盘 2026-11 目录；上传附件的可恢复分片、清单和还原脚本位于 `staging/gitee-v0.3.1-parts-final/`，以目录中的实际验证报告为准。早期 `gitee-v0.3.1-parts/` 保留作历史；仅使用 final 目录，它还验证还原时保护已有文件。上传需使用浏览器文档支持的文件上传 API，全部完成后提交一次并验证下载链接。登录前不尝试其他认证路线。
+3. 实际 NAS 仍需设备地址、下载目录和可信网络方案；安装前核对具体架构及 qB 返回路径。若操作目标涉及 81 服务器，必须针对安装及联调的具体范围重新逐轮取得两次独立确认；此前版本查询的历史确认不能沿用。
+4. 正式发行版提交后，追加 CHANGELOG 并更新 DEPLOYMENT 的 `release_published` 和忽略断点文件，单独提交记录，不移动 `v0.3.1`。自动化、计划和自动发布默认关闭，真实下载、发种和实际 NAS 接入仍未验证。
 
 ## 历史 0.3.0 断点
 
@@ -24,7 +35,7 @@ NAS 媒体代理提供 Linux amd64 与 arm64 Docker 镜像；amd64 已通过真�
 - 临时验证项目 `ptmove-nexus-canary` 已关闭；仅其 `canary-data` 和 `.env.canary` 已删除，18121 不再提供该服务，正式数据保留。
 - 未验证：真实 NAS/站点下载和发布、qB Token 网关及 NAS 媒体代理兼容性。81 服务器不在本次操作授权范围。
 
-## 下次直接续接
+## 历史 0.3.0 的续接步骤（当前不要执行）
 
 1. 用户关闭系统文件选择窗口并在新一轮回复后，重新读取浏览器控制文档；仅继续 Edge 中 Gitee 新发行版页面。标题、说明及已存在的 `v0.3.0` 标签已填好；先核实页面现状，不重复创建标签或提交发行版。不要操作另一个受保护 qB 标签页。
 2. 附件位于 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-10\staging\gitee-v0.3.0-parts\`，上传 `PTMove-Nexus-v0.3.0.part01.zip` 至 `part05.zip` 共五个文件，每个小于 100 MiB。使用浏览器文档支持的文件上传 API，避免无法绑定网址的原生文件选择窗口。五个附件均完成后按已有用户授权提交，核验正式页面和五个下载链接。

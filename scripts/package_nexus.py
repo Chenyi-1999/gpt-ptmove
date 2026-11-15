@@ -68,7 +68,7 @@ def main():
         restore = {"version": version, "created_at": now.isoformat(), "source_path": str(root), "scope": "Tracked and non-ignored source, including uncommitted changes; no live credentials, databases, SDK/cache or media", "docker_included": bool(image), "release_verified": bool(args.release), "restore": "Restore source/; use nexus/compose.ptmove.yaml with --env-file .env.ptmove. Runtime .env.ptmove and data/ (including machine-registry.key and internal-api.key) require a separate secured backup. Python0.2 data cannot be used as native Go data. A source snapshot is not a Docker release."}
         restore["docker_archives"] = [path.name for path in images]
         restore["source_excluded_build_products"] = ["nexus/webui/dist", "nexus/proxy/pt-nexus-box-proxy"]
-        restore["docker_restore"] = "Load only the NAS archive matching the NAS architecture; use compose.nas.yaml for NAS and compose.ptmove.yaml for controller. Configure independent tokens/instance settings; archives contain no live credentials."
+        restore["docker_restore"] = f"Load only the NAS archive matching its architecture; arm64: docker tag ptmove-media-agent:{version}-arm64 ptmove-media-agent:{version}. Use compose.nas.yaml for NAS and compose.ptmove.yaml for controller, up -d --no-build after loading. Configure independent tokens/instance settings; archives contain no live credentials."
         archive.writestr("RESTORE.json", json.dumps(restore, ensure_ascii=False, indent=2))
         archive.writestr("SHA256SUMS.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     with zipfile.ZipFile(target) as archive:

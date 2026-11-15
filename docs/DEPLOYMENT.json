@@ -39,7 +39,9 @@
       "architecture": "amd64",
       "archive_sha256": "b23c667b6f11ef808b1c45b92f536a4a28d273a0112107c57d76bf431d76a5fb",
       "image": "ptmove-media-agent:0.3.1",
-      "image_id": "sha256:5d177d787c7b0762716a5134ee392b8b9819551956c86205a510a37a5ec2f2a0"
+      "image_id": "sha256:90039d0938cab9ec0116e4cf34fc22480711ccf9a6406d06c2348c9471cb3225",
+      "build_index_id": "sha256:5d177d787c7b0762716a5134ee392b8b9819551956c86205a510a37a5ec2f2a0",
+      "digest_note": "BuildKit index before export; saved archive and loaded tag use platform manifest. RootFS layers identical."
     },
     {
       "architecture": "arm64",
@@ -63,9 +65,28 @@
   "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1",
   "release_url_status": "planned; formal Release not submitted",
   "git_tag": "v0.3.1",
-  "release_commit": null,
-  "git_master_pushed": false,
-  "git_tag_pushed": false,
+  "release_commit": "ed0bcc6a39223993368d3489db7172bb1678bf72",
+  "git_master_pushed": true,
+  "git_tag_pushed": true,
   "release_published": false,
-  "release_status": "Runtime deployed and verified; final Git submission and local release archive pending at record time"
+  "release_status": "Code and v0.3.1 tag pushed; runtime deployed; three Docker archives and release ZIP verified on D; formal Gitee Release pending web sign-in and attachment upload",
+  "canary_removed": true,
+  "docker_archive_transfer_verified": true,
+  "release_archive": {
+    "filename": "GPT-PTMOVE__2026-11-16_011943__历史发布__Nexus-v0.3.1.zip",
+    "sha256": "cd9e93dd58d0988e1a91f1092ecee7bc034c8d4e4853858acd22655184fe5c1f",
+    "manifest_files": 741,
+    "verification": "ZIP CRC and every manifest SHA256 passed; no runtime data or credentials",
+    "bytes": 793113781
+  },
+  "temporary_transfer_service_removed": true,
+  "temporary_transfer_certificate_directory_removed": true,
+  "release_parts": {
+    "directory": "staging/gitee-v0.3.1-parts-final",
+    "wrappers": 10,
+    "largest_wrapper_bytes": 83892407,
+    "actual_reassembly_verified": true,
+    "existing_restore_files_preserved_verified": true,
+    "uploaded": false
+  }
 }
