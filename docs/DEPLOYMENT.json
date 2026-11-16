@@ -63,13 +63,13 @@
   "legacy_directory": "/opt/gpt-ptmove",
   "legacy_container_stopped_retained": true,
   "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1",
-  "release_url_status": "planned; formal Release not submitted",
+  "release_url_status": "published; stable latest release, tag commit and eleven custom attachment links verified",
   "git_tag": "v0.3.1",
   "release_commit": "ed0bcc6a39223993368d3489db7172bb1678bf72",
   "git_master_pushed": true,
   "git_tag_pushed": true,
-  "release_published": false,
-  "release_status": "Code and v0.3.1 tag pushed; runtime deployed; three Docker archives and release ZIP verified on D; formal Gitee Release pending web sign-in and attachment upload",
+  "release_published": true,
+  "release_status": "Formal v0.3.1 Gitee Release published with ten Docker bundle parts and NAS source installer; existing152 runtime unchanged",
   "canary_removed": true,
   "docker_archive_transfer_verified": true,
   "release_archive": {
@@ -87,6 +87,24 @@
     "largest_wrapper_bytes": 83892407,
     "actual_reassembly_verified": true,
     "existing_restore_files_preserved_verified": true,
-    "uploaded": false
-  }
+    "uploaded": true
+  },
+  "release_verified_at": "2026-11-16T18:48:19.327385+08:00",
+  "release_page_published_at_minute": "2026-11-16T18:45+08:00",
+  "release_attachment_count": 11,
+  "release_attachment_names": [
+    "GPT-PTMOVE__2026-11-16_010801__源码快照__NAS代理安装包-v0.3.1.zip",
+    "PTMove-Nexus-v0.3.1.part01.zip",
+    "PTMove-Nexus-v0.3.1.part02.zip",
+    "PTMove-Nexus-v0.3.1.part03.zip",
+    "PTMove-Nexus-v0.3.1.part04.zip",
+    "PTMove-Nexus-v0.3.1.part05.zip",
+    "PTMove-Nexus-v0.3.1.part06.zip",
+    "PTMove-Nexus-v0.3.1.part07.zip",
+    "PTMove-Nexus-v0.3.1.part08.zip",
+    "PTMove-Nexus-v0.3.1.part09.zip",
+    "PTMove-Nexus-v0.3.1.part10.zip"
+  ],
+  "release_verified_tag_commit": "ed0bcc6a39223993368d3489db7172bb1678bf72",
+  "release_attachment_verification_scope": "Visible final release links, not a re-download hash test"
 }

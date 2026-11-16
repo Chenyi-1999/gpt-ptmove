@@ -44,7 +44,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-原生 Go + Vue 0.3.1 已部署到 `http://152.136.236.238:18120`，API 管理入口为 `/settings/api`。部署与测试状态见 [DEPLOYMENT.json](docs/DEPLOYMENT.json) 及 CHANGELOG 最新记录。Gitee 仓库为 <https://gitee.com/star1999/gpt-ptmove>；正式发行版的附件发布状态单独记录，Git 标签不等于附件已发布。
+原生 Go + Vue 0.3.1 已部署到 `http://152.136.236.238:18120`，API 管理入口为 `/settings/api`。部署与测试状态见 [DEPLOYMENT.json](docs/DEPLOYMENT.json) 及 CHANGELOG 最新记录。Gitee 仓库为 <https://gitee.com/star1999/gpt-ptmove>；[v0.3.1 正式发行版](https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1) 已发布十个 Docker 包分片与 NAS 独立源码安装包。下载全部分片并解压到同一目录后，运行 `python3 join_release_parts.py` 校验并恢复完整发布包。
 
 ## 初次配置
 

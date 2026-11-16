@@ -1,6 +1,6 @@
 # PTMove Nexus v0.3.1
 
-基于 PTNexus 的 API 管理和 NAS 远程补截图版本。代码及 `v0.3.1` 标签已推送，已在 152 的 Docker 服务部署验证；本文件是正式发行说明草稿，Gitee 附件尚未上传、正式发行版尚未提交。
+基于 PTNexus 的 API 管理和 NAS 远程补截图版本，已在 152 的 Docker 服务部署验证。[Gitee 正式发行版](https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1) 于 2026-11-16 发布，包含十个 Docker 发布包分片及 NAS 独立源码安装包，共 11 个附件。标签保持指向已验证的功能提交 `ed0bcc6a39223993368d3489db7172bb1678bf72`。
 
 ## 变化
 

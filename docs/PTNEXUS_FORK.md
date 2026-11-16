@@ -10,7 +10,7 @@ PTNexus 上游附带其用途和限制声明；使用者需阅读并遵守该声
 
 ## Docker 部署与隔离
 
-从 Gitee 获取本项目后，进入 `nexus/` 使用 `compose.ptmove.yaml`。它构建 `Dockerfile.ptmove`，提供 `ptmove-nexus:0.3.0` 服务，将宿主机当前目录 `data/` 单独挂载到容器 `/app/data`，默认绑定主机 `0.0.0.0:18120` 并转发容器 `5275`。可用 `PTMOVE_BIND` 和 `PTMOVE_PORT` 调整绑定地址与端口。`.env.ptmove` 为必需的 Compose 环境文件；建议显式设置高熵 `JWT_SECRET` 并将该文件设为仅管理员可读。
+从 Gitee 获取本项目后，进入 `nexus/` 使用 `compose.ptmove.yaml`。它构建 `Dockerfile.ptmove`，提供 `ptmove-nexus:0.3.1` 服务，将宿主机当前目录 `data/` 单独挂载到容器 `/app/data`，默认绑定主机 `0.0.0.0:18120` 并转发容器 `5275`。可用 `PTMOVE_BIND` 和 `PTMOVE_PORT` 调整绑定地址与端口。`.env.ptmove` 为必需的 Compose 环境文件；建议显式设置高熵 `JWT_SECRET` 并将该文件设为仅管理员可读。
 
 必须为新实例选择独立工作目录、数据目录、环境文件和未占用端口。不要把 Python 0.2 的 SQLite、加密密钥、NAS worker 状态或其他 PTNexus 实例的 `data/` 挂载进来。Compose 对容器限制为 768 MiB 内存和 1 CPU，日志轮转为 10 MiB、保留 3 个文件。容器 healthcheck 调用程序自身检查。
 
@@ -29,7 +29,9 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 若要通过公网直接访问，将 `PTMOVE_BIND` 设为 `0.0.0.0` 前，需由部署者配置受控的 HTTPS 反向代理或等效网络保护；Compose 默认端口映射本身不是 TLS。此 API 会处理 tracker 凭据，不应在不可信网络上明文暴露。
 
-2026-10-27 已在 `152.136.236.238:18120` 完成原生改版 Docker 部署、健康与重启验证。原管理员密码保留，自动运行、计划和发布均关闭；旧 0.2 容器和数据保留作回滚。代码提交 `0e160b8` 和 `v0.3.0` 标签已推送 Gitee。正式发行版附件尚未上传、发行版尚未提交：浏览器在文件选择窗口无法确认网址，安全检查中止了该操作。下次从附件上传继续，预定地址为 <https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.0>；当前不能将该地址当作已发布证明。
+当前 0.3.1 已在 `152.136.236.238:18120` 部署验证，原管理员密码保留，自动运行、计划和发布均关闭。2026-11-16 已发布 [v0.3.1 正式发行版](https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1)，包含十个完整 Docker 包分片和 NAS 独立源码安装包。标签指向已验证的功能提交 `ed0bcc6`；后续交付文档提交不改变该标签。旧原生 0.3.0 镜像及旧 Python 0.2 容器、数据继续保留作回滚。
+
+历史 0.3.0：2026-10-27 完成首次原生部署、健康与重启验证，代码提交 `0e160b8` 和标签已推送；当时 Gitee 发行附件因文件选择窗口限制未完成。该历史断点不再是当前续接步骤，不要重复首次切换。
 
 ## 自动化行为与默认值
 
