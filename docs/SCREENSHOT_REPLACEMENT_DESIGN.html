@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PTMove 基于 PTNexus 的远程补截图设计：原图校验、NAS 截帧、Pixhost 上传、资料替换与发布前复核。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PTMove｜截图替换设计说明</title>
+  <style>
+    :root {
+      --bg: #f1f5f1; --paper: #fff; --ink: #21352c; --muted: #53655a;
+      --line: #d5e0d7; --accent: #17634a; --soft: #e9f3ec;
+      --amber: #785018; --amber-bg: #fff4df; --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 78px; }
+    body { margin: 0; color: var(--ink); background: var(--bg); font: 16px/1.85 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    a:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 3px; }
+    .skip { position: absolute; top: -100px; left: 16px; padding: 8px 16px; background: white; z-index: 5; }
+    .skip:focus { top: 8px; }
+    .wrap { width: min(1080px, calc(100% - 64px)); margin-inline: auto; }
+    .masthead { padding: 27px 0 19px; display: flex; justify-content: space-between; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+    .brand { color: var(--ink); font-weight: 800; letter-spacing: .04em; }
+    .brand span { color: var(--accent); }
+    .stamp { text-align: right; }
+    .hero { padding: 50px 0 32px; }
+    .eyebrow { margin: 0 0 13px; color: var(--accent); font-size: 13px; font-weight: 800; letter-spacing: .12em; }
+    h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.35; letter-spacing: -.035em; margin: 0 0 22px; }
+    .lead { max-width: 850px; margin: 0; font-size: 20px; line-height: 1.8; }
+    .meta { margin: 22px 0 0; font-size: 14px; color: var(--muted); }
+    .principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
+    .principles div { background: var(--paper); padding: 20px 23px; }
+    .principles strong { display: block; color: var(--accent); margin-bottom: 3px; }
+    .principles p { margin: 0; color: var(--muted); font-size: 15px; }
+    nav { position: sticky; top: 0; z-index: 2; background: #f1f5f1f5; border-block: 1px solid var(--line); }
+    .nav-inner { display: flex; flex-wrap: wrap; gap: 6px 23px; padding-block: 12px; }
+    nav a { font-size: 14px; font-weight: 650; text-decoration: none; padding-block: 4px; }
+    main { padding-block: 34px 48px; }
+    section { margin-bottom: 26px; padding: 29px 32px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); }
+    .section-head { display: flex; gap: 15px; align-items: baseline; margin-bottom: 16px; }
+    .section-no { color: var(--accent); font: 700 14px/1.4 ui-monospace, Consolas, monospace; }
+    h2 { font-size: 24px; line-height: 1.5; letter-spacing: -.02em; margin: 0; }
+    h3 { font-size: 18px; line-height: 1.55; margin: 0 0 8px; }
+    p { margin: 0 0 14px; }
+    p:last-child { margin-bottom: 0; }
+    .note { color: var(--muted); font-size: 14px; }
+    .callout { border-left: 4px solid var(--accent); padding: 16px 20px; background: var(--soft); margin-top: 20px; }
+    .callout.warning { border-left-color: var(--amber); background: var(--amber-bg); }
+    .callout strong { color: var(--accent); }
+    .warning strong { color: var(--amber); }
+    .architecture { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr) 34px minmax(0, 1fr); gap: 8px; align-items: stretch; margin-top: 22px; }
+    .node { border: 1px solid var(--line); border-radius: 10px; padding: 19px; background: #fbfdfb; min-width: 0; }
+    .node .label { display: block; color: var(--accent); font-size: 13px; font-weight: 750; margin-bottom: 6px; }
+    .node p { font-size: 14px; color: var(--muted); }
+    .arrow { align-self: center; text-align: center; color: var(--accent); font-size: 27px; }
+    .return { text-align: center; background: var(--soft); margin-top: 12px; padding: 12px 16px; border-radius: 8px; font-size: 14px; }
+    .timeline { list-style: none; padding: 0; margin: 20px 0 0; counter-reset: flow; }
+    .timeline > li { position: relative; padding: 0 0 23px 50px; counter-increment: flow; }
+    .timeline > li:not(:last-child)::after { content: ""; position: absolute; width: 2px; background: var(--line); top: 36px; bottom: 2px; left: 16px; }
+    .timeline > li::before { content: counter(flow, decimal-leading-zero); position: absolute; left: 0; top: 2px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); color: var(--accent); font: 750 12px/1 ui-monospace, Consolas, monospace; }
+    .timeline > li:last-child { padding-bottom: 0; }
+    .timeline p { color: var(--muted); margin: 0; }
+    .branch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 13px; }
+    .branch div { padding: 13px 16px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+    .branch strong { display: block; margin-bottom: 4px; }
+    .rules { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .rule { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr); gap: 20px; padding: 17px 20px; }
+    .rule + .rule { border-top: 1px solid var(--line); }
+    .rule:nth-child(odd) { background: #f8fbf8; }
+    .rule dt { font-weight: 750; }
+    .rule dd { margin: 0; color: var(--muted); }
+    .example { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+    .example-panel { border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+    .example-panel.result { background: var(--soft); border-color: #a1c6ad; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .chip { border: 1px solid #abc6b2; background: white; border-radius: 5px; padding: 3px 10px; font-size: 14px; }
+    .chip.invalid { color: #805f58; border-style: dashed; border-color: #cbb6b1; text-decoration: line-through; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .clean-list { padding-left: 1.2em; margin: 10px 0 0; }
+    .clean-list li { padding-left: 3px; margin-bottom: 9px; }
+    code { font: .88em/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; color: #24583e; background: var(--soft); border-radius: 4px; padding: 2px 5px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f7f4; border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin: 15px 0; font-size: 14px; line-height: 1.8; }
+    pre code { background: transparent; padding: 0; }
+    .check { border-top: 3px solid var(--accent); padding-top: 13px; }
+    .pending { border-top-color: #b18d53; }
+    details { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 17px; }
+    summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+    details ul { padding-left: 1.2em; font-size: 14px; }
+    details li { margin-bottom: 7px; overflow-wrap: anywhere; }
+    footer { border-top: 1px solid var(--line); padding: 23px 0 38px; color: var(--muted); font-size: 14px; }
+    footer p { margin-bottom: 6px; }
+    @media (max-width: 700px) {
+      .wrap { width: calc(100% - 32px); }
+      .masthead { align-items: flex-start; font-size: 12px; }
+      .hero { padding: 32px 0 24px; }
+      .lead { font-size: 18px; }
+      .principles { grid-template-columns: 1fr; }
+      .principles div { padding: 15px 19px; }
+      nav { position: static; }
+      .nav-inner { gap: 3px 19px; }
+      main { padding-top: 22px; }
+      section { padding: 23px 20px; }
+      h2 { font-size: 22px; }
+      .architecture { grid-template-columns: 1fr; gap: 6px; }
+      .arrow { transform: rotate(90deg); line-height: 1.2; }
+      .node { padding: 16px; }
+      .branch, .example, .two-col { grid-template-columns: 1fr; }
+      .rule { grid-template-columns: 1fr; gap: 5px; padding: 15px 17px; }
+      .timeline > li { padding-left: 45px; }
+      .callout { padding: 14px 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @page { size: A4; margin: 16mm; }
+    @media print {
+      body { background: white; color: #17281f; font-size: 10.5pt; line-height: 1.65; }
+      .wrap { width: 100%; }
+      .masthead { padding-top: 0; }
+      .hero { padding: 22px 0; }
+      h1 { font-size: 26pt; }
+      h2 { font-size: 17pt; }
+      h3 { font-size: 12pt; }
+      .lead { font-size: 13pt; }
+      nav, .skip { display: none; }
+      main { padding: 0; }
+      section { padding: 18px 0; margin: 0 0 12px; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+      .section-head, h3 { break-after: avoid; }
+      .node, .rule, .example-panel, .callout, .timeline > li, .check, pre { break-inside: avoid; }
+      .note, .meta, .node p, .principles p, footer { font-size: 9pt; }
+      a { color: inherit; }
+      footer { padding-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">跳转到正文</a>
+  <header class="wrap">
+    <div class="masthead">
+      <div class="brand">PT<span>Move</span> / PTNexus 改版</div>
+      <div class="stamp">设计说明 · v0.3.1<br>整理日期：2026-11-17</div>
+    </div>
+    <div class="hero">
+      <p class="eyebrow">远程媒体处理 / 截图资料修复</p>
+      <h1>截图替换的设计思路</h1>
+      <p class="lead">先验证原图，保留有效截图，再由 NAS 补图。视频留在下载器端，主程序接收 Pixhost 图片链接；存在待确认问题时，任务停在发布之前。</p>
+      <p class="meta">适用位置：抓取、准备转种资料和发布前校验。已发布帖子中的图片修改，需要另做站点编辑适配与权限核验。</p>
+    </div>
+    <div class="principles" aria-label="三项设计原则">
+      <div><strong>有效原图优先</strong><p>达到校验门槛时直接沿用，避免重复截图与上传。</p></div>
+      <div><strong>计算靠近视频</strong><p>NAS 读取媒体并截帧，152 负责调度和资料管理。</p></div>
+      <div><strong>不确定就待确认</strong><p>图片数量、字幕状态和人工确认共同决定能否发布。</p></div>
+    </div>
+  </header>
+
+  <nav aria-label="文档目录"><div class="wrap nav-inner">
+    <a href="#architecture">数据走向</a><a href="#flow">处理流程</a><a href="#rules">替换规则</a><a href="#example">具体示例</a><a href="#setup">部署与配置</a><a href="#status">验证范围</a>
+  </div></nav>
+
+  <main id="main" class="wrap">
+    <section id="architecture" aria-labelledby="architecture-title">
+      <div class="section-head"><span class="section-no">01</span><h2 id="architecture-title">三个位置，各自承担一件事</h2></div>
+      <p>沿用 PTNexus 的资料处理流程，在下载器所在的 Linux NAS 上增加一个可独立部署的 Docker 媒体代理。代理只开放受限的媒体处理接口。</p>
+      <div class="architecture" aria-label="主程序发出媒体请求，NAS 代理处理并上传 Pixhost">
+        <div class="node"><span class="label">控制与资料</span><h3>152 主程序</h3><p>校验原图、决定是否补图，发送媒体路径及截图请求，保存最终截图资料和审核状态。</p></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node"><span class="label">读取与截帧</span><h3>NAS 媒体代理</h3><p>读取白名单中的视频，运行 FFmpeg / mpv、字幕检查和 MediaInfo，直接上传生成的截图。</p></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node"><span class="label">图片托管</span><h3>Pixhost</h3><p>接收图片并返回图片地址。代理使用官方 HTTPS API，返回完整图片链接及 BBCode。</p></div>
+      </div>
+      <div class="return">回传：图片 URL / BBCode → 152 合并资料 → 发布前再次核对当前记录</div>
+      <div class="callout"><strong>视频无需传到 152。</strong> qB 仍通过自己的 API 提供下载器操作；媒体代理使用独立 Token，只承担媒体信息、截图与文件检查。</div>
+    </section>
+
+    <section id="flow" aria-labelledby="flow-title">
+      <div class="section-head"><span class="section-no">02</span><h2 id="flow-title">从原图校验到发布，共六步</h2></div>
+      <ol class="timeline">
+        <li><h3>提取并验证原图</h3><p>从资料中提取图片 URL，去掉重复字符串并校验图片可用性。已知失效的图片不会被最终合并流程重新带回来。</p>
+          <div class="branch"><div><strong>有效截图至少 3 张</strong>本轮抓取直接保留有效原图，不调用截帧和上传。</div><div><strong>缺图、失效或不足 3 张</strong>留下仍有效的原图，进入媒体检查和补图。</div></div>
+        </li>
+        <li><h3>定位视频，检查字幕</h3><p>主程序使用下载器对应的媒体路径；NAS 代理校验路径、文件与目录权限。字幕检查结果会影响是否需要人工确认。</p></li>
+        <li><h3>按运行方式生成截图</h3><p>后台抓取在可处理时生成正式截图，默认目标为 5 张；字幕未知或检查失败仍会标为待确认。交互式流程可先展示候选预览，由用户选择。</p></li>
+        <li><h3>上传到 Pixhost，接收成功结果</h3><p>NAS 直接上传成功截取的图片，返回 URL 和 BBCode。部分成功时保留成功图片；全部失败则按失败处理。</p></li>
+        <li><h3>合并并更新截图资料</h3><p>把有效旧图放在前面，再接入成功的新图，按完整 URL 字符串去重。用合并后的截图字段更新资料，不把整个简介重新覆盖一遍。</p></li>
+        <li><h3>审核状态与发布门槛共同检查</h3><p>待确认、未知状态或图片不足会阻止自动发布。用户在原生资料页确认后，另行重试任务；已有确认资料会复用。排队、准备发布和实际上传前都检查当前资料，防止旧截图覆盖后续修改。</p></li>
+      </ol>
+      <p class="note">“正式截图 5 张”与“候选预览”是两个步骤。候选预览默认生成 12 个候选位置，供用户选择；不能把预览数量当作最终上传数量。</p>
+    </section>
+
+    <section id="rules" aria-labelledby="rules-title">
+      <div class="section-head"><span class="section-no">03</span><h2 id="rules-title">什么时候替换，什么时候停下</h2></div>
+      <dl class="rules">
+        <div class="rule"><dt>原图校验通过且 ≥ 3 张</dt><dd>保留有效原图，跳过本轮自动补图。发布环节仍读取当前审核记录。</dd></div>
+        <div class="rule"><dt>只剩 1～2 张有效原图</dt><dd>保留这些图并尝试补图。合并后不足 3 张时，后台抓取标记为待确认。</dd></div>
+        <div class="rule"><dt>原图全部失效</dt><dd>尝试生成新图；如果补图也失败，清空已知失效的截图资料并标为待确认。</dd></div>
+        <div class="rule"><dt>字幕不能确认 / 检查失败</dt><dd>后台可继续尝试出图，但结果保留待确认状态；截图再多也不能直接跳过人工确认。</dd></div>
+        <div class="rule"><dt>截图或上传部分失败</dt><dd>保留成功结果与有效旧图，再结合最终数量和字幕状态判断；“目标 5 张”不代表一定成功 5 张。</dd></div>
+        <div class="rule"><dt>用户已明确确认</dt><dd>自动发布允许至少 1 张格式合规的截图 URL；0 张始终拒绝。确认动作本身不会自动发种，需要再重试任务。</dd></div>
+      </dl>
+      <div class="callout warning"><strong>两种校验分开理解。</strong> 抓取修复阶段检查原图可用性；自动发布关卡重新检查审核状态、去重后的 URL 格式和数量、来源标识以及当前资料一致性，不会在每次发布前重新请求全部图片来证明实时可用。</div>
+    </section>
+
+    <section id="example" aria-labelledby="example-title">
+      <div class="section-head"><span class="section-no">04</span><h2 id="example-title">一个例子：保留 A，替换失效的 B 和 C</h2></div>
+      <div class="example">
+        <div class="example-panel"><h3>抓取到的原图</h3><div class="chips"><span class="chip">A · 有效</span><span class="chip invalid">B · 失效</span><span class="chip invalid">C · 失效</span></div><p class="note">只有 1 张有效，进入补图。</p></div>
+        <div class="example-panel"><h3>NAS 本次生成</h3><div class="chips"><span class="chip">补图 1</span><span class="chip">补图 2</span><span class="chip">补图 3</span><span class="chip">补图 4</span><span class="chip">补图 5</span></div><p class="note">假设全部截帧及上传成功。</p></div>
+        <div class="example-panel result"><h3>最终截图资料</h3><p><strong>A + 补图 1～5</strong></p><p class="note">共 6 张。B、C 被移除；相同 URL 只保留一次。审核状态允许时才能继续发布。</p></div>
+      </div>
+      <p class="note" style="margin-top:16px">3 张是默认校验门槛，5 张是正式补图的目标；最终图片总数不会强制截断为 5。去重按 URL 字符串精确相等处理，不做内容哈希去重或 URL 归一化。</p>
+    </section>
+
+    <section id="setup" aria-labelledby="setup-title">
+      <div class="section-head"><span class="section-no">05</span><h2 id="setup-title">落地方式：NAS 一个容器，下载器一组配置</h2></div>
+      <div class="two-col">
+        <div><h3>NAS 侧</h3><ul class="clean-list"><li>使用 Linux <strong>amd64 或 arm64</strong> Docker 镜像；本版范围为 64 位架构。</li><li>显式配置媒体目录和绝对路径白名单，目录只读挂载。</li><li>设置独立 <code>PTMOVE_PROXY_TOKEN</code>，至少 32 字符。</li><li>Compose 示例默认绑定 <code>127.0.0.1:19090</code>；152 跨机器访问需配置可信网络或隧道。</li></ul></div>
+        <div><h3>主程序侧</h3><ul class="clean-list"><li>在“设置 → 下载器”启用远程媒体处理，明确填写实际代理端口及 Token。</li><li>开启<strong>仅媒体代理</strong>，qB 列表和控制继续直连自己的 API。</li><li>代理沿用下载器主机名加代理端口连接，需要为该地址安排可达通道。</li><li>先验证预览、截图和字幕确认，再接入真实自动化任务。</li></ul></div>
+      </div>
+      <h3 style="margin-top:24px">路径一致是关键</h3>
+      <p>以 qB 返回的文件路径为准。假设它看到 <code>/volume1/downloads/Movie/Movie.mkv</code>，媒体代理也应能从这个绝对路径读取文件。</p>
+      <pre><code>qB 返回路径：     /volume1/downloads/Movie/Movie.mkv
+代理容器内路径：  /volume1/downloads/Movie/Movie.mkv
+允许的媒体根目录：/volume1/downloads</code></pre>
+      <p class="note">如果 qB 本身在 Docker 中，主机目录与 qB 容器目录可能不同。调整代理挂载的 source / target，使容器内路径和白名单匹配；不需要为这个示例移动正在使用的媒体文件。</p>
+      <div class="callout"><strong>代理的能力边界：</strong>非 root 运行、独立认证、限制请求字段和并发、拒绝路径穿越与符号链接越界。不挂载 Docker socket，不提供 qB 转发、任意命令执行或视频下载接口。</div>
+    </section>
+
+    <section aria-labelledby="lifecycle-title">
+      <div class="section-head"><span class="section-no">06</span><h2 id="lifecycle-title">“暂存”分成 NAS 缓存与图床图片</h2></div>
+      <div class="two-col"><div><h3>NAS 临时截图</h3><p>视频只读，生成的临时截图在任务结束后清理。媒体代理不负责删除原视频，也不接管 qB 的长期做种数据。</p></div><div><h3>Pixhost 托管图片</h3><p>上传结果是公共图床内容。本程序清理 NAS 临时目录不会删除 Pixhost 上的图片，也没有自动过期保证。程序保存的是图片 URL 和 BBCode。</p></div></div>
+    </section>
+
+    <section id="status" aria-labelledby="status-title">
+      <div class="section-head"><span class="section-no">07</span><h2 id="status-title">实现与验证到哪一步</h2></div>
+      <p class="note">以下依据 v0.3.1 交付记录，验证日期为 2026-11-16；本文未重新访问服务器或真实站点。</p>
+      <div class="two-col">
+        <div class="check"><h3>已完成</h3><ul class="clean-list"><li>补图、资料合并、审核状态与自动发布保护已实现。</li><li>NAS amd64 / arm64 镜像已构建并验证镜像加载。</li><li>合成视频的真实 FFmpeg / mpv 截图、预览、MediaInfo 已验证。</li><li>一张合成测试图的真实 Pixhost 上传成功。</li></ul></div>
+        <div class="check pending"><h3>接入后验证</h3><ul class="clean-list"><li>真实 NAS 的地址、媒体目录、文件权限和网络通道。</li><li>物理 ARM NAS 的媒体解码与运行表现。</li><li>真实下载器、源站与目标站的完整下载和发种流程。</li><li>已发布帖子图片的后续编辑不在本版自动修复流程内。</li></ul></div>
+      </div>
+      <div class="callout warning"><strong>当前默认：</strong>自动化、月度计划和自动发布开关均默认关闭。安装代理后先做预览与截图验证，再按实际需求启用。</div>
+      <details>
+        <summary>查看对应实现位置</summary>
+        <ul>
+          <li><code>nexus/server/internal/service/processing/repair/fetch_flow.go</code>：原图校验、补图合并与待确认判断。</li>
+          <li><code>nexus/server/internal/service/processing/repair/images.go</code>：提取、精确 URL 去重与 BBCode 转换。</li>
+          <li><code>nexus/server/internal/service/processing/repair/screenshot.go</code>、<code>screenshot_preview.go</code>：正式截帧上传与交互候选预览。</li>
+          <li><code>nexus/server/internal/service/migrationflow/automation_publish_guard.go</code>：发布前检查当前审核记录、数量、来源和资料一致性。</li>
+          <li><code>nexus/proxy/media_security.go</code>、<code>media_handlers.go</code>：NAS 认证、路径边界和媒体处理。</li>
+          <li><code>nexus/proxy/compose.nas.yaml</code>：NAS Docker 的挂载、端口和资源限制。</li>
+        </ul>
+      </details>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p><strong>PTMove 截图替换设计说明</strong> · 对照实现版本 v0.3.1 · 文档日期 2026-11-17</p>
+    <p>单文件 HTML，无外部字体、脚本或图片依赖。可离线阅读，也可用浏览器“打印 / 保存为 PDF”。</p>
+    <p><a href="https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1" rel="noreferrer">打开 v0.3.1 发行页与 Docker 安装包</a></p>
+  </footer>
+</body>
+</html>

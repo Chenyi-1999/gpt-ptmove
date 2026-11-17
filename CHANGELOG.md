@@ -248,3 +248,11 @@
 - Actualchecks: SCP docs/DEPLOYMENT.json to project-owned /opt/gpt-ptmove-nexus/deployment.json succeeded; remote JSON release_published=true/count11 and exactfileSHA match localPASS. Named productioncontainer healthy and unchangedimage df6476edac6376a9dcc749e536a484173ce551d3e44d4f114512f10c0d5f650d; loopbackhealth service ptmove-nexus/version0.3.1PASS. No restart/build/cleanup orotherprojectoperation. No NAS/qB/tracker/81access.
 - Git/publication: actualGiteeRelease and11links alreadyverified029; upcomingdocumentationcommit/review/merge/push records029/030 withoutmovingv0.3.1. PriorfunctionalGo/frontend/API/media tests unchanged, no runtimecodechangejustifiesrepeatingthem. LatestmetadataJSONconsistencyPASS; diffcheck andindependentmetadatareviewfinalresultsnext. Userloginhandoffclosed; remainingrealNAS/physicalARM/actualtrackerintegrationlimits unchanged.
 - Final independent review: publication metadata and all11 attachmentnames/tag/timestamps agree with saved page evidence; JPEG SHA and visual latestbadge/commit/links recheckedPASS, active pending-login text removed while historical records retained. JSON assertions/diffcheckPASS; no network/browser/server access by reviewer.
+
+## PTM-20261117-031 — 2026-11-17T23:32:59.071058+08:00 — root / screenshot_doc_facts
+
+- 目的与文件：新增 docs/SCREENSHOT_REPLACEMENT_DESIGN.html，按用户要求把截图替换思路整理为中文单文件 HTML；docs/REMOTE_SCREENSHOTS.md 增加入口。包含三端数据流、六步处理、替换/失败规则、保留有效旧图示例、NAS 配置、临时文件与 Pixhost 生命周期、实际验证范围及源码索引。自带 CSS、打印样式和 CSP，无脚本、外部字体或自动加载资源。HTML SHA256：8ac290828cd7b0b15443575f54955d2d548fae56a2d565347e5b4c81728578c1。
+- 内容复核：独立只读代码核对及全文事实复核通过。明确抓取阶段 HTTP 可用性校验与发布阶段语法/状态校验的区别；正式补图目标5、预览默认12、合并去重后默认门槛3、人工确认至少1；部分成功和未知字幕仍可能待确认，确认后另行重试，不把确认描述成自动发种。去重为 URL 精确字符串；实际 NAS/物理 ARM/真实发种未验证边界保留。
+- 实际检查：使用已有 Playwright SDK 与已安装 Edge，以 file:// 渲染 HTML，不启动本地应用服务器。1280×960 与390×844检查通过：7章节、唯一主标题、无重复ID/失效页内链接/横向或元素溢出，目录跳转和源码详情展开正常；0外部网络请求、0控制台错误、0脚本和外部资源，四组正文配色对比度均≥6.22，打印时隐藏导航已核对。6张截图及 qa-report.json 保存在 D归档根目录2026-11/staging/screenshot-design-20261117；root实际查看桌面概览与手机架构图，无排版问题。未做物理打印/PDF逐页分页验收。
+- 工具适配：普通模块解析最初找不到 playwright，npx/共享视觉脚本不在当前路径；改用已有运行时中的 Playwright SDK 和 msedge 渠道完成验证，没有安装依赖或访问互联网。未运行 Go/应用测试，因本次仅文档变化。
+- Git/部署：独立 worktree261117-screenshot-design-b104，当前尚未提交/推送，按已有项目提交授权完成文档提交、审查、集成和推送；不移动 v0.3.1。没有152部署/重启、站点/NAS/qB/81访问；软件版本和镜像不变。本任务交付离线HTML，不新建发行版。
