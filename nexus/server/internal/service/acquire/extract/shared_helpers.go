@@ -17,8 +17,6 @@ var (
 	reAnyHTMLTag               = regexp.MustCompile(`(?is)<[^>]+>`)
 	reMultiSpace               = regexp.MustCompile(`[ \t]+`)
 	reMultiNewLine             = regexp.MustCompile(`\n{3,}`)
-	reImgBBCode                = regexp.MustCompile(`(?is)\[img\](.*?)\[/img\]`)
-	reImageURL                 = regexp.MustCompile(`https?://[^\s\[\]"'<>]+\.(?:jpg|jpeg|png|webp|gif)`)
 	reMediaReportSectionHeader = regexp.MustCompile(`(?i)^(General|Video|Audio|Text|Menu|Chapters)(\s*#\d+)?$`)
 )
 
@@ -188,27 +186,7 @@ func toBBCodeImages(urls []string) string {
 }
 
 func extractImageURLsFromText(text string) []string {
-	trimmed := strings.TrimSpace(text)
-	if trimmed == "" {
-		return []string{}
-	}
-	result := make([]string, 0)
-	for _, match := range reImgBBCode.FindAllStringSubmatch(trimmed, -1) {
-		if len(match) < 2 {
-			continue
-		}
-		url := strings.TrimSpace(match[1])
-		if url != "" {
-			result = appendUniqueString(result, url)
-		}
-	}
-	for _, match := range reImageURL.FindAllString(trimmed, -1) {
-		url := strings.TrimSpace(match)
-		if url != "" {
-			result = appendUniqueString(result, url)
-		}
-	}
-	return result
+	return ExtractImageURLsFromText(text)
 }
 
 func firstNonEmpty(values ...string) string {

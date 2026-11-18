@@ -4,12 +4,11 @@ import (
 	neturl "net/url"
 	"regexp"
 	"strings"
+
+	"github.com/pt-nexus/server/internal/service/acquire/extract"
 )
 
-var (
-	reImgBBCode = regexp.MustCompile(`(?is)\[img\](.*?)\[/img\]`)
-	reImageURL  = regexp.MustCompile(`https?://[^\s\[\]"'<>]+\.(?:jpg|jpeg|png|webp|gif)`)
-)
+var reImgBBCode = regexp.MustCompile(`(?is)\[img\](.*?)\[/img\]`)
 
 // ToBBCodeImages 将图片 URL 列表转换为 BBCode（每行一个 [img]...[/img]）。
 func ToBBCodeImages(urls []string) string {
@@ -33,27 +32,7 @@ func ToBBCodeImages(urls []string) string {
 
 // ExtractImageURLsFromText 从 BBCode 或纯文本中提取图片 URL（去重）。
 func ExtractImageURLsFromText(text string) []string {
-	trimmed := strings.TrimSpace(text)
-	if trimmed == "" {
-		return []string{}
-	}
-	result := make([]string, 0)
-	for _, match := range reImgBBCode.FindAllStringSubmatch(trimmed, -1) {
-		if len(match) < 2 {
-			continue
-		}
-		url := strings.TrimSpace(match[1])
-		if url != "" {
-			result = appendUniqueStringLocal(result, url)
-		}
-	}
-	for _, match := range reImageURL.FindAllString(trimmed, -1) {
-		url := strings.TrimSpace(match)
-		if url != "" {
-			result = appendUniqueStringLocal(result, url)
-		}
-	}
-	return result
+	return extract.ExtractImageURLsFromText(text)
 }
 
 // AbsolutizeURL 以 baseURL 为基准将相对链接补全为绝对链接。

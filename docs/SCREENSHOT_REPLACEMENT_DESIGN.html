@@ -137,7 +137,7 @@
   <header class="wrap">
     <div class="masthead">
       <div class="brand">PT<span>Move</span> / PTNexus 改版</div>
-      <div class="stamp">设计说明 · v0.3.1<br>整理日期：2026-11-17</div>
+      <div class="stamp">设计说明 · v0.3.1 修订版<br>更新于 2026-11-18</div>
     </div>
     <div class="hero">
       <p class="eyebrow">远程媒体处理 / 截图资料修复</p>
@@ -180,7 +180,7 @@
         <li><h3>定位视频，检查字幕</h3><p>主程序使用下载器对应的媒体路径；NAS 代理校验路径、文件与目录权限。字幕检查结果会影响是否需要人工确认。</p></li>
         <li><h3>按运行方式生成截图</h3><p>后台抓取在可处理时生成正式截图，默认目标为 5 张；字幕未知或检查失败仍会标为待确认。交互式流程可先展示候选预览，由用户选择。</p></li>
         <li><h3>上传到 Pixhost，接收成功结果</h3><p>NAS 直接上传成功截取的图片，返回 URL 和 BBCode。部分成功时保留成功图片；全部失败则按失败处理。</p></li>
-        <li><h3>合并并更新截图资料</h3><p>把有效旧图放在前面，再接入成功的新图，按完整 URL 字符串去重。用合并后的截图字段更新资料，不把整个简介重新覆盖一遍。</p></li>
+        <li><h3>合并并更新截图资料</h3><p>把有效旧图放在前面，再接入成功的新图，同一张 Pixhost 原图只计一次，保留首次出现的图片地址。用合并后的截图字段更新资料，不把整个简介重新覆盖一遍。</p></li>
         <li><h3>审核状态与发布门槛共同检查</h3><p>待确认、未知状态或图片不足会阻止自动发布。用户在原生资料页确认后，另行重试任务；已有确认资料会复用。排队、准备发布和实际上传前都检查当前资料，防止旧截图覆盖后续修改。</p></li>
       </ol>
       <p class="note">“正式截图 5 张”与“候选预览”是两个步骤。候选预览默认生成 12 个候选位置，供用户选择；不能把预览数量当作最终上传数量。</p>
@@ -206,7 +206,7 @@
         <div class="example-panel"><h3>NAS 本次生成</h3><div class="chips"><span class="chip">补图 1</span><span class="chip">补图 2</span><span class="chip">补图 3</span><span class="chip">补图 4</span><span class="chip">补图 5</span></div><p class="note">假设全部截帧及上传成功。</p></div>
         <div class="example-panel result"><h3>最终截图资料</h3><p><strong>A + 补图 1～5</strong></p><p class="note">共 6 张。B、C 被移除；相同 URL 只保留一次。审核状态允许时才能继续发布。</p></div>
       </div>
-      <p class="note" style="margin-top:16px">3 张是默认校验门槛，5 张是正式补图的目标；最终图片总数不会强制截断为 5。去重按 URL 字符串精确相等处理，不做内容哈希去重或 URL 归一化。</p>
+      <p class="note" style="margin-top:16px">3 张是默认校验门槛，5 张是正式补图的目标；最终图片总数不会强制截断为 5。图片地址的片段标识不影响计数。Pixhost 展示页与对应原图配对时只保留原图，同一路径的 CDN 别名和缓存参数也只计一张。</p>
     </section>
 
     <section id="setup" aria-labelledby="setup-title">
@@ -233,15 +233,15 @@
       <div class="section-head"><span class="section-no">07</span><h2 id="status-title">实现与验证到哪一步</h2></div>
       <p class="note">以下依据 v0.3.1 交付记录，验证日期为 2026-11-16；本文未重新访问服务器或真实站点。</p>
       <div class="two-col">
-        <div class="check"><h3>已完成</h3><ul class="clean-list"><li>补图、资料合并、审核状态与自动发布保护已实现。</li><li>NAS amd64 / arm64 镜像已构建并验证镜像加载。</li><li>合成视频的真实 FFmpeg / mpv 截图、预览、MediaInfo 已验证。</li><li>一张合成测试图的真实 Pixhost 上传成功。</li></ul></div>
-        <div class="check pending"><h3>接入后验证</h3><ul class="clean-list"><li>真实 NAS 的地址、媒体目录、文件权限和网络通道。</li><li>物理 ARM NAS 的媒体解码与运行表现。</li><li>真实下载器、源站与目标站的完整下载和发种流程。</li><li>已发布帖子图片的后续编辑不在本版自动修复流程内。</li></ul></div>
+        <div class="check"><h3>已完成</h3><ul class="clean-list"><li>补图、资料合并、审核状态与自动发布保护已实现。</li><li>NAS amd64 / arm64 镜像已构建并验证镜像加载。</li><li>合成视频的真实 FFmpeg / mpv 截图、预览、MediaInfo 已验证。</li><li>飞牛 amd64 上已验证真实 qB 视频。隔离草稿从 0 张自动补到 5 张，五张 Pixhost 原图均已完整解码，分辨率为 1920×1080。该片未检出可用字幕，审核状态为待确认。</li></ul></div>
+        <div class="check pending"><h3>接入后验证</h3><ul class="clean-list"><li>物理 ARM NAS 的媒体解码与运行表现。</li><li>真实下载器、源站与目标站的完整下载和发种流程。</li><li>已发布帖子图片的后续编辑不在本版自动修复流程内。</li></ul></div>
       </div>
       <div class="callout warning"><strong>当前默认：</strong>自动化、月度计划和自动发布开关均默认关闭。安装代理后先做预览与截图验证，再按实际需求启用。</div>
       <details>
         <summary>查看对应实现位置</summary>
         <ul>
           <li><code>nexus/server/internal/service/processing/repair/fetch_flow.go</code>：原图校验、补图合并与待确认判断。</li>
-          <li><code>nexus/server/internal/service/processing/repair/images.go</code>：提取、精确 URL 去重与 BBCode 转换。</li>
+          <li><code>nexus/server/internal/service/processing/repair/images.go</code>：BBCode 转换。抓取和修复共用 <code>nexus/server/internal/service/acquire/extract/image_urls.go</code> 解析图片地址。</li>
           <li><code>nexus/server/internal/service/processing/repair/screenshot.go</code>、<code>screenshot_preview.go</code>：正式截帧上传与交互候选预览。</li>
           <li><code>nexus/server/internal/service/migrationflow/automation_publish_guard.go</code>：发布前检查当前审核记录、数量、来源和资料一致性。</li>
           <li><code>nexus/proxy/media_security.go</code>、<code>media_handlers.go</code>：NAS 认证、路径边界和媒体处理。</li>
@@ -252,7 +252,7 @@
   </main>
 
   <footer class="wrap">
-    <p><strong>PTMove 截图替换设计说明</strong> · 对照实现版本 v0.3.1 · 文档日期 2026-11-17</p>
+    <p><strong>PTMove 截图替换设计说明</strong> · 对照 152 部署版本 v0.3.1-pixhost.1 · 更新于 2026-11-18</p>
     <p>单文件 HTML，无外部字体、脚本或图片依赖。可离线阅读，也可用浏览器“打印 / 保存为 PDF”。</p>
     <p><a href="https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1" rel="noreferrer">打开 v0.3.1 发行页与 Docker 安装包</a></p>
   </footer>

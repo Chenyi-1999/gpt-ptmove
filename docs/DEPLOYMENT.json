@@ -1,14 +1,14 @@
 {
   "version": "0.3.1",
-  "date": "2026-11-16",
+  "date": "2026-11-18",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:0.3.1",
-  "image_id": "sha256:df6476edac6376a9dcc749e536a484173ce551d3e44d4f114512f10c0d5f650d",
+  "image": "ptmove-nexus:0.3.1-pixhost.1",
+  "image_id": "sha256:c8da38daa2c0ebf0e25d8d9a5d922fb2d7f022535f1bcdb127b9105e9d9040af",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "7c7fa54b769f400cd468557b749ab4566805ca4672d769ea995fe9a893004f6a",
+  "image_archive_sha256": null,
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "upstream_repository": "https://github.com/sqing33/PTNexus",
@@ -33,7 +33,7 @@
   "upgrade_persistence_verified": true,
   "existing_jwt_valid_after_upgrade": true,
   "administrator_password_preserved": true,
-  "runtime_env_and_instance_keys_unchanged": true,
+  "runtime_env_and_instance_keys_unchanged": false,
   "media_agent_images": [
     {
       "architecture": "amd64",
@@ -56,10 +56,10 @@
   "media_agent_arm64_build_verified": true,
   "media_agent_arm64_hardware_runtime_verified": false,
   "media_agent_docker_load_verified": true,
-  "real_nas_deployment_performed": false,
+  "real_nas_deployment_performed": true,
   "real_nas_tracker_publish_verified": false,
   "protected_81_access_performed": false,
-  "rollback_native_image": "ptmove-nexus:0.3.0",
+  "rollback_native_image": "ptmove-nexus:0.3.1",
   "legacy_directory": "/opt/gpt-ptmove",
   "legacy_container_stopped_retained": true,
   "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1",
@@ -69,7 +69,7 @@
   "git_master_pushed": true,
   "git_tag_pushed": true,
   "release_published": true,
-  "release_status": "Formal v0.3.1 Gitee Release published with ten Docker bundle parts and NAS source installer; existing152 runtime unchanged",
+  "release_status": "Gitee v0.3.1 has eleven published attachments. The 2026-11-18 controller hotfix is deployed separately on 152.",
   "canary_removed": true,
   "docker_archive_transfer_verified": true,
   "release_archive": {
@@ -106,5 +106,31 @@
     "PTMove-Nexus-v0.3.1.part10.zip"
   ],
   "release_verified_tag_commit": "ed0bcc6a39223993368d3489db7172bb1678bf72",
-  "release_attachment_verification_scope": "Visible final release links, not a re-download hash test"
+  "release_attachment_verification_scope": "Visible final release links, not a re-download hash test",
+  "release_image_archive_sha256": "7c7fa54b769f400cd468557b749ab4566805ca4672d769ea995fe9a893004f6a",
+  "feiniu_screenshot_check": {
+    "date": "2026-11-18",
+    "nas_architecture": "linux/amd64",
+    "qb_version": "5.3.0",
+    "downloader_id": "ptmove-feiniu-qb8080",
+    "media_agent": "ptmove-media-agent:0.3.1",
+    "media_roots": [
+      "/keep",
+      "/temp"
+    ],
+    "read_only": true,
+    "transport": "Controller container loopback to a restricted SSH session on the independent NAS",
+    "controller_unit": "ptmove-feiniu-link.service",
+    "native_preview_images": 5,
+    "draft_database": "isolated SQLite",
+    "real_media_file": true,
+    "source_metadata": "fixture",
+    "saved_pixhost_images": 5,
+    "decoded_unique_pngs": 5,
+    "width": 1920,
+    "height": 1080,
+    "screenshot_review_status": "pending",
+    "publish_queue_entries": 0,
+    "tracker_publish": false
+  }
 }
