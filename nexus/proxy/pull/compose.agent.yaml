@@ -1,0 +1,29 @@
+services:
+  agent:
+    image: ${PTMOVE_PULL_IMAGE:-ptmove-pull:0.3.1-pull.1}
+    command: ["agent"]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PTMOVE_PULL_URL: ${PTMOVE_PULL_URL:?Set the controller HTTPS origin}
+      PTMOVE_PULL_CA: /run/ptmove/agent/controller.crt
+      PTMOVE_PULL_TOKEN_FILE: /run/ptmove/agent/agent.token
+      PTMOVE_QB_TOKEN_FILE: /run/ptmove/agent/qb.token
+      PTMOVE_PROXY_TOKEN_FILE: /run/ptmove/agent/media.token
+    volumes:
+      - type: bind
+        source: ${PTMOVE_PULL_AGENT_SECRETS:?Set the project agent credentials directory}
+        target: /run/ptmove/agent
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 384m
+    cpus: 0.7
+    logging:
+      options:
+        max-size: 5m
+        max-file: "2"

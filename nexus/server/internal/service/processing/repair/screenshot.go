@@ -2,6 +2,7 @@ package repair
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -69,7 +70,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 
 			if apiErr, ok := err.(*downloaderclient.ProxyAPIError); ok && apiErr != nil {
 				lastErr = err
-				// 400 通常表示路径不存在/未找到视频文件，继续尝试下一个候选；其他错误回退本地逻辑。
+				// 400 可表示未找到视频文件，继续尝试下一个路径候选。
 				if apiErr.StatusCode == 400 {
 					continue
 				}
@@ -77,6 +78,9 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 			}
 			lastErr = err
 			break
+		}
+		if err := remoteOnlyScreenshotError(downloader, lastErr); err != nil {
+			return nil, err
 		}
 		if lastErr != nil {
 			logx.PlainWarnf("盒子代理截图失败，回退本地截图 err=%v", lastErr)
@@ -324,6 +328,16 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 		return nil, fmt.Errorf("未生成可用截图")
 	}
 	return finalList, nil
+}
+
+func remoteOnlyScreenshotError(downloader downloaderclient.Downloader, err error) error {
+	if !downloader.ProxyMediaOnly || downloader.ProxyToken == "" {
+		return nil
+	}
+	if err == nil {
+		return errors.New("仅媒体代理截图未命中有效路径")
+	}
+	return fmt.Errorf("仅媒体代理截图失败: %w", err)
 }
 
 func buildRemotePathCandidatesForProxy(savePath, torrentName, contentName string) []string {

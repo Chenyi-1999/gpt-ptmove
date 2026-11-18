@@ -160,6 +160,9 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 			lastErr = err
 			break
 		}
+		if err := remoteOnlyScreenshotError(downloader, lastErr); err != nil {
+			return ScreenshotPreviewBundle{}, err
+		}
 		if lastErr != nil {
 			logx.Warnf(screenshotPreviewLogModule, "盒子代理候选截图失败 downloader_id=%s err=%v", downloaderID, lastErr)
 		} else {
@@ -322,6 +325,9 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 			}
 			lastErr = err
 			break
+		}
+		if err := remoteOnlyScreenshotError(downloader, lastErr); err != nil {
+			return nil, err
 		}
 		if lastErr != nil {
 			logx.PlainWarnf("盒子代理截图失败，回退本地截图 err=%v", lastErr)

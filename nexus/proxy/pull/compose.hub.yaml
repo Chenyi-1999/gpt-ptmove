@@ -1,0 +1,39 @@
+services:
+  hub:
+    image: ${PTMOVE_PULL_IMAGE:-ptmove-pull:0.3.1-pull.1}
+    user: "65534:65534"
+    command: ["hub"]
+    restart: unless-stopped
+    environment:
+      PTMOVE_PULL_CERT: /run/ptmove/tls/server.crt
+      PTMOVE_PULL_KEY: /run/ptmove/tls/server.key
+      PTMOVE_PULL_TOKEN_FILE: /run/ptmove/tls/agent.token
+      PTMOVE_PULL_LOCAL_TOKEN_FILE: /run/ptmove/tls/controller.token
+      PTMOVE_PULL_LOCAL_BIND: 0.0.0.0
+    volumes:
+      - type: bind
+        source: ${PTMOVE_PULL_HUB_SECRETS:?Set the project TLS and credentials directory}
+        target: /run/ptmove/tls
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "${PTMOVE_PULL_PUBLISH_IP:-0.0.0.0}:${PTMOVE_PULL_PORT:-28443}:28443"
+    networks:
+      ptmove:
+        aliases: [ptmove-pull-hub]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 384m
+    cpus: 0.7
+    logging:
+      options:
+        max-size: 5m
+        max-file: "2"
+
+networks:
+  ptmove:
+    external: true
+    name: ${PTMOVE_CONTROLLER_NETWORK:-ptmove-nexus_default}

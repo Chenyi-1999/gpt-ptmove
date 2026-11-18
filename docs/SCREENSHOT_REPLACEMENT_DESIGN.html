@@ -159,7 +159,7 @@
   <main id="main" class="wrap">
     <section id="architecture" aria-labelledby="architecture-title">
       <div class="section-head"><span class="section-no">01</span><h2 id="architecture-title">三个位置，各自承担一件事</h2></div>
-      <p>沿用 PTNexus 的资料处理流程，在下载器所在的 Linux NAS 上增加一个可独立部署的 Docker 媒体代理。代理只开放受限的媒体处理接口。</p>
+      <p>沿用 PTNexus 的资料处理流程，在下载器所在的 Linux NAS 上增加一个可独立部署的 Docker 媒体代理。代理只开放受限的媒体处理接口。飞牛通过 HTTPS 主动从 152 领取任务，qB 查询和截图均在飞牛本机处理。</p>
       <div class="architecture" aria-label="主程序发出媒体请求，NAS 代理处理并上传 Pixhost">
         <div class="node"><span class="label">控制与资料</span><h3>152 主程序</h3><p>校验原图、决定是否补图，发送媒体路径及截图请求，保存最终截图资料和审核状态。</p></div>
         <div class="arrow" aria-hidden="true">→</div>
@@ -252,7 +252,7 @@
   </main>
 
   <footer class="wrap">
-    <p><strong>PTMove 截图替换设计说明</strong> · 对照 152 部署版本 v0.3.1-pixhost.1 · 更新于 2026-11-18</p>
+    <p><strong>PTMove 截图替换设计说明</strong> · 对照 152 部署版本 v0.3.1-pull.1 · 更新于 2026-11-18</p>
     <p>单文件 HTML，无外部字体、脚本或图片依赖。可离线阅读，也可用浏览器“打印 / 保存为 PDF”。</p>
     <p><a href="https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1" rel="noreferrer">打开 v0.3.1 发行页与 Docker 安装包</a></p>
   </footer>

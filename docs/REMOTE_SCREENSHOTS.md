@@ -88,8 +88,19 @@ docker buildx build --platform linux/arm64 -f Dockerfile.nas --load -t ptmove-me
 
 跨平台构建包含 Debian 媒体工具，需要原生 ARM 构建节点或 BuildKit/QEMU 支持。具体已完成的镜像、运行测试和验证限制见 CHANGELOG 与部署记录；不能用交叉编译成功替代真实 NAS 的路径、权限、网络和解码验证。
 
-## 飞牛与 152 的验证结果
+## 旧 SSH 部署的验证记录
 
 2026-11-18，152 主程序通过 Docker 容器内的回环地址连接飞牛的 qB 和截图代理。专用 SSH 密钥只能访问飞牛本机的两个服务。飞牛代理使用与 qB 相同的普通用户身份，按 qB 的路径只读挂载 `/keep` 和 `/temp`。在管理页面的「设置 → 下载器」中可对「飞牛刷流 qB」执行连接测试。
 
 用“重复”标签下的真实电影测试时，152 管理接口返回了五张预览图。以没有截图的模拟来源资料走原生后台修复流程，隔离草稿保存了五张 Pixhost 原图。五张图片均在 152 完整解码为 1920×1080。该片未检出可用字幕，草稿保留为待确认。另一个单集样本命中既有分集限制，流程跳过补图。两个样本均未向站点发种。
+
+## 飞牛主动领取任务
+
+飞牛的领单容器只向 152 发起 HTTPS 请求。152 仍负责选择资源、准备转种草稿和写回图片。飞牛在本机查询 qB 的版本、任务、标签及文件，并调用本机媒体代理完成文件检查、字幕检查、截图或预览。正式图片仍由飞牛直接上传 Pixhost。
+
+- **152** 运行 `nexus/proxy/pull/compose.hub.yaml`，并加入 PTMove 的 Docker 网络。默认只向公网发布 TLS 端口 `28443`。PTMove 通过 Docker 内网的 `http://ptmove-pull-hub:28380` 查询 qB，媒体代理端口填 `29090`，开启“远程”和“仅媒体代理”。下载器的 API Key 与代理 Token 都填 Hub 的 `controller.token`，飞牛侧的真实 qB Token 放在飞牛。
+- **飞牛** 运行 `nexus/proxy/pull/compose.agent.yaml`。领单容器用宿主网络访问现有的 `127.0.0.1:8080` qB 和 `127.0.0.1:19090` 媒体代理。保留现有媒体容器的只读挂载。领单容器只需要 TLS 信任证书、领单 Token 和两项本机服务凭据。
+- **密钥与证书**。Hub 的目录由 `PTMOVE_PULL_HUB_SECRETS` 指定，文件为 `server.crt`、`server.key`、`agent.token`、`controller.token`。飞牛的目录由 `PTMOVE_PULL_AGENT_SECRETS` 指定，文件为 `controller.crt`（用于校验 152 的证书）、同一 `agent.token`、`qb.token` 和 `media.token`。两个容器默认使用 UID 65534，挂载文件应允许该用户读取。飞牛的 `PTMOVE_PULL_URL` 为例如 `https://152.136.236.238:28443`，TLS 证书需要包含该 IP 或实际域名。
+- **任务边界**。Hub 提供 `POST /v1/claim` 和 `POST /v1/result`，qB 查询和截图分别领取。结果以任务 ID 和租约标识确认，网络重试只回传同一结果。Hub 重启时，尚未完成的请求会失败，已领取的截图任务不会由 Hub 自动重放。该连接的 qB 接口用于查询。下载管理、种子导出和发种需要另外配置。媒体队列正在生成正式截图时，连接探针可能需要等当前任务结束，qB 查询使用独立队列。
+
+镜像从 `nexus/proxy/pull` 构建，两个服务使用同一镜像。上线前先用该下载器完成连接测试和远程预览，确认截图草稿的写回后再停止旧连接。
