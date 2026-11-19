@@ -131,9 +131,9 @@ func PublishPublic(input PublishInput) (PublishResult, error) {
 	}
 
 	torrentPath := strings.TrimSpace(input.TorrentPath)
-	torrentFile, err := os.ReadFile(torrentPath)
-	if err != nil {
-		return PublishResult{UploadFormFields: formFields, AttemptDetailLog: buildDetail()}, fmt.Errorf("读取种子文件失败: %w", err)
+	torrentFile := input.TorrentData
+	if len(torrentFile) == 0 {
+		return PublishResult{UploadFormFields: formFields, AttemptDetailLog: buildDetail()}, fmt.Errorf("缺少已核验的发布种子")
 	}
 
 	uploadURL := strings.TrimRight(baseURL, "/") + "/takeupload.php"

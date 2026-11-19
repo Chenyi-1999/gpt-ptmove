@@ -2,7 +2,7 @@
   <!-- Update Dialog -->
   <el-dialog
     v-model="updateDialogVisible"
-    title="PT Nexus 版本更新"
+    title="STARPT 版本更新"
     width="800px"
     :close-on-click-modal="!isBlockingForceUpdate"
     :close-on-press-escape="!isBlockingForceUpdate"

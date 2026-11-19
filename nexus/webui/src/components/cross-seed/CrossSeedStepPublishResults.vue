@@ -9,9 +9,7 @@
           :show-text="true"
           :stroke-width="8"
         />
-        <div class="progress-text">
-          {{ publishProgress.current }} / {{ publishProgress.total }}
-        </div>
+        <div class="progress-text">{{ publishProgress.current }} / {{ publishProgress.total }}</div>
       </div>
       <div class="progress-item" v-if="downloaderProgress.total > 0">
         <div class="progress-label">下载器添加进度:</div>
@@ -49,102 +47,69 @@
               'is-error': result.displayStatus === 'error',
               'is-waiting': result.displayStatus === 'waiting',
               'is-publishing': result.displayStatus === 'publishing',
-              'is-paused': result.displayStatus === 'paused',
+              'is-paused':
+                result.displayStatus === 'paused' || result.displayStatus === 'incomplete',
             }"
           >
-            <div class="card-icon">
-              <el-icon v-if="result.displayStatus === 'success'" color="#67C23A" :size="32">
-                <CircleCheckFilled />
-              </el-icon>
-              <el-icon v-else-if="result.displayStatus === 'warning'" color="#E6A23C" :size="32">
-                <Warning />
-              </el-icon>
-              <el-icon v-else-if="result.displayStatus === 'error'" color="#F56C6C" :size="32">
-                <CircleCloseFilled />
-              </el-icon>
-              <el-icon
-                v-else-if="result.displayStatus === 'publishing'"
-                color="#409EFF"
-                :size="32"
-                class="loading-icon"
-              >
-                <Loading />
-              </el-icon>
-              <el-icon v-else :color="result.displayStatus === 'paused' ? '#E6A23C' : '#FFB6C1'" :size="32">
-                <Clock />
-              </el-icon>
-              <div v-if="result.isExisted" class="existed-tags">
-                <el-tag type="warning" size="small">已存在</el-tag>
-                <el-tag v-if="result.auto_edit_result?.success" type="success" size="small">已编辑</el-tag>
-              </div>
-            </div>
             <h4 class="card-title">{{ result.siteName }}</h4>
-            <div v-if="result.displayStatus === 'waiting'" class="status-tag">
-              <el-tag size="small" class="waiting-tag">等待中</el-tag>
+            <div class="status-tag">
+              <el-icon :class="{ 'loading-icon': result.displayStatus === 'publishing' }">
+                <Loading v-if="result.displayStatus === 'publishing'" />
+                <CircleClose v-else-if="result.displayStatus === 'error'" />
+                <CircleCheck
+                  v-else-if="
+                    result.displayStatus === 'success' || result.displayStatus === 'warning'
+                  "
+                />
+                <Clock v-else />
+              </el-icon>
+              <span>{{ outcomeLabel(result) }}</span>
             </div>
-            <div v-else-if="result.displayStatus === 'publishing'" class="status-tag">
-              <el-tag type="primary" size="small">发布中</el-tag>
-            </div>
-            <div v-else-if="result.displayStatus === 'paused'" class="status-tag">
-              <el-tag type="warning" size="small">已暂停</el-tag>
-            </div>
-
-            <div v-else-if="result.displayStatus === 'warning'" class="status-tag">
-              <el-tag type="warning" size="small">添加失败</el-tag>
-            </div>
-
-            <!-- 下载器添加状态 -->
-            <div class="downloader-status" v-if="result.downloaderStatus">
-              <div class="status-icon">
-                <el-icon v-if="result.downloaderStatus.success" color="#67C23A" :size="16">
-                  <CircleCheckFilled />
-                </el-icon>
-                <el-icon v-else color="#F56C6C" :size="16">
-                  <CircleCloseFilled />
-                </el-icon>
-              </div>
-              <span
-                class="status-text"
-                :class="{
-                  success: result.downloaderStatus.success,
-                  error: !result.downloaderStatus.success,
-                }"
+            <p
+              v-if="
+                result.source_restriction_status === 'denied' ||
+                result.source_restriction_status === 'unknown'
+              "
+              class="result-detail"
+            >
+              {{ result.message }}
+            </p>
+            <p v-if="result.downloaderStatus?.success === false" class="result-detail">
+              添加失败<template v-if="result.downloaderStatus.message">
+                · {{ result.downloaderStatus.message }}</template
               >
-                {{
-                  result.downloaderStatus.success
-                    ? `种子已添加到'${result.downloaderStatus.downloaderName}'`
-                    : '添加失败'
-                }}
-              </span>
-            </div>
+            </p>
+            <p v-else-if="result.downloaderStatus?.success" class="result-detail">下载器已添加</p>
 
             <!-- 操作按钮 -->
             <div class="card-extra">
-              <el-button type="primary" size="small" @click="showSiteLog(result.siteName, result.logs)">
+              <el-button
+                type="primary"
+                size="small"
+                @click="showSiteLog(result.siteName, result.logs)"
+              >
                 查看日志
               </el-button>
               <a
-                v-if="result.success && result.url"
+                v-if="result.success && result.url && filterUploadedParam(result.url)"
                 :href="filterUploadedParam(result.url)"
                 target="_blank"
                 rel="noopener noreferrer"
-                style="transform: translateY(-1px)"
+                class="result-link"
               >
-                <el-button type="success" size="small"> 查看种子 </el-button>
+                查看种子
               </a>
             </div>
           </div>
         </div>
         <div class="row-action">
           <el-button
-            type="warning"
-            :icon="Refresh"
-            size="large"
+            :icon="TopRight"
             @click="openAllSitesInRow(row)"
             :disabled="!hasValidUrlsInRow(row)"
             class="open-all-button"
           >
-            <div class="button-subtitle">打开{{ getValidUrlsCount(row) }}个站点</div>
+            打开 {{ getValidUrlsCount(row) }} 个站点
           </el-button>
         </div>
       </div>
@@ -153,15 +118,18 @@
 </template>
 
 <script setup lang="ts">
-import {
-  CircleCheckFilled,
-  CircleCloseFilled,
-  Clock,
-  Loading,
-  Refresh,
-  Warning,
-} from '@element-plus/icons-vue'
-import { useCrossSeedPanelContext } from './crossSeedPanelContext'
+import { CircleCheck, CircleClose, Clock, Loading, TopRight } from '@element-plus/icons-vue'
+import { getPublishDisplayStatus, getPublishResponseStatus } from '@/utils/publishPresentation'
+import { useCrossSeedPanelContext, type PublishDisplayResult } from './crossSeedPanelContext'
+
+const outcomeLabel = (result: PublishDisplayResult) => {
+  if (result.displayStatus === 'waiting') return '等待中'
+  if (result.displayStatus === 'publishing') return '发布中'
+  if (result.displayStatus === 'paused' || result.displayStatus === 'incomplete') return '未完成'
+  if (result.source_restriction_status === 'denied') return '源站禁转'
+  if (result.source_restriction_status === 'unknown') return '待核验'
+  return getPublishDisplayStatus(getPublishResponseStatus(result)).label
+}
 
 const {
   publishProgress,
@@ -176,3 +144,112 @@ const {
 } = useCrossSeedPanelContext()
 </script>
 
+<style scoped>
+.results-rows-container {
+  display: grid;
+  gap: 18px;
+}
+
+.results-row {
+  display: grid;
+  gap: 10px;
+}
+
+.row-sites {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  align-items: stretch;
+  gap: 10px;
+}
+
+.result-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 12px;
+  background: var(--el-bg-color-overlay);
+}
+
+.card-title {
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.result-card.is-success .status-tag {
+  color: var(--el-color-success-dark-2);
+}
+.result-card.is-error .status-tag {
+  color: var(--el-color-danger-dark-2);
+}
+.result-card.is-warning .result-detail {
+  color: var(--el-color-warning-dark-2);
+}
+.result-card.is-publishing .status-tag {
+  color: var(--el-color-primary-dark-2);
+}
+
+.loading-icon {
+  animation: cross-seed-rotate 1s linear infinite;
+}
+
+.row-action {
+  justify-self: end;
+}
+
+.progress-section {
+  flex-wrap: wrap;
+  padding: 14px;
+  border-color: var(--el-border-color-light);
+  background: var(--el-bg-color-overlay);
+  box-shadow: none;
+}
+
+.progress-item {
+  min-width: min(180px, 100%);
+}
+.limit-alert-section {
+  width: 100%;
+  margin-top: 0;
+}
+.limit-alert-message {
+  overflow-wrap: anywhere;
+}
+
+.status-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.result-detail {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.result-link {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 8px;
+  color: var(--el-color-primary-dark-2);
+}
+
+.card-extra {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-icon {
+    animation: none;
+  }
+}
+</style>

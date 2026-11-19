@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pt-nexus/server/internal/repository"
+	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 	"github.com/pt-nexus/server/internal/service/reversemapping"
 )
 
@@ -231,6 +232,11 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 		isDeletedExpr = "CASE WHEN ct.hash IS NULL THEN true ELSE false END AS is_deleted"
 	}
 
+	requiredFields := []string{"poster", "screenshots", "body", "mediainfo"}
+	missingChecks := make([]string, 0, len(requiredFields))
+	for _, field := range requiredFields {
+		missingChecks = append(missingChecks, fmt.Sprintf("CASE WHEN TRIM(COALESCE(sp.%s, '')) IN ('', '[]', 'null') THEN 1 ELSE 0 END AS missing_%s", field, field))
+	}
 	dataQuery := fmt.Sprintf(`
 			SELECT sp.hash, sp.torrent_id, sp.site_name, sp.nickname,
 			       COALESCE(ct.save_path, '') AS save_path,
@@ -239,11 +245,12 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 			       sp.audio_codec, sp.resolution, sp.team, sp.source, sp.tags,
 			       sp.title_components, sp.screenshot_review_status,
 			       %s,
+			       %s,
 			       sp.is_reviewed, sp.updated_at
 			%s
 			%s
 			ORDER BY sp.created_at DESC
-		`, isDeletedExpr, fromClause, whereClause)
+		`, strings.Join(missingChecks, ", "), isDeletedExpr, fromClause, whereClause)
 
 	dataArgs := args
 	if normalizedReviewStatus == "" {
@@ -261,6 +268,15 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 	reverseMappings := reversemapping.Build(nil)
 	for _, item := range pageData {
 		normalizeQueryRow(item, reverseMappings)
+		missing := make([]string, 0, len(requiredFields))
+		for _, field := range requiredFields {
+			key := "missing_" + field
+			if processingshared.ToBool(item[key]) {
+				missing = append(missing, field)
+			}
+			delete(item, key)
+		}
+		item["missing_required_fields"] = missing
 	}
 
 	if normalizedReviewStatus != "" {

@@ -22,7 +22,7 @@
   </div>
 
   <!-- 日志弹窗 (保持不变) -->
-  <LogViewerCard v-model="showLogCard" title="操作日志" :content="logContent" />
+  <LogViewerCard v-model="showLogCard" title="操作日志" :content="redactPrivateText(logContent)" />
 
   <!-- 日志进度组件 -->
   <LogProgress
@@ -181,6 +181,7 @@ import { ElNotification } from '@/utils/uiNotify'
 import { openSSE, type EventSourceLike } from '@/desktop/sse'
 import LogProgress from './LogProgress.vue'
 import LogViewerCard from './LogViewerCard.vue'
+import { redactPrivateText } from '@/utils/publishPresentation'
 import CrossSeedStepsHeader from './cross-seed/CrossSeedStepsHeader.vue'
 import CrossSeedStepDetails from './cross-seed/CrossSeedStepDetails.vue'
 import CrossSeedStepPublishPreview from './cross-seed/CrossSeedStepPublishPreview.vue'
@@ -2742,6 +2743,7 @@ watch(autoUpdateExistingTorrent, (isEnabled) => {
 
 // --- Extracted: publish flow + derived computed (see cross-seed/panel/publishFlow.ts) ---
 const publishFlow = createPublishFlow({
+  sourceRestriction: seedFlow.sourceRestriction,
   emit,
   publishScene: props.publishScene,
 
@@ -2829,6 +2831,7 @@ const handleFetchLogProgressClose = () => {
 const showCompleteButton = computed(() => props.showCompleteButton)
 
 provide(crossSeedPanelContextKey, {
+  sourceRestriction: seedFlow.sourceRestriction,
   steps,
   activeStep,
   activeTab,

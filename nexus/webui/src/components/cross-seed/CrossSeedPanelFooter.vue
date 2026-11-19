@@ -1,5 +1,13 @@
 <template>
   <footer class="panel-footer">
+    <p
+      v-if="activeStep < 3 && sourceRestriction.status !== 'allowed' && sourceRestriction.message"
+      class="validation-hint"
+      role="status"
+    >
+      <el-icon class="hint-icon"><Warning /></el-icon>
+      <span>{{ sourceRestriction.message }}</span>
+    </p>
     <!-- 步骤 0 的按钮 -->
     <div v-if="activeStep === 0" class="button-group">
       <transition name="el-fade-in-linear">
@@ -89,7 +97,9 @@
         type="warning"
         @click="handleEnqueue"
         :loading="isEnqueueing"
-        :disabled="isLoading || selectedTargetSites.length === 0"
+        :disabled="
+          sourceRestriction.status !== 'allowed' || isLoading || selectedTargetSites.length === 0
+        "
       >
         加入队列
       </el-button>
@@ -97,7 +107,9 @@
         type="primary"
         @click="handlePublish"
         :loading="isLoading"
-        :disabled="isEnqueueing || selectedTargetSites.length === 0"
+        :disabled="
+          sourceRestriction.status !== 'allowed' || isEnqueueing || selectedTargetSites.length === 0
+        "
       >
         立即发布
       </el-button>
@@ -116,6 +128,7 @@ import { useCrossSeedPanelContext } from './crossSeedPanelContext'
 
 const {
   activeStep,
+  sourceRestriction,
   maintenanceOnly,
   showCompleteButton,
   isCompleteButtonDisabled,

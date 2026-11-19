@@ -718,8 +718,8 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 		return
 	}
 	ctx := publishworkflow.Context{}
-	if err := json.Unmarshal([]byte(taskRecord.ContextJSON), &ctx); err != nil && taskRecord.Trigger == "automation" {
-		reason := "自动发布上下文快照无效"
+	if err := json.Unmarshal([]byte(taskRecord.ContextJSON), &ctx); err != nil {
+		reason := "发布上下文快照无效，无法确认源站转种权限"
 		s.failAutomationBeforePublish(taskRecord, reason)
 		_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, reason, "")
 		return
@@ -803,7 +803,25 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 		execTaskID = fmt.Sprintf("queue-%d", taskID)
 	}
 
-	preCheckPassed, preCheckMessage := s.checkQueueVideoSizePrecondition(taskRecord, payload, ctx)
+	var sourceCheck func(publishworkflow.Context) publishworkflow.SourceRestriction
+	if taskRecord.Trigger != "automation" {
+		if err := s.guardNativePublishEvidence(payload, ctx, 0); err != nil {
+			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
+			return
+		}
+		check := s.inspectSourceRestriction(ctx)
+		if check.Status != publishworkflow.SourceRestrictionAllowed {
+			result := publishworkflow.SourceRestrictionFailure(check)
+			encoded, _ := json.Marshal(result)
+			message := processingshared.ToString(result["message"], "")
+			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, message, string(encoded))
+			s.appendPublishLog(payload, execTaskID, torrentID, result, 409, 0)
+			return
+		}
+		sourceCheck = func(publishworkflow.Context) publishworkflow.SourceRestriction { return check }
+	}
+
+	preCheckPassed, preCheckMessage := s.checkQueueVideoSizePrecondition(ctx)
 	if !preCheckPassed {
 		s.failAutomationBeforePublish(taskRecord, preCheckMessage)
 		preCheckResult := map[string]any{
@@ -832,7 +850,7 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
 			return
 		}
-		if err := s.prepareAutomationQueue(taskRecord); err != nil {
+		if err := s.prepareAutomationQueue(taskRecord, ctx); err != nil {
 			s.failAutomationBeforePublish(taskRecord, err.Error())
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
 			return
@@ -848,6 +866,10 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 		payload["upload_data"] = uploadData
 		encoded, _ := json.Marshal(uploadData)
 		taskRecord.UploadDataJSON = string(encoded)
+		// prepareAutomationQueue 已核对本条冻结任务的源站详情、权限与载荷。
+		sourceCheck = func(publishworkflow.Context) publishworkflow.SourceRestriction {
+			return publishworkflow.SourceRestriction{Status: publishworkflow.SourceRestrictionAllowed}
+		}
 	}
 	if taskRecord.Trigger == "automation" {
 		payload[automationUploadGuardKey] = func(path string) error {
@@ -859,10 +881,6 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			return s.guardNativePublishEvidence(payload, checked, taskRecord.ID)
 		}
 	} else {
-		if err := s.guardNativePublishEvidence(payload, ctx, 0); err != nil {
-			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
-			return
-		}
 		payload[automationUploadGuardKey] = func(path string) error {
 			checked := ctx
 			checked.OriginalTorrentPath = path
@@ -881,7 +899,8 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			DefaultDownloaderID: s.resolveDefaultPublishDownloaderID(),
 		},
 		publishworkflow.PublishWithContextDeps{
-			GetSiteByName: s.repo.GetSiteByName,
+			GetSiteByName:          s.repo.GetSiteByName,
+			CheckSourceRestriction: sourceCheck,
 			ResolveTorrentPath: func(ctx publishworkflow.Context) string {
 				return acquirefetch.ResolvePublishTorrentPath(s.repo, acquirefetch.ResolvePublishTorrentPathInput{
 					OriginalTorrentPath: ctx.OriginalTorrentPath,
@@ -978,32 +997,17 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 	logx.Warnf(publishQueueLogModule, "队列任务失败，已重试入队 id=%d attempt=%d next_run_at=%s", taskID, attempt, nextRunAt.Format(time.RFC3339))
 }
 
-func (s *MigrateService) checkQueueVideoSizePrecondition(task repository.PublishQueueTask, payload map[string]any, ctx publishworkflow.Context) (bool, string) {
+func (s *MigrateService) checkQueueVideoSizePrecondition(ctx publishworkflow.Context) (bool, string) {
 	if s == nil || s.repo == nil {
 		return false, "发布前预检查触发限制: 队列服务未初始化"
 	}
 
-	ctxCopy := ctx
-	if strings.TrimSpace(ctxCopy.TorrentID) == "" {
-		ctxCopy.TorrentID = strings.TrimSpace(firstNonEmptyString(task.TorrentID, processingshared.ToString(payload["torrent_id"], "")))
-	}
-	if strings.TrimSpace(ctxCopy.SiteName) == "" {
-		ctxCopy.SiteName = strings.TrimSpace(firstNonEmptyString(task.SourceSite, processingshared.ToString(payload["sourceSite"], "")))
-	}
-	if strings.TrimSpace(ctxCopy.SourceNickname) == "" {
-		ctxCopy.SourceNickname = strings.TrimSpace(firstNonEmptyString(task.SourceSite, ctxCopy.SiteName))
-	}
-	if strings.TrimSpace(ctxCopy.SourceDetailURL) == "" {
-		ctxCopy.SourceDetailURL = strings.TrimSpace(ctxCopy.TorrentID)
-	}
-
 	torrentPath := acquirefetch.ResolvePublishTorrentPath(s.repo, acquirefetch.ResolvePublishTorrentPathInput{
-		OriginalTorrentPath: ctxCopy.OriginalTorrentPath,
-		TorrentDir:          ctxCopy.TorrentDir,
-		SiteName:            ctxCopy.SiteName,
-		TorrentID:           ctxCopy.TorrentID,
-		SourceNickname:      ctxCopy.SourceNickname,
-		SourceDetailURL:     ctxCopy.SourceDetailURL,
+		OriginalTorrentPath: ctx.OriginalTorrentPath,
+		TorrentDir:          ctx.TorrentDir,
+		SiteName:            ctx.SiteName,
+		TorrentID:           ctx.TorrentID,
+		SourceDetailURL:     firstNonEmptyString(ctx.SourceDetailURL, ctx.TorrentID),
 	})
 	if strings.TrimSpace(torrentPath) == "" {
 		return false, "发布前预检查触发限制: 无法获取 torrent 文件"

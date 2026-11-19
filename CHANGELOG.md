@@ -273,3 +273,17 @@
 - 部署。152 的主程序换为 `ptmove-nexus:0.3.1-pull.1`，镜像 ID `sha256:cd023e8073aae7407bf468121425fc388e69b168a44b897b29e36c2df86044f5`，复用原数据目录和 18120，应用健康。Hub `ptmove-pull:0.3.1-pull.1` 位于 `/opt/gpt-ptmove-nexus/pull-agent`。飞牛在 `/opt/ptmove-pull-agent` 启动同镜像的 Agent，沿用原媒体容器和只读媒体挂载。按用户澄清，SSH 只用于飞牛 Docker 安装及核对状态。验证了实际目标为独立飞牛，没有操作 81 主机或中转配置。飞牛代理保持两条直达 152:28443 的连接，152 上旧 `ptmove-feiniu-link.service` 停止且禁用开机启动。PTMove 容器自身只监听应用和 Docker DNS，旧回环业务端口不存在。152 现用下载器配置只含本项目的 Controller Token，qB Token 在飞牛本机使用。
 - 验收。152 上通过 Pull 全量 Docker Go 测试、go vet 和主程序全量 Go 测试，临时空库镜像启动通过。公网 TLS 校验 IP SAN 成功，未认证领取返回 401。新路径真实读到 qB “重复”标签下 29 个完成任务。选取《皇冠高地》真实视频，停掉旧 SSH 转发后，生产管理接口返回 5 张预览，原生后台修复用模拟来源资料从 0 张补齐 5 张，在隔离 SQLite 入库并通过标准草稿查询读回。字幕确认状态为 confirmed_chinese，草稿状态 none，发布队列和日志都是 0。Pixhost 返回五张 1920×800 PNG，152 下载、FFmpeg 完整解码和不同 SHA256 校验成功。验收尺寸最初套用了上一部电影的 1920×1080，读取 PNG 头后修正并复用原链接，没有再次上传。SFTP 首次写入空文件错误已用明确读写模式恢复。
 - 交付。更新 `docs/REMOTE_SCREENSHOTS.md`、`docs/SCREENSHOT_REPLACEMENT_DESIGN.html`、`docs/DEPLOYMENT.json`。三个主程序守卫源文件和部署元数据已同步至 152，部署 JSON 哈希一致。未在本机启动生产服务。自动化、月度计划和自动发种均未启用，真实站点发种和物理 ARM 硬件不在本次实测范围。记录时改动待提交及推送到 Gitee；原 v0.3.1 的发行附件保留对应历史镜像。本次运行 URL 为 http://152.136.236.238:18120/ 。
+
+## PTM-20261119-037 — 2026-11-19T20:59:00+08:00 — Codex root，STARPT 界面、任务状态、源站禁转保护和插件
+
+- 源站限制。修改 `nexus/server/internal/service/{acquire,migrationflow,publish}` 及 HTTP 路由。统一直接发布、批次和队列的可信源站判定。在上传前读取同源详情，拒绝禁转或权限未知的资源，并绑定源站种子标识和实际发布字节。客户端不能通过改资料或提交允许字段覆盖。历史队列缺少可信种子标识时会停止。已存在记录的后续自动编辑和自动添加同样受入口限制。
+- 资料与任务。修改 `crossseed/query.go`、`repository/publish_log_repository.go`、`migrationflow/task_monitor.go`。一键多种投影海报、截图、简介正文、MediaInfo 缺项并逐条展示。转种记录按站点显示发布成功、已存在、失败、未完成等，自动添加显示独立结果。前端提供带目标站和资料摘要的批量确认，按队列分组追踪，状态不明确时不自动重发。
+- 界面与插件。修改 `nexus/webui/src` 的导航、登录、首页、设置、任务记录及转种相关界面和响应式布局，加入 STARPT 标识、线框图标、适度半透明导航和减少动态效果支持。移除 Wiki 入口，源码与反馈入口指向项目 Gitee，站点导入和机器 API 保留。新增 `server/internal/service/plugins`、`plugins_handler.go`、`PluginsView.vue` 和 `docs/STARPT_PLUGINS.md`。管理员可以在数据目录放入或移除 JSON 后在 Web 刷新。清单可展示文字、现有页面链接和只读指标，扩展后台能力需增加服务端实现。
+- 验证。152 上 Gofmt、无网络 Docker 全量 Go 测试和编译、Vue 全量类型检查和生产构建通过。状态与脱敏 Node 测试六项通过。隔离应用验证 JWT 边界、插件加载和移除、无效文件诊断、未知源预检、资料缺项、未完成筛选、站点结果与自动添加独立。Edge Playwright 桌面和手机验证登录、导航、插件、任务记录、种子维护，通过后清理隔离容器、测试数据和临时凭据。首次隔离网络不映射宿主端口，改用容器私网地址及 152 SSH 隧道复测通过。真实站点发布及 81 操作次数均为零。
+- 部署及 Git。152 的 `ptmove-nexus-ptmove-nexus-1` 已升级 `ptmove-nexus:0.3.1-starpt.1`，镜像 ID `sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829`。公网首页和健康接口返回 HTTP 200，生产数据沿用现有挂载。飞牛 HTTPS 领单组件未变动。生产 `/opt/gpt-ptmove-nexus/data/plugins` 已建，部署清单与本地 `docs/DEPLOYMENT.json` 校验一致。自动调度保持关闭。本轮未提交、推送或追加 Gitee 发行版。
+
+## PTM-20261119-038 — 2026-11-19T21:14:38+08:00 — Codex root，准备 STARPT 双平台发行
+
+- 交付范围。提交已在 152 验证的 61 个 STARPT 源码文件和对应部署记录。此前的飞牛 403 修复、实际站点记录和其他本地历史继续保留在工作区。本次标签为 v0.3.1-starpt.1，与发布镜像的构建号一致。
+- 检查。逐文件比对 152 构建使用的 STARPT 工作树和发布源码。确认运行镜像 `ptmove-nexus:0.3.1-starpt.1` 为 linux/amd64，镜像 ID 为 `sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829`，152 容器健康。扫描待提交文件和已有 Git 历史的常见密钥、凭据和运行时文件，无阻塞项。
+- Git 及部署。准备提交、打标签并发布到 Gitee 与 GitHub 私有仓库，发行及附件状态在验证后追加。生产应用继续运行已验证的同一镜像。本轮无实际发种、无 81 操作。

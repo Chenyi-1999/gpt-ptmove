@@ -1,14 +1,16 @@
-import { computed, nextTick, type ComputedRef, type Ref } from 'vue'
+import { computed, nextTick, ref, type ComputedRef, type Ref } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import { useTaskMonitorStore } from '@/stores/taskMonitor'
 import { useContentFiltersStore } from '@/stores/contentFilters'
 import { ElNotification } from '@/utils/uiNotify'
 import { resolveSourceTorrentId } from '@/utils/sourceTorrentId'
+import { redactPrivateText } from '@/utils/publishPresentation'
 
 import type {
   ReverseMappings,
   ScreenshotReviewStatus,
+  SourceRestriction,
   SiteStatus,
   StandardParamKey,
   TagOption,
@@ -70,6 +72,7 @@ export type SeedFlowApi = {
   handleTeamInput: (param: TitleComponent, value: string) => void
   saveCurrentSeedEdits: () => Promise<boolean>
   goToPublishPreviewStep: () => Promise<void>
+  sourceRestriction: Ref<SourceRestriction>
   goToSelectSiteStep: () => Promise<void>
   toggleSiteSelection: (siteName: string) => void
   selectAllTargetSites: () => void
@@ -293,6 +296,37 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     showLogProgress.value = true
   }
 
+  const sourceRestriction = ref<SourceRestriction>({ status: 'unknown', message: '' })
+  let restrictionRequest = 0
+
+  const resetSourceRestriction = () => {
+    restrictionRequest++
+    sourceRestriction.value = { status: 'unknown', message: '等待核验源站转种限制' }
+  }
+
+  const checkSourceRestriction = async (contextId: string | null) => {
+    const request = ++restrictionRequest
+    sourceRestriction.value = { status: 'unknown', message: '缺少可核验的源站资料' }
+    if (!contextId) return
+    sourceRestriction.value = { status: 'checking', message: '正在核验源站转种限制' }
+    const siteName = sourceSite.value
+    try {
+      const response = await axios.get('/api/migrate/source-restriction', {
+        params: { task_id: contextId },
+        timeout: 15000,
+      })
+      if (request !== restrictionRequest || siteName !== sourceSite.value) return
+      const { success, source_restriction_status: status, source_restriction_message: message } = response.data || {}
+      sourceRestriction.value = {
+        status: success && (status === 'allowed' || status === 'denied') ? status : 'unknown',
+        message: typeof message === 'string' ? redactPrivateText(message) : '',
+      }
+    } catch {
+      if (request !== restrictionRequest || siteName !== sourceSite.value) return
+      sourceRestriction.value = { status: 'unknown', message: '未能核验源站转种限制，请重新获取种子信息' }
+    }
+  }
+
   const taskMonitorStore = useTaskMonitorStore()
   const contentFiltersStore = useContentFiltersStore()
 
@@ -412,6 +446,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       torrentId: string
       englishSiteName: string
       taskIdValue: string | null
+      restrictionContextId?: string | null
       successNotification?: { title: string; message: string } | null
       checkBdinfoFromFetch: boolean
       screenshotPreviewRequired?: boolean
@@ -434,6 +469,8 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     } else {
       taskId.value = `db_${options.torrentId}_${options.englishSiteName}`
     }
+
+    void checkSourceRestriction(options.restrictionContextId ?? null)
 
     const normalizedMedia = normalizeIntroBodyAndMediainfo(dbData.body || '', dbData.mediainfo || '')
     const compositeSeedId = `${dbData.hash || options.torrentId}_${options.torrentId}_${options.englishSiteName}`
@@ -709,7 +746,8 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     await applyDbSeedData(finalDbResponse.data.data, {
       torrentId: options.torrentId,
       englishSiteName: options.englishSiteName,
-      taskIdValue: storeResponse.data.task_id || options.taskIdValue || null,
+      taskIdValue: finalDbResponse.data.task_id || storeResponse.data.task_id || options.taskIdValue || null,
+      restrictionContextId: finalDbResponse.data.task_id || storeResponse.data.task_id || null,
       successNotification: options.successNotification,
       checkBdinfoFromFetch: true,
       screenshotPreviewRequired:
@@ -761,6 +799,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       return
     }
 
+    resetSourceRestriction()
     isRefetchingFromSource.value = true
     isLoading.value = true
     fetchFlowErrorMessage.value = ''
@@ -830,6 +869,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
 
   const fetchTorrentInfo = async (prefetchedDbSeedInfo?: unknown) => {
     if (!sourceSite.value || !torrent.value) return
+    resetSourceRestriction()
     fetchFlowErrorMessage.value = ''
 
     const siteDetails = torrent.value.sites[sourceSite.value]
@@ -992,6 +1032,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
           torrentId,
           englishSiteName,
           taskIdValue: dbResponse.data.task_id || `db_${torrentId}_${englishSiteName}`,
+          restrictionContextId: dbResponse.data.task_id || null,
           successNotification: {
             title: '读取成功',
             message: '种子信息已从数据库成功加载，请核对。',
@@ -1573,6 +1614,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
   }
 
   return {
+    sourceRestriction,
     getEnglishSiteName,
     fetchSitesStatus,
     fetchCrossSeedSettings,

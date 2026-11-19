@@ -11,6 +11,7 @@ import (
 	"github.com/pt-nexus/server/internal/repository"
 	"github.com/pt-nexus/server/internal/service/downloaderclient"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
+	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
 	"gorm.io/gorm"
 )
 
@@ -120,7 +121,7 @@ func TestAutomationPendingCannotEnqueueOrPreflight(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.downloaderHook = func(string) (automationDownloader, error) { t.Fatal("pending touched downloader"); return nil, nil }
-	if err := m.prepareAutomationQueue(queue); err == nil || !strings.Contains(err.Error(), "截图") {
+	if err := m.prepareAutomationQueue(queue, publishworkflow.Context{}); err == nil || !strings.Contains(err.Error(), "截图") {
 		t.Fatalf("preflight: %v", err)
 	}
 	if _, err := m.beginAutomationPublish(queue); err == nil {

@@ -139,18 +139,8 @@ func (s *MigrateService) authorizeAutomationUpload(queue repository.PublishQueue
 		return errors.New("自动发布尝试围栏已改变，禁止上传")
 	}
 	if len(paths) > 0 {
-		file, err := os.Open(paths[0])
-		if err != nil {
-			return errors.New("自动发布源种子不可读，禁止上传")
-		}
-		raw, readErr := io.ReadAll(io.LimitReader(file, 16*1024*1024+1))
-		_ = file.Close()
-		if readErr != nil || len(raw) > 16*1024*1024 {
-			return errors.New("自动发布源种子无效，禁止上传")
-		}
-		meta, err := acquirefetch.ParseTorrentMeta(raw)
-		if err != nil || !strings.EqualFold(meta.InfoHash, task.InfoHash) || meta.Size != task.Size {
-			return errors.New("自动发布实际种子与任务冻结载荷不一致，禁止上传")
+		if err := verifyAutomationPublishTorrent(paths[0], task); err != nil {
+			return err
 		}
 	}
 
@@ -177,6 +167,25 @@ func (s *MigrateService) authorizeAutomationUpload(queue repository.PublishQueue
 		}
 	}
 	return s.automation.validateFrozen(snapshot)
+}
+
+// verifyAutomationPublishTorrent 在记录尝试及实际发送前核对冻结任务的种子与体积。
+func verifyAutomationPublishTorrent(path string, task repository.AutomationTask) error {
+	const maxTorrentBytes = 16 << 20
+	file, err := os.Open(path)
+	if err != nil {
+		return errors.New("自动发布源种子不可读，禁止上传")
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, maxTorrentBytes+1))
+	if err != nil || len(raw) > maxTorrentBytes {
+		return errors.New("自动发布源种子无效，禁止上传")
+	}
+	meta, err := acquirefetch.ParseTorrentMeta(raw)
+	if err != nil || !strings.EqualFold(meta.InfoHash, task.InfoHash) || meta.Size != task.Size {
+		return errors.New("自动发布实际种子与任务冻结载荷不一致，禁止上传")
+	}
+	return nil
 }
 
 // failAutomationBeforePublish 只结束尚未尝试上传的自动任务，取消或未知上传证据不被覆盖。

@@ -15,6 +15,7 @@ type PublishFromPayloadDeps struct {
 
 	GetSiteByName           func(name string) (map[string]any, error)
 	ResolveTorrentPath      func(ctx Context) string
+	CheckSourceRestriction  func(ctx Context) SourceRestriction
 	AddToDownloader         func(payload map[string]any) (map[string]any, int)
 	FindSiteNicknameByGroup func(releaseGroup string) (string, error)
 }
@@ -51,6 +52,7 @@ func ExecutePublishFromPayload(input PublishFromPayloadInput, deps PublishFromPa
 		PublishWithContextDeps{
 			GetSiteByName:           deps.GetSiteByName,
 			ResolveTorrentPath:      deps.ResolveTorrentPath,
+			CheckSourceRestriction:  deps.CheckSourceRestriction,
 			AddToDownloader:         deps.AddToDownloader,
 			FindSiteNicknameByGroup: deps.FindSiteNicknameByGroup,
 		},

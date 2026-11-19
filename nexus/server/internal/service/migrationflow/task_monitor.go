@@ -1,6 +1,7 @@
 package migrationflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -44,11 +45,11 @@ func (s *MigrateService) TaskMonitorSnapshot() (map[string]any, int) {
 	}
 
 	if s.publishLogRepo != nil {
-		attentionLogs, err := s.publishLogRepo.ListRecentAttentionLogs(20)
+		transferLogs, err := s.publishLogRepo.ListRecentTransferLogs(20)
 		if err != nil {
 			return map[string]any{"success": false, "message": "读取发种日志失败: " + err.Error()}, 500
 		}
-		for _, log := range attentionLogs {
+		for _, log := range transferLogs {
 			tasks = append(tasks, buildPublishLogTaskEntry(log))
 		}
 	}
@@ -150,14 +151,18 @@ func (s *MigrateService) applyPublishQueueTaskAction(rawID string, action string
 }
 
 func buildBatchPublishTaskEntry(task publishworkflow.BatchTask) map[string]any {
-	status := "success"
-	if task.IsRunning {
-		status = "running"
-	} else if task.Failed > 0 {
-		status = "failed"
+	status, outcome := "success", ""
+	switch {
+	case task.IsRunning:
+		status, outcome = "running", "running"
+	case task.Failed > 0:
+		status, outcome = "failed", "failed"
+	case task.Total == 0 || task.Processed < task.Total:
+		status, outcome = "failed", "incomplete"
 	}
 
 	entry := map[string]any{
+		"outcome":       outcome,
 		"key":           "publish_batch:" + strings.TrimSpace(task.BatchID),
 		"kind":          "publish_batch",
 		"raw_id":        strings.TrimSpace(task.BatchID),
@@ -231,19 +236,16 @@ func buildBDInfoTaskEntry(task map[string]any) map[string]any {
 }
 
 func buildQueueTaskEntry(task repository.PublishQueueTask) map[string]any {
-	status := "running"
-	if strings.TrimSpace(task.Status) == repository.PublishQueueStatusSuccess {
-		status = "success"
-	}
+	outcome := strings.TrimSpace(task.Status)
 
 	entry := map[string]any{
 		"key":           "publish_queue:" + strconv.FormatInt(task.ID, 10),
 		"kind":          "publish_queue",
 		"raw_id":        strconv.FormatInt(task.ID, 10),
 		"title":         firstNonEmptyString(strings.TrimSpace(task.Title), "发布任务入队"),
-		"status":        status,
+		"status":        "running",
+		"outcome":       outcome,
 		"message":       buildQueueTaskMessage(task),
-		"error":         strings.TrimSpace(task.LastError),
 		"progress_text": strings.TrimSpace(task.TargetSite),
 		"started_at":    firstNonEmptyString(stringPtrValue(task.StartedAt), strings.TrimSpace(task.CreatedAt)),
 		"updated_at":    strings.TrimSpace(task.UpdatedAt),
@@ -263,17 +265,49 @@ func buildQueueTaskEntry(task repository.PublishQueueTask) map[string]any {
 }
 
 func buildPublishLogTaskEntry(log repository.PublishLogEntry) map[string]any {
+	status, outcome, message := "failed", "incomplete", "未完成"
+	switch strings.TrimSpace(log.Status) {
+	case "success":
+		status, outcome, message = "success", "published", "已发布"
+	case "exists":
+		status, outcome, message = "success", "exists", "目标站已存在"
+	case "edited":
+		status, outcome, message = "success", "edited", "已有种子已更新"
+	case "failed":
+		outcome, message = "failed", "转种失败"
+	case "pre_check_limit":
+		message = "预检拦截"
+	case "filtered":
+		message = "未通过筛选"
+	case "cancelled":
+		outcome, message = "cancelled", "已取消"
+	}
+	var autoAdd struct {
+		Success *bool
+		Skipped bool
+		Message string
+	}
+	autoAddStatus := ""
+	if json.Unmarshal([]byte(log.AutoAddResult), &autoAdd) == nil && autoAdd.Success != nil && !autoAdd.Skipped && !strings.HasPrefix(autoAdd.Message, "未执行") && !strings.HasPrefix(autoAdd.Message, "未启用") && !strings.Contains(autoAdd.Message, "跳过") {
+		if *autoAdd.Success {
+			autoAddStatus = "success"
+		} else {
+			autoAddStatus = "failed"
+			message += " · 自动添加下载器失败"
+		}
+	}
 	return map[string]any{
-		"key":           "publish_log:" + strconv.FormatUint(log.ID, 10),
-		"kind":          "publish_log",
-		"raw_id":        strconv.FormatUint(log.ID, 10),
-		"title":         firstNonEmptyString(strings.TrimSpace(log.Title), "发种失败"),
-		"status":        "failed",
-		"message":       firstNonEmptyString(strings.TrimSpace(log.TargetSite), strings.TrimSpace(log.SourceSite)),
-		"error":         strings.TrimSpace(log.Logs),
-		"progress_text": strings.TrimSpace(log.Status),
-		"started_at":    strings.TrimSpace(log.CreatedAt),
-		"updated_at":    strings.TrimSpace(log.UpdatedAt),
+		"key":             "publish_log:" + strconv.FormatUint(log.ID, 10),
+		"kind":            "publish_log",
+		"raw_id":          strconv.FormatUint(log.ID, 10),
+		"title":           firstNonEmptyString(strings.TrimSpace(log.Title), "转种任务"),
+		"status":          status,
+		"outcome":         outcome,
+		"auto_add_status": autoAddStatus,
+		"message":         message,
+		"progress_text":   firstNonEmptyString(strings.TrimSpace(log.TargetSite), strings.TrimSpace(log.SourceSite)),
+		"started_at":      strings.TrimSpace(log.CreatedAt),
+		"updated_at":      strings.TrimSpace(log.UpdatedAt),
 		"route_target": map[string]any{
 			"path": "/publish-logs",
 			"query": map[string]any{
@@ -292,7 +326,10 @@ func buildBatchPublishMessage(task publishworkflow.BatchTask) string {
 	if task.Failed > 0 {
 		return "批量发布已结束，存在失败站点"
 	}
-	return "批量发布已完成"
+	if task.Total == 0 || task.Processed < task.Total {
+		return "批量发布未完成"
+	}
+	return "批量处理已完成，详情见各站点结果"
 }
 
 func buildBatchFetchMessage(task acquirefetch.BatchFetchTask) string {
@@ -323,8 +360,6 @@ func buildQueueTaskMessage(task repository.PublishQueueTask) string {
 		return "等待发布"
 	case repository.PublishQueueStatusRunning:
 		return "发布中"
-	case repository.PublishQueueStatusSuccess:
-		return "已发布成功"
 	default:
 		return strings.TrimSpace(task.Status)
 	}

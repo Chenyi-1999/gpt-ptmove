@@ -31,10 +31,7 @@ func ResolvePublishTorrentPath(reader SiteInfoReader, input ResolvePublishTorren
 		return ""
 	}
 
-	sourceLookup := strings.TrimSpace(input.SourceNickname)
-	if sourceLookup == "" {
-		sourceLookup = strings.TrimSpace(input.SiteName)
-	}
+	sourceLookup := strings.TrimSpace(input.SiteName)
 	sourceDetailURL := strings.TrimSpace(input.SourceDetailURL)
 	if sourceLookup == "" || sourceDetailURL == "" {
 		return ""

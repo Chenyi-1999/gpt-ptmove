@@ -15,6 +15,8 @@ type PublishInput struct {
 
 	UploadData  map[string]any
 	TorrentPath string
+	// TorrentData 与工作流校验的字节一致；发布器不再从路径重新读取。
+	TorrentData []byte
 
 	Title       string
 	Subtitle    string

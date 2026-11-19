@@ -12,7 +12,10 @@ import (
 	publishuploader "github.com/pt-nexus/server/internal/service/publish/uploader"
 )
 
-var checkPublishDownloaderGate = publishguard.CheckDownloaderGate
+var (
+	checkPublishDownloaderGate = publishguard.CheckDownloaderGate
+	publishToTarget            = publishTorrentToTarget
+)
 
 // PublishExecutionInput 定义单站发布执行输入。
 type PublishExecutionInput struct {
@@ -21,6 +24,8 @@ type PublishExecutionInput struct {
 	UploadData map[string]any
 
 	SourceSiteNickname string
+	SourceRestriction  SourceRestriction
+	SourceTorrentHash  string
 
 	TorrentPath string
 	Payload     map[string]any
@@ -41,6 +46,9 @@ type PublishExecutionDeps struct {
 // 失败场景：标签限制命中、上传失败、自动加下载器参数不足时返回对应状态与提示。
 // 副作用：会向目标站点发起上传请求，并可选调用下载器添加任务。
 func ExecutePublish(input PublishExecutionInput, deps PublishExecutionDeps) (map[string]any, int) {
+	if input.SourceRestriction.Status != SourceRestrictionAllowed {
+		return SourceRestrictionFailure(input.SourceRestriction), 409
+	}
 	targetSite := strings.TrimSpace(input.TargetSite)
 	targetInfo := input.TargetInfo
 	uploadData := input.UploadData
@@ -102,10 +110,19 @@ func ExecutePublish(input PublishExecutionInput, deps PublishExecutionDeps) (map
 	if guard, ok := payload["_ptnexus_before_upload"].(func(string) error); ok {
 		beforeUpload = func() error { return guard(strings.TrimSpace(input.TorrentPath)) }
 	}
-	publishURL, directDownloadURL, logs, isExistingTorrent, uploadFormFields, publishErr := PublishTorrentToTarget(
+	torrentPath := strings.TrimSpace(input.TorrentPath)
+	torrentData, err := readVerifiedPublishTorrent(torrentPath, strings.TrimSpace(input.SourceTorrentHash))
+	if err != nil {
+		return SourceRestrictionFailure(SourceRestriction{
+			Status:  SourceRestrictionUnknown,
+			Message: "发布种子与源站已核验记录不符，已停止发布；请重新抓取源站资料",
+		}), 409
+	}
+	publishURL, directDownloadURL, logs, isExistingTorrent, uploadFormFields, publishErr := publishToTarget(
 		targetInfo,
 		uploadData,
-		strings.TrimSpace(input.TorrentPath),
+		torrentPath,
+		torrentData,
 		strings.TrimSpace(input.SourceSiteNickname),
 		deps.FindSiteNicknameByGroup,
 		beforeUpload,

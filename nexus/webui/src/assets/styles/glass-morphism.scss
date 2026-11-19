@@ -1,110 +1,179 @@
-/* 毛玻璃效果公共样式 */
+:root {
+  --star-canvas: #eff5f9;
+  --star-surface: #fff;
+  --star-surface-muted: #f4f8fb;
+  --star-border: #dce6ee;
+  --star-border-strong: #b7c8d5;
+  --star-ink: #172b3b;
+  --star-muted: #526779;
+  --star-accent: #086c89;
+  --star-accent-hover: #07566e;
+  --star-accent-soft: #e1f2f8;
+  --star-success: #236548;
+  --star-success-soft: #ebf5ee;
+  --star-warning: #825613;
+  --star-warning-soft: #fff4de;
+  --star-danger: #a92e43;
+  --star-danger-soft: #fbeef0;
+  --star-radius: 16px;
+  --star-shadow: 0 6px 20px rgb(33 64 88 / 6%);
 
-/* 基础毛玻璃样式 - 标准透明度 (70%) */
+  --el-color-primary: var(--star-accent);
+  --el-color-primary-light-3: #4b98ad;
+  --el-color-primary-light-5: #77b0bf;
+  --el-color-primary-light-7: #a5cfd9;
+  --el-color-primary-light-8: #c7e3ea;
+  --el-color-primary-light-9: var(--star-accent-soft);
+  --el-color-primary-dark-2: var(--star-accent-hover);
+  --el-text-color-primary: var(--star-ink);
+  --el-text-color-regular: #344f62;
+  --el-text-color-secondary: var(--star-muted);
+  --el-border-color: var(--star-border-strong);
+  --el-border-color-light: var(--star-border);
+  --el-fill-color-light: var(--star-surface-muted);
+}
+
+/* The glass classes are also used by existing views. Keep their content opaque. */
+.star-surface,
 .glass-card {
-  background-color: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(220, 223, 230, 0.5);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s;
+  background-color: var(--star-surface);
+  border: 1px solid var(--star-border);
+  border-radius: var(--star-radius);
+  box-shadow: var(--star-shadow);
 }
 
-/* Element Plus 组件透明化辅助类 */
-.glass-transparent-header {
-  :deep(.el-card__header) {
-    background-color: transparent;
-    border-bottom: 1px solid rgba(228, 231, 237, 0.5);
-  }
+.glass-card {
+  background-color: var(--star-surface) !important;
 }
 
-.glass-transparent-body {
-  :deep(.el-card__body) {
-    background-color: transparent;
-  }
+.glass-transparent-header .el-card__header {
+  background-color: transparent;
+  border-bottom: 1px solid var(--star-border);
 }
 
-/* 表格毛玻璃效果 */
+.glass-transparent-body .el-card__body {
+  background-color: transparent;
+}
+
 .glass-table {
-  background-color: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(3px);
+  background-color: var(--star-surface) !important;
 
-  .el-table__inner-wrapper {
-    background-color: transparent !important;
-
-  }
-
-  .el-table__body-wrapper {
-    background-color: transparent !important;
-  }
-
-  .el-table__header-wrapper {
-    background-color: transparent !important;
-
-
-    th.el-table__cell {
-      background-color: rgba(255, 255, 255, 0.1) !important;
-    }
-  }
-
-  /* 确保表头行本身也是透明的 */
-  .el-table__header tr {
-    background-color: transparent !important;
-  }
-
-  tbody tr {
-    background-color: transparent !important;
-  }
-
-  .el-table__row {
-    background-color: transparent !important;
-  }
-
-  /* 确保悬停状态也保持透明 */
-  .el-table__body tr.hover-row>td {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-
+  .el-table__header-wrapper th.el-table__cell {
+    background-color: var(--star-surface-muted);
   }
 }
 
-
-/* 分页器毛玻璃效果 */
 .glass-pagination {
-  background-color: rgba(255, 255, 255, 0.7) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-radius: 4px;
-  padding: 10px;
   display: flex;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: var(--star-surface);
 }
 
-/* 导航栏毛玻璃效果 */
-.glass-nav {
-  background-color: rgba(255, 255, 255, 0.5) !important;
-  backdrop-filter: blur(5px);
-
-  :deep(.el-menu) {
-    background-color: transparent !important;
-  }
-
-  :deep(.el-menu-item) {
-    background-color: transparent !important;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.05) !important;
-    }
-  }
-}
-
-
-/* 圆角样式变体 */
 .glass-rounded {
+  border-radius: 12px;
+}
+.glass-rounded-lg {
+  border-radius: var(--star-radius);
+}
+.glass-rounded-sm {
   border-radius: 8px;
 }
 
-.glass-rounded-lg {
-  border-radius: 12px;
+.star-page-heading {
+  margin: 0;
+  color: var(--star-ink);
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
 }
 
-.glass-rounded-sm {
-  border-radius: 4px;
+.star-button,
+.star-icon-button {
+  box-sizing: border-box;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--star-border);
+  border-radius: 9px;
+  color: var(--star-ink);
+  background: var(--star-surface);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.star-icon-button {
+  position: relative;
+  width: 44px;
+  padding: 0;
+}
+
+.star-button:hover,
+.star-icon-button:hover {
+  background: var(--star-accent-soft);
+  border-color: var(--star-border-strong);
+  color: var(--star-accent-hover);
+}
+
+.star-button--primary {
+  background: var(--star-accent);
+  border-color: var(--star-accent);
+  color: #fff;
+}
+
+.star-button--primary:hover {
+  background: var(--star-accent-hover);
+  border-color: var(--star-accent-hover);
+  color: #fff;
+}
+
+.star-button:disabled,
+.star-icon-button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
+.star-button svg,
+.star-icon-button svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.star-button:focus-visible,
+.star-icon-button:focus-visible,
+.star-shell a:focus-visible,
+.star-drawer :is(a, button):focus-visible,
+.star-login :is(input, summary, button):focus-visible,
+.star-home a:focus-visible {
+  outline: 2px solid var(--star-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-button,
+  .star-icon-button,
+  .star-shell *,
+  .star-drawer *,
+  .star-drawer .el-drawer__body {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .el-overlay:has(.star-drawer),
+  .el-overlay .star-drawer {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
 }

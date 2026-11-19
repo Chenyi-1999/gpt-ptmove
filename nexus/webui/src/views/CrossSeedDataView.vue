@@ -9,10 +9,16 @@
       style="margin: 0; border-radius: 0"
     ></el-alert>
 
+    <header class="seed-heading">
+      <h1>{{ isMaintenanceMode ? '种子维护' : '一键多种' }}</h1>
+    </header>
+
     <div class="search-and-controls glass-table">
       <el-input
         v-model="searchQuery"
-        placeholder="搜索标题或种子ID..."
+        aria-label="搜索种子"
+        placeholder="搜索标题或种子 ID"
+        :prefix-icon="Search"
         clearable
         class="search-input"
         style="width: 300px; margin-right: 15px"
@@ -20,7 +26,9 @@
 
       <el-button
         v-if="isCrossSeedMode"
-        type="success"
+        type="primary"
+        :icon="List"
+        :disabled="selectedRows.length === 0 || isEnqueueing"
         @click="handleBatchCrossSeedButtonClick"
         plain
         style="margin-right: 15px"
@@ -31,6 +39,7 @@
       <el-button
         v-if="isMaintenanceMode"
         type="info"
+        :icon="Document"
         @click="openRecordViewDialog"
         plain
         style="margin-right: 15px"
@@ -40,7 +49,8 @@
 
       <el-button
         v-if="isMaintenanceMode"
-        type="warning"
+        type="primary"
+        :icon="Download"
         @click="openBatchFetchDialog"
         plain
         style="margin-right: 15px"
@@ -51,6 +61,7 @@
       <el-button
         v-if="isMaintenanceMode"
         type="danger"
+        :icon="Delete"
         @click="isDeleteMode && selectedRows.length > 0 ? executeBatchDelete() : toggleDeleteMode()"
         plain
         style="margin-right: 15px"
@@ -58,7 +69,7 @@
         {{ getDeleteButtonText() }}
       </el-button>
 
-      <el-button type="primary" @click="openFilterDialog" plain style="margin-right: 15px">
+      <el-button :icon="Filter" @click="openFilterDialog" plain style="margin-right: 15px">
         筛选
       </el-button>
 
@@ -87,6 +98,7 @@
 
       <div class="pagination-controls" v-if="tableData.length > 0">
         <el-pagination
+          :pager-count="5"
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :page-sizes="[20, 50, 100]"
@@ -136,7 +148,7 @@
           <template v-if="isCrossSeedMode">
             <el-divider content-position="left">
               <span class="target-site-filter-title">
-                <el-icon><WarningFilled /></el-icon>
+                <el-icon><Warning /></el-icon>
                 <span>选择批量转种目标站点</span>
               </span>
             </el-divider>
@@ -182,6 +194,7 @@
 
     <div class="table-container">
       <el-table
+        ref="dataTable"
         :data="tableData"
         v-loading="loading"
         border
@@ -213,7 +226,7 @@
             <div class="mapped-cell">{{ scope.row.nickname }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="title" label="标题" align="center">
+        <el-table-column prop="title" label="标题" min-width="220">
           <template #default="scope">
             <div class="title-cell">
               <div class="subtitle-line" :title="scope.row.subtitle">
@@ -222,6 +235,9 @@
               <div class="main-title-line" :title="scope.row.title">
                 {{ scope.row.title || '' }}
               </div>
+              <p v-for="issue in getSeedIssues(scope.row)" :key="issue" class="seed-issue">
+                {{ issue }}
+              </p>
             </div>
           </template>
         </el-table-column>
@@ -350,9 +366,7 @@
         <el-table-column prop="updated_at" label="更新时间" width="140" align="center" sortable>
           <template #default="scope">
             <div class="mapped-cell datetime-cell">
-              {{
-                scope.row.is_deleted ? getRestrictionText(scope.row) : formatDateTime(scope.row.updated_at)
-              }}
+              {{ formatDateTime(scope.row.updated_at) }}
             </div>
           </template>
         </el-table-column>
@@ -360,15 +374,73 @@
           <template #default="scope">
             <el-button
               size="small"
-              :type="isMaintenanceMode ? 'primary' : 'success'"
+              :type="isMaintenanceMode ? 'primary' : 'default'"
+              :disabled="isCrossSeedMode && (!checkSelectable(scope.row) || isEnqueueing)"
               @click="isMaintenanceMode ? handleMaintain(scope.row) : handleSingleCrossSeed(scope.row)"
             >
-              {{ isMaintenanceMode ? '维护' : '转种' }}
+              {{ isMaintenanceMode ? '维护' : '选目标' }}
             </el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
+
+    <div v-loading="loading" class="seed-mobile-list" :aria-busy="loading">
+      <el-empty v-if="!loading && !tableData.length" description="暂无待处理数据" :image-size="64" />
+      <ul v-else aria-label="种子列表">
+        <li v-for="row in tableData" :key="`${row.hash}-${row.site_name}-${row.torrent_id}`">
+          <el-checkbox
+            v-if="isCrossSeedMode || isDeleteMode"
+            :model-value="selectedRows.includes(row)"
+            :disabled="!checkSelectable(row)"
+            :aria-label="`选择 ${row.subtitle || row.title || row.torrent_id}`"
+            @change="toggleMobileSelection(row, $event === true)"
+          />
+          <div class="seed-mobile-body">
+            <strong>{{ row.subtitle || row.title || row.torrent_id }}</strong>
+            <small v-if="row.subtitle && row.title">{{ row.title }}</small>
+            <small>{{ row.nickname || row.site_name }} · #{{ row.torrent_id }}</small>
+            <p v-for="issue in getSeedIssues(row)" :key="issue" class="seed-issue">{{ issue }}</p>
+          </div>
+          <el-button
+            :disabled="isCrossSeedMode && (!checkSelectable(row) || isEnqueueing)"
+            @click="isMaintenanceMode ? handleMaintain(row) : handleSingleCrossSeed(row)"
+          >
+            {{ isMaintenanceMode ? '维护' : '选目标' }}
+          </el-button>
+        </li>
+      </ul>
+    </div>
+
+    <el-dialog
+      v-model="queueReviewVisible"
+      title="确认批量转种"
+      width="min(600px, calc(100vw - 24px))"
+      :close-on-click-modal="!isEnqueueing"
+      :close-on-press-escape="!isEnqueueing"
+      :show-close="!isEnqueueing"
+    >
+      <el-form label-position="top">
+        <el-form-item label="目标站点">
+          <el-select v-model="queueTargetSite" aria-label="目标站点" placeholder="选择站点" :disabled="isEnqueueing">
+            <el-option v-for="site in targetSitesList" :key="site" :label="site" :value="site" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <ul class="queue-review-list" aria-label="所选种子">
+        <li v-for="row in queueReviewRows" :key="`${row.site_name}-${row.torrent_id}`">
+          <strong>{{ row.subtitle || row.title || row.torrent_id }}</strong>
+          <small>{{ row.nickname || row.site_name }} · #{{ row.torrent_id }}</small>
+          <p v-for="issue in getQueueReviewIssues(row)" :key="issue" class="seed-issue">{{ issue }}</p>
+        </li>
+      </ul>
+      <template #footer>
+        <el-button :disabled="isEnqueueing" @click="queueReviewVisible = false">取消</el-button>
+        <el-button type="primary" :loading="isEnqueueing" :disabled="!queueTargetSite || queueEligibleRows.length === 0" @click="submitQueueReview">
+          加入队列（{{ queueEligibleRows.length }}）
+        </el-button>
+      </template>
+    </el-dialog>
 
     <BDInfoRecordsDialog v-if="isMaintenanceMode" v-model="recordDialogVisible" @closed="fetchData" />
 
@@ -451,9 +523,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { WarningFilled } from '@element-plus/icons-vue'
+import { Delete, Document, Download, Filter, List, Search, Warning } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import type { ElTree } from 'element-plus'
+import type { ElTable, ElTree } from 'element-plus'
 import axios from 'axios'
 import BatchFetchPanel from '@/components/BatchFetchPanel.vue'
 import CrossSeedPanel from '@/components/CrossSeedPanel.vue'
@@ -464,6 +536,7 @@ import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import type { ISourceInfo } from '@/types'
 import '@/assets/styles/glass-morphism.scss'
 import { ElMessage } from '@/utils/uiNotify'
+import { getMissingSeedFields, redactPrivateText } from '@/utils/publishPresentation'
 
 interface SeedParameter {
   id: number
@@ -485,11 +558,8 @@ interface SeedParameter {
   team: string
   source: string
   tags: string[] | string
-  poster: string
-  screenshots: string
-  statement: string
-  body: string
-  mediainfo: string
+  missing_required_fields?: string[]
+  screenshot_review_status?: string
   title_components: string
   unrecognized: string
   created_at: string
@@ -588,7 +658,12 @@ const tableData = ref<SeedParameter[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const selectedRows = ref<SeedParameter[]>([])
-const pendingBatchCrossSeedAfterFilter = ref(false)
+const dataTable = ref<InstanceType<typeof ElTable> | null>(null)
+const queueReviewVisible = ref(false)
+const queueReviewRows = ref<SeedParameter[]>([])
+const queueTargetSite = ref('')
+const isEnqueueing = ref(false)
+const queueEligibleRows = computed(() => queueReviewRows.value.filter((row) => !getQueueReviewIssues(row).length))
 const batchFetchDialogVisible = ref(false)
 const batchFetchPanelRef = ref<InstanceType<typeof BatchFetchPanel> | null>(null)
 const isDeleteMode = ref(false)
@@ -691,13 +766,8 @@ const clearSelectedTargetSite = () => {
 
 const batchCrossSeedButtonText = computed(() => {
   const selectedCount = selectedRows.value.length
-  const targetSiteName = activeFilters.value.excludeTargetSites.trim()
-
   if (selectedCount === 0) {
     return '批量转种'
-  }
-  if (targetSiteName) {
-    return `转种到 ${targetSiteName} (${selectedCount})`
   }
   return `批量转种 (${selectedCount})`
 })
@@ -870,23 +940,35 @@ const hasRestrictedTag = (tags: string[] | string): boolean => {
   )
 }
 
-const getRestrictionText = (row: SeedParameter) => {
+const getSeedIssues = (row: SeedParameter) => {
   const labels: string[] = []
 
   if (row.is_deleted) {
-    labels.push('已删除做种文件')
+    labels.push('下载器中无做种记录')
   }
   if (!row.is_reviewed) {
     labels.push('待检查')
   }
   if (hasRestrictedTag(row.tags)) {
-    labels.push('禁转标签')
+    labels.push('含禁转、限转或分集标签')
   }
-  if (hasInvalidParams(row)) {
+  if (row.unrecognized || hasInvalidParams(row)) {
     labels.push('参数异常')
   }
 
-  return labels.join('\n')
+  const missingFields = getMissingSeedFields(row)
+  if (missingFields.length) labels.push(`缺少 ${missingFields.join('、')}`)
+  if (row.screenshot_review_status === 'pending') labels.push('截图待确认')
+  return labels
+}
+
+const getQueueReviewIssues = (row: SeedParameter) => {
+  const issues = getSeedIssues(row)
+  const target = queueTargetSite.value.trim().toLowerCase()
+  if (target && [row.site_name, row.nickname].some((site) => site?.trim().toLowerCase() === target)) {
+    issues.push('源站与目标站相同')
+  }
+  return issues
 }
 
 const buildPathTree = (paths: string[]): PathNode[] => {
@@ -1146,7 +1228,6 @@ const clearFilters = async () => {
 
 const closeFilterDialog = () => {
   filterDialogVisible.value = false
-  pendingBatchCrossSeedAfterFilter.value = false
 }
 
 const openFilterDialog = async () => {
@@ -1171,18 +1252,11 @@ const applyFilters = () => {
 
   activeFilters.value = { ...tempFilters.value }
   filterDialogVisible.value = false
-  const shouldContinueBatchCrossSeed =
-    pendingBatchCrossSeedAfterFilter.value &&
-    selectedRows.value.length > 0 &&
-    activeFilters.value.excludeTargetSites.trim() !== ''
-  pendingBatchCrossSeedAfterFilter.value = false
   currentPage.value = 1
   void fetchData()
   void saveUiSettings()
 
-  if (shouldContinueBatchCrossSeed) {
-    void handleBatchCrossSeed(activeFilters.value.excludeTargetSites.trim())
-  }
+
 }
 
 watch(searchQuery, () => {
@@ -1409,6 +1483,10 @@ const handleSelectionChange = (selection: SeedParameter[]) => {
   selectedRows.value = selection
 }
 
+const toggleMobileSelection = (row: SeedParameter, selected: boolean) => {
+  if (checkSelectable(row)) dataTable.value?.toggleRowSelection(row, selected)
+}
+
 const buildBatchCrossSeedPayload = (rows: SeedParameter[], targetSiteName: string) => ({
   target_site_name: targetSiteName,
   seeds: rows.map((row) => ({
@@ -1443,48 +1521,36 @@ const enqueueCrossSeedRows = async (rows: SeedParameter[], targetSiteName: strin
   const queued = Number(result?.queued || 0)
   const requested = Number(result?.requested || rows.length)
 
-  ElMessage.success(
-    `${result.message || `批量加入队列完成（${queued}/${requested}）`}${publishTrigger ? `（${publishTrigger}）` : ''}`,
-  )
+  const message = `已入队 ${queued} / ${requested} 条`
+  if (queued < requested) ElMessage.warning(`${message}，处理结果见任务记录`)
+  else ElMessage.success(message)
 
   await fetchData()
 
-  if (publishTrigger) {
+  if (groupID || publishTrigger) {
     await routeToPublishLogs(groupID || undefined)
   }
 }
 
-const handleBatchCrossSeedButtonClick = () => {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning('请先选择要批量转种的条目')
-    return
-  }
-
-  const targetSiteName = activeFilters.value.excludeTargetSites.trim()
-  if (!targetSiteName) {
-    pendingBatchCrossSeedAfterFilter.value = true
-    void openFilterDialog()
-    return
-  }
-
-  void handleBatchCrossSeed()
+const openQueueReview = (rows: SeedParameter[]) => {
+  if (!rows.length || isEnqueueing.value) return
+  queueReviewRows.value = [...rows]
+  queueTargetSite.value = activeFilters.value.excludeTargetSites.trim()
+  queueReviewVisible.value = true
 }
 
-const handleBatchCrossSeed = async (targetSiteOverride?: string) => {
-  const targetSiteName = (targetSiteOverride || activeFilters.value.excludeTargetSites).trim()
+const handleBatchCrossSeedButtonClick = () => openQueueReview(selectedRows.value)
 
-  if (!targetSiteName) {
-    ElMessage.warning('请先在筛选中选择目标站点')
-    return
-  }
+const handleSingleCrossSeed = (row: SeedParameter) => {
+  if (checkSelectable(row)) openQueueReview([row])
+}
 
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning('请先选择要批量转种的条目')
-    return
-  }
-
+const submitQueueReview = async () => {
+  if (isEnqueueing.value || !queueTargetSite.value || !queueEligibleRows.value.length) return
+  isEnqueueing.value = true
   try {
-    await enqueueCrossSeedRows(selectedRows.value, targetSiteName)
+    await enqueueCrossSeedRows(queueEligibleRows.value, queueTargetSite.value)
+    queueReviewVisible.value = false
   } catch (error: unknown) {
     const message = axios.isAxiosError(error)
       ? (error.response?.data as { message?: string; error?: string } | undefined)?.message ||
@@ -1492,36 +1558,10 @@ const handleBatchCrossSeed = async (targetSiteOverride?: string) => {
         error.message
       : error instanceof Error
         ? error.message
-        : '网络错误'
-    ElMessage.error(message)
-  }
-}
-
-const handleSingleCrossSeed = async (row: SeedParameter) => {
-  const targetSiteName = activeFilters.value.excludeTargetSites.trim()
-
-  if (!targetSiteName) {
-    ElMessage.warning('请先在筛选中选择目标站点')
-    void openFilterDialog()
-    return
-  }
-
-  if (!checkSelectable(row)) {
-    ElMessage.warning('当前条目不可转种，请检查删除状态、检查状态或参数映射')
-    return
-  }
-
-  try {
-    await enqueueCrossSeedRows([row], targetSiteName)
-  } catch (error: unknown) {
-    const message = axios.isAxiosError(error)
-      ? (error.response?.data as { message?: string; error?: string } | undefined)?.message ||
-        (error.response?.data as { error?: string } | undefined)?.error ||
-        error.message
-      : error instanceof Error
-        ? error.message
-        : '网络错误'
-    ElMessage.error(message)
+        : '加入队列失败'
+    ElMessage.error(redactPrivateText(message))
+  } finally {
+    isEnqueueing.value = false
   }
 }
 
@@ -1882,8 +1922,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 15px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ebeef5;
+  background: var(--el-bg-color-overlay);
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .pagination-controls {
@@ -2053,5 +2093,82 @@ onUnmounted(() => {
   .target-sites-radio-group {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.seed-heading {
+  padding: 14px clamp(14px, 2vw, 28px) 4px;
+}
+
+.seed-heading h1 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 650;
+}
+
+.seed-issue {
+  margin: 4px 0 0;
+  color: var(--el-color-danger-dark-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.queue-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(42vh, 420px);
+  overflow: auto;
+}
+
+.queue-review-list li {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+
+.queue-review-list small {
+  color: var(--el-text-color-secondary);
+}
+
+.seed-mobile-list { display: none; }
+
+@media (max-width: 720px) {
+  .table-container { display: none; }
+  .seed-mobile-list {
+    display: block;
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+    padding-inline: 10px;
+  }
+
+  .seed-mobile-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .seed-mobile-list li {
+    display: flex;
+    align-items: start;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--el-border-color-light);
+  }
+
+  .seed-mobile-list .el-button { min-height: 44px; }
+
+  .seed-mobile-body {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  .seed-mobile-body small { color: var(--el-text-color-secondary); }
+  .pagination-controls :deep(.el-pagination__sizes) { display: none; }
 }
 </style>

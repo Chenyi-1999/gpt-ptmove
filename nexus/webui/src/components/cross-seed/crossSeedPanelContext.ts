@@ -84,6 +84,7 @@ export type PublishDisplayStatus =
   | 'warning'
   | 'error'
   | 'paused'
+  | 'incomplete'
 
 export interface AutoAddResult {
   success: boolean
@@ -103,6 +104,7 @@ export type PublishDisplayResult = {
   isExisted?: boolean
   // raw fields from backend responses (used by CrossSeedPanel)
   is_existing_torrent?: boolean
+  source_restriction_status?: string
   pre_check?: boolean
   limit_reached?: boolean
   auto_add_result?: AutoAddResult | null
@@ -135,7 +137,13 @@ export interface TagOption {
   value: string
 }
 
+export interface SourceRestriction {
+  status: 'checking' | 'allowed' | 'denied' | 'unknown'
+  message: string
+}
+
 export interface CrossSeedPanelContext {
+  sourceRestriction: Ref<SourceRestriction>
   // Step state
   steps: Array<{ title: string }>
   activeStep: Ref<number>

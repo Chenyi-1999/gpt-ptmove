@@ -483,7 +483,7 @@ const formatDate = (value: string) => {
 
 const guide = computed(() => {
   const base = normalizedApiBase.value || window.location.origin
-  return `PTNexus 机器 API 接入说明\n\n当前部署：${window.location.origin}\nAPI 根地址：${base}${MACHINE_API_PATH}\nOpenAPI JSON：${base}${OPENAPI_PATH}\n认证：Authorization: Bearer <machine-key>（使用 PTMOVE_API_KEY 环境变量注入真实密钥）\n\n权限独立且遵循最小授权：\n- read：读取仪表板、站点、任务与运行记录。\n- write：预览配置、导入/修改配置、取消任务等写入操作。\n- publish：创建运行或明确加入下载/发布队列。执行需要明确 API 请求；不会因密钥存在而静默自动运行。\n- 修改配置需要 write；自动化已启用或存在待执行内容时，还必须同时有 publish。\n- POST /tasks 或 /runs 会明确创建一次运行；如果已保存的自动化规则处于启用状态，扫描后可能创建真实任务并进入执行流程。selected_ids 或 enqueue=true 也会明确请求执行，即使规则未启用。\n\n只读示例：\ncurl -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  '${base}${MACHINE_API_PATH}/dashboard'\n\n写入示例（write；同一操作重试必须复用相同幂等键和请求体）：\ncurl -X PUT '${base}${MACHINE_API_PATH}/rules' \\\n  -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: rule-update-0001' \\\n  --data '{"enabled":false}'\n\n创建运行示例（需要 publish 权限；可能创建真实任务/队列项，请先确认请求内容）：\ncurl -X POST '${base}${MACHINE_API_PATH}/tasks' \\\n  -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: run-request-0001' \\\n  --data '{"selected_ids":[],"enqueue":false}'\n\n所有改变状态的请求都必须带 Idempotency-Key：8–128 个字母、数字、下划线、点、冒号或连字符。只对结果明确且服务端契约允许的操作重试；上传结果不明确时先对账，不要盲目重发。密钥有效期可选 7/30/90/365 天，也可随时撤销。`
+  return `STARPT 机器 API 接入说明\n\n当前部署：${window.location.origin}\nAPI 根地址：${base}${MACHINE_API_PATH}\nOpenAPI JSON：${base}${OPENAPI_PATH}\n认证：Authorization: Bearer <machine-key>（使用 PTMOVE_API_KEY 环境变量注入真实密钥）\n\n权限独立且遵循最小授权：\n- read：读取仪表板、站点、任务与运行记录。\n- write：预览配置、导入/修改配置、取消任务等写入操作。\n- publish：创建运行或明确加入下载/发布队列。执行需要明确 API 请求；不会因密钥存在而静默自动运行。\n- 修改配置需要 write；自动化已启用或存在待执行内容时，还必须同时有 publish。\n- POST /tasks 或 /runs 会明确创建一次运行；如果已保存的自动化规则处于启用状态，扫描后可能创建真实任务并进入执行流程。selected_ids 或 enqueue=true 也会明确请求执行，即使规则未启用。\n\n只读示例：\ncurl -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  '${base}${MACHINE_API_PATH}/dashboard'\n\n写入示例（write；同一操作重试必须复用相同幂等键和请求体）：\ncurl -X PUT '${base}${MACHINE_API_PATH}/rules' \\\n  -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: rule-update-0001' \\\n  --data '{"enabled":false}'\n\n创建运行示例（需要 publish 权限；可能创建真实任务/队列项，请先确认请求内容）：\ncurl -X POST '${base}${MACHINE_API_PATH}/tasks' \\\n  -H "Authorization: Bearer $PTMOVE_API_KEY" \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: run-request-0001' \\\n  --data '{"selected_ids":[],"enqueue":false}'\n\n所有改变状态的请求都必须带 Idempotency-Key：8–128 个字母、数字、下划线、点、冒号或连字符。只对结果明确且服务端契约允许的操作重试；上传结果不明确时先对账，不要盲目重发。密钥有效期可选 7/30/90/365 天，也可随时撤销。`
 })
 
 const load = async () => {
@@ -525,7 +525,7 @@ const downloadBlob = (blob: Blob, filename: string) => {
 }
 
 const integrationPackage = computed(() => ({
-  name: 'PTNexus AI API 接入包',
+  name: 'STARPT AI API 接入包',
   version: 1,
   deployment: window.location.origin,
   base_url: normalizedApiBase.value || window.location.origin,

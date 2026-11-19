@@ -252,6 +252,16 @@ func (r *PublishLogRepository) UpdateStatusAndLogsByQueueTaskID(queueTaskID int6
 	return r.store.DB.Model(&PublishLogEntry{}).Where("id = ?", existing.ID).Updates(updates).Error
 }
 
+// A queued log may outlive its worker after a failure or restart. Consult the
+// queue only until a site-level outcome has been recorded in the log.
+const effectivePublishStatus = "CASE WHEN publish_logs.status = 'queued' AND publish_logs.queue_task_id IS NOT NULL " +
+	"THEN COALESCE((SELECT CASE status WHEN 'success' THEN 'incomplete' ELSE status END " +
+	"FROM publish_queue_tasks WHERE id = publish_logs.queue_task_id), 'incomplete') ELSE publish_logs.status END"
+
+const publishResultColumns = "id, publish_trigger, scene, queue_task_id, queue_group_id, task_id, torrent_id, " +
+	"source_site, target_site, downloader_id, title, subtitle, result_url, logs, auto_add_result, cost_ms, created_at, updated_at, " +
+	effectivePublishStatus + " AS status"
+
 // List 分页查询发种日志。
 // 参数/返回：query 为筛选与分页条件；返回 rows、total 与 error。
 // 失败场景：查询失败时返回 error。
@@ -276,7 +286,7 @@ func (r *PublishLogRepository) List(query PublishLogQuery) ([]PublishLogEntry, i
 
 	db := r.store.DB.Model(&PublishLogEntry{})
 	if value := strings.TrimSpace(query.Status); value != "" {
-		db = db.Where("status = ?", value)
+		db = db.Where(effectivePublishStatus+" = ?", value)
 	}
 	if value := strings.TrimSpace(query.Trigger); value != "" {
 		db = db.Where("publish_trigger = ?", value)
@@ -317,7 +327,7 @@ func (r *PublishLogRepository) List(query PublishLogQuery) ([]PublishLogEntry, i
 	}
 
 	rows := make([]PublishLogEntry, 0)
-	if err := db.Order("id DESC").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
+	if err := db.Select(publishResultColumns).Order("id DESC").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	return rows, total, nil
@@ -342,11 +352,8 @@ func (r *PublishLogRepository) DeleteByID(id uint64) (bool, error) {
 	return result.RowsAffected > 0, nil
 }
 
-// ListRecentAttentionLogs 读取最近需要用户关注的失败/限制类日志。
-// 参数/返回：limit 为最大返回数量；返回日志切片与 error。
-// 失败场景：数据库未初始化或查询失败返回 error。
-// 副作用：读取 publish_logs。
-func (r *PublishLogRepository) ListRecentAttentionLogs(limit int) ([]PublishLogEntry, error) {
+// ListRecentTransferLogs 读取最近的站点级转种结果。
+func (r *PublishLogRepository) ListRecentTransferLogs(limit int) ([]PublishLogEntry, error) {
 	if r == nil || r.store == nil || r.store.DB == nil {
 		return nil, errors.New("publish log repo is nil")
 	}
@@ -356,7 +363,8 @@ func (r *PublishLogRepository) ListRecentAttentionLogs(limit int) ([]PublishLogE
 
 	rows := make([]PublishLogEntry, 0)
 	if err := r.store.DB.Model(&PublishLogEntry{}).
-		Where("status IN ?", []string{"failed", "pre_check_limit"}).
+		Select(publishResultColumns).
+		Where(effectivePublishStatus+" IN ?", []string{"success", "exists", "edited", "failed", "pre_check_limit", "filtered", "cancelled", "incomplete"}).
 		Order("updated_at DESC, id DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {

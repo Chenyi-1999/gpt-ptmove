@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/pt-nexus/server/internal/repository"
 	acquireautomation "github.com/pt-nexus/server/internal/service/acquire/automation"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
+	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
 	"gorm.io/gorm"
 )
 
@@ -68,7 +70,7 @@ func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTas
 }
 
 // prepareAutomationQueue 在任何上传标记前重新校验站点冻结、完整下载、限制和目标缺失。
-func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTask) error {
+func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTask, nativeContext publishworkflow.Context) error {
 	if !s.automationQueueEnabled() {
 		return errors.New("模块或自动发布已关闭")
 	}
@@ -90,6 +92,20 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if _, err = s.automationSeedForPublish(task, snapshot); err != nil {
 		return err
 	}
+	sp, err := acquireautomation.ProfileFrom(snapshot.Source)
+	if err != nil {
+		return errors.New("源站配置不可用，无法确认转种权限")
+	}
+	id, err := acquireautomation.SourceRestrictionID(sp, nativeContext.TorrentID, nativeContext.SourceDetailURL)
+	nativeSite := strings.TrimSpace(nativeContext.SiteName)
+	if err != nil || id != task.SourceID ||
+		(nativeSite != snapshot.Source.NativeCode() && nativeSite != snapshot.Source.NativeName()) ||
+		!strings.EqualFold(nativeContext.Hash, task.InfoHash) {
+		return errors.New("自动发布上下文与冻结的源站种子不一致")
+	}
+	if err := verifyAutomationPublishTorrent(nativeContext.OriginalTorrentPath, task); err != nil {
+		return err
+	}
 	d, err := a.downloader(task.DownloaderID)
 	if err != nil {
 		return err
@@ -102,7 +118,6 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if err != nil || !complete {
 		return errors.New("源种子并非全部文件完成")
 	}
-	sp, _ := acquireautomation.ProfileFrom(snapshot.Source)
 	tp, _ := acquireautomation.ProfileFrom(snapshot.Target)
 	sourceCookie, err := a.profiles.Cookie(task.Source)
 	if err != nil {
@@ -115,8 +130,14 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	candidate, err := a.scanner.Inspect(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
+	if candidate.RestrictionsKnown && !candidate.Allowed {
+		return errors.New("源站标记禁转或限转，已停止发布")
+	}
 	if err != nil {
 		return errors.New("发布前只读检查失败")
+	}
+	if !candidate.RestrictionsKnown {
+		return errors.New("无法确认源站转种权限，已停止发布")
 	}
 	candidate = policy.Evaluate(candidate, snapshot.Settings)
 	if !candidate.Eligible || candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {

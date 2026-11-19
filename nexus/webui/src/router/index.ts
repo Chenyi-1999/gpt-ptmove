@@ -32,6 +32,11 @@ const router = createRouter({
       component: () => import('../views/SeedMaintenanceView.vue'),
     },
     {
+      path: '/plugins',
+      name: 'plugins',
+      component: () => import('../views/PluginsView.vue'),
+    },
+    {
       path: '/publish-logs',
       name: 'publish-logs',
       component: () => import('../views/PublishLogsView.vue'),

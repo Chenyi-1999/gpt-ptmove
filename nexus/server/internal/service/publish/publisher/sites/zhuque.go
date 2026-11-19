@@ -110,11 +110,9 @@ func PublishZhuque(input publisher.PublishInput) (publisher.PublishResult, error
 	}
 
 	torrentPath := strings.TrimSpace(input.TorrentPath)
-	torrentFile, err := os.ReadFile(torrentPath)
-	if err != nil {
-		wrappedErr := fmt.Errorf("读取种子文件失败: %w", err)
-		appendLog(fmt.Sprintf("读取种子失败: %v", wrappedErr))
-		return publisher.PublishResult{UploadFormFields: zhuqueFields, AttemptDetailLog: buildDetail()}, wrappedErr
+	torrentFile := input.TorrentData
+	if len(torrentFile) == 0 {
+		return publisher.PublishResult{UploadFormFields: zhuqueFields, AttemptDetailLog: buildDetail()}, fmt.Errorf("缺少已核验的发布种子")
 	}
 
 	publishURL, directDownloadURL, existing, attemptDetail, attemptErr := TryUploadTorrentZhuque(

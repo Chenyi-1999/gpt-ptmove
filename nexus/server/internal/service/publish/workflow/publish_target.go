@@ -17,14 +17,12 @@ import (
 
 var publishTitleBitDepthPattern = regexp.MustCompile(`(?i)\b(?:8|10|12|16|24)bit\b`)
 
-// PublishTorrentToTarget 将种子文件发布到目标站点，并返回发布 URL 与日志文案。
-// 参数/返回：targetInfo 为目标站配置，uploadData 为发布字段，torrentPath 为本地种子路径。
-// 失败场景：配置缺失、读取种子失败、上传接口全部失败时返回 error。
-// 副作用：读取本地种子文件并向目标站点发起上传请求。
-func PublishTorrentToTarget(
+// publishTorrentToTarget 将已核验的种子字节交给对应站点发布器，返回发布和已存在结果。
+func publishTorrentToTarget(
 	targetInfo map[string]any,
 	uploadData map[string]any,
 	torrentPath string,
+	torrentData []byte,
 	sourceSiteNickname string,
 	findSiteNicknameByGroup func(releaseGroup string) (string, error),
 	beforeUpload ...func() error,
@@ -60,6 +58,7 @@ func PublishTorrentToTarget(
 
 		UploadData:  uploadData,
 		TorrentPath: strings.TrimSpace(torrentPath),
+		TorrentData: torrentData,
 
 		Title:       title,
 		Subtitle:    subtitle,

@@ -1,215 +1,144 @@
 <template>
-  <div class="publish-logs-view">
-    <el-alert
-      v-if="error"
-      :title="error"
-      type="error"
-      show-icon
-      :closable="false"
-      style="margin: 0; border-radius: 0"
-    />
+  <section class="publish-logs-view" aria-labelledby="publish-logs-heading">
+    <header class="logs-heading">
+      <div>
+        <h1 id="publish-logs-heading">任务记录</h1>
+        <p>发布结果与下载器添加</p>
+      </div>
+      <el-button :icon="Refresh" :loading="loading" @click="fetchLogs()">刷新</el-button>
+    </header>
 
-    <div class="search-and-controls glass-table">
+    <form class="filters" aria-label="筛选任务记录" @submit.prevent="applyFilters">
       <el-input
         v-model="searchQuery"
-        placeholder="搜索标题/副标题/种子ID/站点/触发/场景..."
+        aria-label="搜索任务"
+        :prefix-icon="Search"
+        placeholder="搜索标题、种子 ID 或站点"
         clearable
-        class="search-input"
-        style="width: 320px; margin-right: 15px"
-        @keyup.enter="applyFilters"
       />
-
-      <el-select
-        v-model="sceneFilter"
-        placeholder="场景"
-        clearable
-        style="width: 140px; margin-right: 15px"
-      >
+      <el-select v-model="statusFilter" aria-label="发布状态" placeholder="发布状态" clearable>
+        <el-option
+          v-for="status in filterStatuses"
+          :key="status"
+          :label="getPublishDisplayStatus(status).label"
+          :value="status"
+        />
+      </el-select>
+      <el-select v-model="sceneFilter" aria-label="场景" placeholder="场景" clearable>
         <el-option label="一种多站" value="multi_site" />
         <el-option label="一站多种" value="multi_torrent" />
       </el-select>
-
       <el-select
         v-model="triggerFilter"
-        placeholder="触发（如：批量转种-1）"
+        aria-label="触发方式"
+        placeholder="触发方式"
         clearable
         filterable
         allow-create
         default-first-option
-        style="width: 180px; margin-right: 15px"
       >
         <el-option label="手动" value="manual" />
         <el-option label="队列" value="queue" />
       </el-select>
-
       <el-input
         v-model="queueGroupFilter"
-        placeholder="队列分组ID"
+        aria-label="队列分组 ID"
+        placeholder="队列分组 ID"
         clearable
-        style="width: 170px; margin-right: 15px"
-        @keyup.enter="applyFilters"
       />
+      <el-input v-model="targetSiteFilter" aria-label="目标站点" placeholder="目标站点" clearable />
+      <div class="filter-actions">
+        <el-button native-type="submit" type="primary">查询</el-button>
+        <el-button @click="clearFilters">清空</el-button>
+      </div>
+    </form>
 
-      <el-select
-        v-model="statusFilter"
-        placeholder="发布状态"
-        clearable
-        style="width: 160px; margin-right: 15px"
-      >
-        <el-option label="待发布" value="queued" />
-        <el-option label="发布成功" value="success" />
-        <el-option label="发布失败" value="failed" />
-        <el-option label="已过滤" value="filtered" />
-        <el-option label="已存在" value="exists" />
-        <el-option label="已编辑" value="edited" />
-        <el-option label="已取消" value="cancelled" />
-        <el-option label="预检查限制" value="pre_check_limit" />
-      </el-select>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
 
-      <el-input
-        v-model="targetSiteFilter"
-        placeholder="目标站点"
-        clearable
-        style="width: 140px; margin-right: 15px"
-        @keyup.enter="applyFilters"
+    <div v-loading="loading" class="record-panel" :aria-busy="loading">
+      <el-empty
+        v-if="!loading && !error && rows.length === 0"
+        description="暂无发布记录"
+        :image-size="64"
       />
+      <div v-if="rows.length" class="record-header" aria-hidden="true">
+        <span>种子与站点</span><span>发布时间</span><span>发布结果</span><span>自动添加</span
+        ><span>操作</span>
+      </div>
+      <ul v-if="rows.length" class="record-list" aria-label="发布记录">
+        <li v-for="row in displayRows" :key="row.id" class="record">
+          <div class="record-title">
+            <strong>{{ row.title || row.subtitle || row.torrent_id || '未命名种子' }}</strong>
+            <small v-if="row.title && row.subtitle">{{ row.subtitle }}</small>
+            <small
+              >{{ [row.source_site, row.target_site].filter(Boolean).join(' → ') || '站点未知' }} ·
+              {{ formatScene(row.scene) }} · {{ formatTrigger(row.trigger)
+              }}<template v-if="row.torrent_id"> · #{{ row.torrent_id }}</template></small
+            >
+          </div>
+          <time class="record-time" :title="`加入时间 ${formatDateTime(row.created_at)}`">{{
+            formatDateTime(row.updated_at || row.created_at)
+          }}</time>
+          <div class="record-outcome">
+            <span class="status" :data-tone="row.outcome.tone">{{ row.outcome.label }}</span>
+          </div>
+          <div class="record-add">
+            <span class="status" :data-tone="row.autoAdd.tone">{{ row.autoAdd.label }}</span>
+            <small v-if="row.autoAdd.detail">{{ row.autoAdd.detail }}</small>
+          </div>
+          <div class="record-actions">
+            <el-button :icon="Document" text @click="openLogs(row)">日志</el-button>
+            <a
+              v-if="row.safeUrl"
+              :href="row.safeUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="record-link"
+              >查看种子 <el-icon><TopRight /></el-icon
+            ></a>
+            <el-button
+              :icon="Delete"
+              text
+              :disabled="!canDeleteLog(row)"
+              aria-label="删除发布记录"
+              @click="deleteLog(row)"
+            />
+          </div>
+        </li>
+      </ul>
 
-      <el-button type="primary" plain @click="applyFilters">查询</el-button>
-      <el-button type="danger" plain style="margin-left: 8px" @click="clearFilters">清空</el-button>
-
-      <div class="pagination-controls" v-if="total > 0">
+      <footer v-if="total > 0" class="pagination-controls">
+        <span>共 {{ total }} 条</span>
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :page-sizes="[20, 50, 100]"
           :total="total"
-          layout="total, sizes, prev, pager, next"
+          :pager-count="5"
+          layout="sizes, prev, pager, next"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
-          background
         />
-      </div>
-    </div>
-
-    <div class="table-container">
-      <el-table
-        :data="rows"
-        row-key="id"
-        v-loading="loading"
-        border
-        style="width: 100%"
-        height="100%"
-        empty-text="暂无发种日志"
-        class="glass-table"
-      >
-        <el-table-column label="加入时间" width="150" align="center">
-          <template #default="scope">
-            <div class="datetime-cell">{{ formatDateTimeTwoLines(scope.row.created_at) }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="150" align="center">
-          <template #default="scope">
-            <div class="datetime-cell">{{ formatDateTimeTwoLines(scope.row.updated_at) }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="场景" width="110" align="center">
-          <template #default="scope">
-            {{ formatScene(scope.row.scene) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="触发" width="120" align="center">
-          <template #default="scope">
-            {{ formatTrigger(scope.row.trigger) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="source_site" label="源站" width="90" align="center" />
-        <el-table-column prop="target_site" label="目标站" width="90" align="center" />
-        <el-table-column
-          prop="torrent_id"
-          label="ID"
-          width="90"
-          align="center"
-          show-overflow-tooltip
-        />
-
-        <el-table-column label="标题" min-width="360">
-          <template #default="scope">
-            <div class="title-cell">
-              <div class="subtitle-line" :title="scope.row.subtitle">
-                {{ scope.row.subtitle || '' }}
-              </div>
-              <div class="main-title-line" :title="scope.row.title">
-                {{ scope.row.title || '' }}
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="发布状态" width="120" align="center">
-          <template #default="scope">
-            <div class="status-tags">
-              <el-tag :type="publishStatusTagType(scope.row.status)" size="small">
-                {{ formatPublishStatus(scope.row.status) }}
-              </el-tag>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="下载器" width="120" align="center">
-          <template #default="scope">
-            <div class="status-tags">
-              <el-tag
-                v-if="scope.row.status !== 'queued' && scope.row.status !== 'cancelled'"
-                :type="downloaderTagType(scope.row)"
-                size="small"
-                :style="downloaderTagStyle(scope.row)"
-              >
-                {{ formatDownloaderStatus(scope.row) }}
-              </el-tag>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="170" align="center" fixed="right">
-          <template #default="scope">
-            <div class="action-buttons">
-              <el-button size="small" type="primary" @click="openLogs(scope.row)">日志</el-button>
-              <el-button
-                size="small"
-                type="success"
-                style="margin-left: 5px"
-                :disabled="!scope.row.result_url"
-                @click="openResultURL(scope.row)"
-              >
-                打开
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                style="margin-left: 5px"
-                :disabled="!canDeleteLog(scope.row)"
-                @click="deleteLog(scope.row)"
-              >
-                删除
-              </el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+      </footer>
     </div>
 
     <LogViewerCard v-model="dialogVisible" :title="dialogTitle" :content="dialogContent" />
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import { useTorrentsViewState } from '@/stores/torrentsViewState'
+import { Delete, Document, Refresh, Search, TopRight } from '@element-plus/icons-vue'
 import LogViewerCard from '@/components/LogViewerCard.vue'
-import type { Downloader } from '@/types'
+import {
+  getAutoAddPresentation,
+  getPublishDisplayStatus,
+  redactPrivateText,
+  safeTrackerResultUrl,
+} from '@/utils/publishPresentation'
 import { ElMessage } from '@/utils/uiNotify'
 
 const emits = defineEmits(['ready'])
@@ -233,25 +162,36 @@ type PublishLogRow = {
   [key: string]: unknown
 }
 
-type ParsedAutoAddResult = {
-  success: boolean
-  message: string
-  downloaderName: string
-  downloaderId: string
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
 const loading = ref(false)
 const error = ref('')
 
-const torrentsViewState = useTorrentsViewState()
-const allDownloadersList = ref<Downloader[]>([])
 const route = useRoute()
 const router = useRouter()
 
 const rows = ref<PublishLogRow[]>([])
+const filterStatuses = [
+  'queued',
+  'success',
+  'exists',
+  'edited',
+  'failed',
+  'filtered',
+  'pre_check_limit',
+  'cancelled',
+]
+const displayRows = computed(() =>
+  rows.value.map((row) => ({
+    ...row,
+    outcome: getPublishDisplayStatus(row.status),
+    autoAdd: getAutoAddPresentation(row.status, row.auto_add_result),
+    safeUrl: ['success', 'exists', 'edited'].includes(row.status)
+      ? safeTrackerResultUrl(row.result_url)
+      : '',
+  })),
+)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -306,41 +246,17 @@ const loadUiSettings = async () => {
       queueGroupFilter.value = readStringSetting(activeFilters.queue_group_id)
       targetSiteFilter.value = readStringSetting(activeFilters.target_site)
     }
-  } catch (e) {
-    console.error('加载发布日志 UI 设置时出错:', e)
+  } catch {
+    console.error('加载发布日志设置失败')
   }
 }
 
 const saveUiSettings = async () => {
   try {
     await axios.post('/api/ui_settings/publish_logs', buildUiSettings())
-  } catch (e) {
-    console.error('无法保存发布日志 UI 设置:', e)
+  } catch {
+    console.error('保存发布日志设置失败')
   }
-}
-
-const publishStatusTagType = (status: string) => {
-  if (status === 'queued') return 'info'
-  if (status === 'success') return 'success'
-  if (status === 'edited') return 'success'
-  if (status === 'exists') return 'warning'
-  if (status === 'filtered') return 'warning'
-  if (status === 'pre_check_limit') return 'danger'
-  if (status === 'cancelled') return 'info'
-  if (status === 'failed') return 'danger'
-  return 'info'
-}
-
-const formatPublishStatus = (status: string) => {
-  if (status === 'queued') return '待发布'
-  if (status === 'success') return '发布成功'
-  if (status === 'failed') return '发布失败'
-  if (status === 'filtered') return '已过滤'
-  if (status === 'exists') return '已存在'
-  if (status === 'edited') return '已编辑'
-  if (status === 'pre_check_limit') return '预检查限制'
-  if (status === 'cancelled') return '已取消'
-  return status || '未知'
 }
 
 const formatTrigger = (trigger: string) => {
@@ -355,15 +271,15 @@ const formatScene = (scene: string) => {
   return scene || '未知'
 }
 
-const formatDateTimeTwoLines = (raw: string) => {
+const formatDateTime = (raw: string) => {
   const trimmed = (raw || '').trim()
-  if (!trimmed) return '-\n-'
+  if (!trimmed) return '—'
 
   const parts = trimmed.split(' ')
   if (parts.length >= 2) {
     const datePart = parts[0] || ''
     const timePart = parts[1] || ''
-    return `${datePart}\n${timePart}`
+    return `${datePart} ${timePart}`
   }
 
   const dt = new Date(trimmed)
@@ -374,113 +290,10 @@ const formatDateTimeTwoLines = (raw: string) => {
     const hh = String(dt.getHours()).padStart(2, '0')
     const mi = String(dt.getMinutes()).padStart(2, '0')
     const ss = String(dt.getSeconds()).padStart(2, '0')
-    return `${yyyy}-${mm}-${dd}\n${hh}:${mi}:${ss}`
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   return trimmed
-}
-
-const parseAutoAddResult = (row: PublishLogRow | null | undefined): ParsedAutoAddResult => {
-  const raw = String(row?.auto_add_result || '').trim()
-  if (!raw) return { success: false, message: '', downloaderName: '', downloaderId: '' }
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (!isRecord(parsed)) {
-      return { success: false, message: raw, downloaderName: '', downloaderId: '' }
-    }
-    return {
-      success: parsed.success === true,
-      message: typeof parsed.message === 'string' ? parsed.message : String(parsed.message || ''),
-      downloaderName:
-        typeof parsed.downloader_name === 'string'
-          ? parsed.downloader_name
-          : String(parsed.downloader_name || ''),
-      downloaderId:
-        typeof parsed.downloader_id === 'string'
-          ? parsed.downloader_id
-          : String(parsed.downloader_id || ''),
-    }
-  } catch {
-    return { success: false, message: raw, downloaderName: '', downloaderId: '' }
-  }
-}
-
-const deriveDownloaderColor = (seed: string) => {
-  const value = (seed || '').trim()
-  if (!value) return ''
-
-  let hash = 0
-  for (let i = 0; i < value.length; i++) {
-    hash = value.charCodeAt(i) + ((hash << 5) - hash)
-  }
-
-  const hue = (Math.abs(hash) % 320) + 20
-  const saturation = 72
-  const lightness = 45
-  return `hsl(${hue} ${saturation}% ${lightness}%)`
-}
-
-const resolveDownloaderColor = (downloaderId: string, downloaderName: string) => {
-  const id = (downloaderId || '').trim()
-  if (id) {
-    const item = allDownloadersList.value.find((d) => d.id === id)
-    const configured = String(item?.color || '').trim()
-    if (configured) return configured
-    return deriveDownloaderColor(id)
-  }
-
-  const name = (downloaderName || '').trim()
-  if (name) return deriveDownloaderColor(name)
-  return ''
-}
-
-const isWaitingDownloaderStatus = (row: PublishLogRow, message: string) =>
-  row.status === 'queued' || message.startsWith('等待发布')
-
-const isSkippedDownloaderStatus = (row: PublishLogRow, message: string) =>
-  row.status === 'cancelled' || message.startsWith('未执行')
-
-const downloaderTagType = (row: PublishLogRow) => {
-  const parsed = parseAutoAddResult(row)
-  if (parsed.success) return 'info'
-  if ((parsed.message || '').trim().startsWith('未执行')) return 'info'
-  return 'info'
-}
-
-type DownloaderTagStyle = Record<string, string>
-
-const downloaderTagStyle = (row: PublishLogRow): DownloaderTagStyle => {
-  const parsed = parseAutoAddResult(row)
-  const message = (parsed.message || '').trim()
-  if (isWaitingDownloaderStatus(row, message) || isSkippedDownloaderStatus(row, message)) {
-    return {} as DownloaderTagStyle
-  }
-
-  let color = ''
-  if (parsed.success) {
-    color = resolveDownloaderColor(parsed.downloaderId || '', parsed.downloaderName || '')
-  } else {
-    color = '#f56c6c'
-  }
-
-  if (!color) return {} as DownloaderTagStyle
-
-  return {
-    '--el-tag-bg-color': color,
-    '--el-tag-border-color': color,
-    '--el-tag-text-color': '#ffffff',
-  }
-}
-
-const formatDownloaderStatus = (row: PublishLogRow) => {
-  const parsed = parseAutoAddResult(row)
-  const message = (parsed.message || '').trim()
-  if (isWaitingDownloaderStatus(row, message)) return message || '等待发布'
-  if (isSkippedDownloaderStatus(row, message)) return '未执行'
-  if (parsed.success) {
-    return parsed.downloaderName || parsed.downloaderId || '成功'
-  }
-  return '失败'
 }
 
 const fetchLogs = async (options: { silent?: boolean } = {}) => {
@@ -524,7 +337,7 @@ const fetchLogs = async (options: { silent?: boolean } = {}) => {
         : e instanceof Error
           ? e.message
           : '获取发种日志失败'
-      error.value = message
+      error.value = redactPrivateText(message)
     }
   } finally {
     if (!silent && currentFetchSeq === fetchSeq) {
@@ -568,28 +381,13 @@ const handleCurrentChange = async (page: number) => {
 
 const openLogs = (row: PublishLogRow) => {
   dialogTitle.value = `日志 - ${row.target_site || ''}`
-  const base = row.logs || ''
-  const parsed = parseAutoAddResult(row)
-  const message = (parsed.message || '').trim()
-  let addon = ''
-  if (isWaitingDownloaderStatus(row, message)) {
-    addon = `\n\n--- [下载器] ---\n${message || '等待发布'}`
-  } else if (isSkippedDownloaderStatus(row, message)) {
-    addon = '\n\n--- [下载器] ---\n未执行'
-  } else if (parsed.success) {
-    const name = parsed.downloaderName || parsed.downloaderId
-    addon = `\n\n--- [下载器] ---\n成功${name ? `：${name}` : ''}`
-  } else {
-    addon = `\n\n--- [下载器] ---\n失败${message ? `：${message}` : ''}`
-  }
-  dialogContent.value = `${base}${addon}`.trim()
+  const autoAdd = getAutoAddPresentation(row.status, row.auto_add_result)
+  const lines = [
+    redactPrivateText(row.logs || '').trim(),
+    `下载器 · ${autoAdd.label}${autoAdd.detail ? ` · ${autoAdd.detail}` : ''}`,
+  ]
+  dialogContent.value = lines.filter(Boolean).join('\n\n')
   dialogVisible.value = true
-}
-
-const openResultURL = (row: PublishLogRow) => {
-  const url = String(row?.result_url || '').trim()
-  if (!url) return
-  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 const canDeleteLog = (row: PublishLogRow) => {
@@ -628,7 +426,7 @@ const deleteLog = async (row: PublishLogRow) => {
       : error instanceof Error
         ? error.message
         : '删除失败'
-    ElMessage.error(message)
+    ElMessage.error(redactPrivateText(message))
   }
 }
 
@@ -740,13 +538,6 @@ const stopPolling = () => {
 }
 
 onMounted(async () => {
-  try {
-    const result = await torrentsViewState.fetchDownloadersList(false)
-    allDownloadersList.value = result.allDownloadersList || []
-  } catch {
-    allDownloadersList.value = []
-  }
-
   await loadUiSettings()
 
   let routeFiltersApplied = false
@@ -781,80 +572,202 @@ watch(
 
 <style scoped>
 .publish-logs-view {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  gap: 16px;
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  padding: clamp(14px, 2vw, 28px);
   box-sizing: border-box;
 }
 
-.search-and-controls {
+.logs-heading,
+.pagination-controls,
+.record-actions {
   display: flex;
   align-items: center;
-  padding: 10px 15px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ebeef5;
+  gap: 8px;
+}
+
+.logs-heading {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logs-heading h1 {
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 650;
+  margin: 0;
+}
+
+.logs-heading p {
+  margin: 4px 0 0;
+  color: var(--el-text-color-secondary);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(206px, 2fr) repeat(5, minmax(98px, 1fr)) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-actions .el-button + .el-button,
+.record-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.record-panel {
+  border: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color-overlay);
+  border-radius: 14px;
+  min-width: 0;
+  min-height: 90px;
+}
+
+.record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.record-header,
+.record {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(108px, 0.75fr) minmax(86px, 0.55fr) minmax(
+      118px,
+      1fr
+    ) minmax(168px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.record-header {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.record {
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.record-title,
+.record-add {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.record small,
+.record time {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+}
+
+.status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.status[data-tone='success'] {
+  color: var(--el-color-success-dark-2);
+}
+.status[data-tone='failed'] {
+  color: var(--el-color-danger-dark-2);
+}
+.status[data-tone='running'] {
+  color: var(--el-color-primary-dark-2);
+}
+
+.record-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-color-primary-dark-2);
+  white-space: nowrap;
+  font-size: 13px;
+  text-decoration: none;
+  padding-block: 8px;
+}
+
+.record-link:hover,
+.record-link:focus-visible {
+  text-decoration: underline;
+}
+
+.record-actions {
+  flex-wrap: wrap;
+  column-gap: 6px;
+}
+
+.record-actions .el-button {
+  padding-inline: 6px;
 }
 
 .pagination-controls {
-  flex: 1;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.table-container {
-  flex: 1;
-  overflow: hidden;
-  min-height: 300px;
-}
-
-.table-container :deep(.el-table) {
-  height: 100%;
-}
-
-.table-container :deep(.el-table__body-wrapper) {
-  overflow-y: auto;
-}
-
-.table-container :deep(.el-table__header-wrapper) {
-  overflow-x: hidden;
-}
-
-.datetime-cell {
-  white-space: pre-line;
-  line-height: 1.2;
-  font-size: 12px;
-}
-
-.status-tags {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-.title-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.subtitle-line {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.2;
-}
-.main-title-line {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  color: var(--el-text-color-secondary);
   font-size: 13px;
-  line-height: 1.25;
-  white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters > :first-child {
+    grid-column: 1 / -1;
+  }
+  .record-header {
+    display: none;
+  }
+  .record {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .record:first-child {
+    border-top: 0;
+  }
+  .record-title,
+  .record-time,
+  .record-actions {
+    grid-column: 1 / -1;
+  }
+  .record-actions .el-button,
+  .record-link {
+    min-height: 44px;
+  }
+  .pagination-controls :deep(.el-pagination__sizes) {
+    display: none;
+  }
 }
 </style>

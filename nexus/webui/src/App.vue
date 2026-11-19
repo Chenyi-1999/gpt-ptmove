@@ -1,183 +1,85 @@
-<!-- src/App.vue -->
 <template>
   <div
+    v-if="backgroundImage"
+    class="star-backdrop"
+    :style="{ backgroundImage }"
+    aria-hidden="true"
+  />
+  <a v-if="!isLoginPage" href="#main-content" class="star-skip-link" @click.prevent="focusMain">
+    跳至主要内容
+  </a>
+
+  <header
     v-if="showDesktopCompactTitleBar"
-    class="desktop-titlebar glass-nav desktop-drag-region"
-    @dblclick="handleWindowMaximiseToggle"
+    class="star-titlebar desktop-drag-region"
+    @dblclick="handleDesktopNavDoubleClick"
   >
-    <div class="desktop-titlebar__brand">
-      <img src="/favicon.png" alt="Logo" height="24" class="brand-logo desktop-titlebar__logo" />
-      <div class="desktop-titlebar__text">
-        <span class="desktop-titlebar__title">PT Nexus</span>
-        <span class="desktop-titlebar__subtitle">{{ desktopCompactSubtitle }}</span>
-      </div>
+    <div class="star-brand">
+      <img src="/starpt.svg" width="24" height="24" alt="" />
+      <span>STARPT</span>
     </div>
-    <div class="desktop-titlebar__spacer" />
     <DesktopWindowControls
-      class="desktop-titlebar__controls desktop-no-drag"
       compact
       :is-maximised="isMaximised"
       @minimise="minimiseWindow"
       @toggle-maximise="handleWindowMaximiseToggle"
       @close="hideWindowToTray"
     />
-  </div>
+  </header>
 
-  <div v-if="!isLoginPage" class="app-nav-wrapper">
-    <div v-if="!showMobileNav" class="desktop-main-nav">
-      <el-menu
-        :default-active="activeRoute"
-        class="main-nav glass-nav desktop-drag-region"
-        mode="horizontal"
-        :ellipsis="false"
-        router
-        @dblclick="handleDesktopNavDoubleClick"
-      >
-        <div class="brand-block desktop-no-drag">
-          <img src="/favicon.png" alt="Logo" height="32" class="brand-logo" />
-          PT Nexus
-        </div>
-        <el-menu-item index="/">首页</el-menu-item>
-        <el-menu-item index="/info">流量统计</el-menu-item>
-        <el-menu-item index="/torrents">一种多站</el-menu-item>
-        <el-menu-item index="/data">一站多种</el-menu-item>
-        <el-menu-item index="/seed-maintenance">维护种子</el-menu-item>
-        <el-menu-item index="/publish-logs">发种日志</el-menu-item>
-        <el-menu-item index="/sites">做种检索</el-menu-item>
-        <el-menu-item index="/settings">设置</el-menu-item>
-      </el-menu>
-      <div
-        class="right-buttons-container desktop-no-drag"
-        :class="{ 'right-buttons-container--with-window-controls': showDesktopWindowControlsInNav }"
-      >
-        <el-popover
-          placement="bottom-end"
-          :width="360"
-          trigger="click"
-          popper-class="task-monitor-popover"
-        >
-          <template #reference>
-            <el-badge :value="taskMonitorBadge" :hidden="taskMonitorBadge <= 0" :max="99">
-              <el-button plain class="task-monitor-button">
-                任务
-                <span class="task-monitor-button__summary">
-                  {{ runningCount }} 运行中 / {{ failedCount }} 失败
-                </span>
-              </el-button>
-            </el-badge>
-          </template>
-          <div class="task-monitor-panel">
-            <div class="task-monitor-panel__header">
-              <span>全局任务监控</span>
-              <el-button link @click="clearFinishedTasks">清理已结束</el-button>
-            </div>
-            <div v-if="taskList.length === 0" class="task-monitor-panel__empty">暂无后台任务</div>
-            <div v-else class="task-monitor-list">
-              <div v-for="task in taskList" :key="task.key" class="task-monitor-item">
-                <div class="task-monitor-item__top">
-                  <span class="task-monitor-item__title">{{ task.title }}</span>
-                  <el-tag :type="taskStatusTagType(task.status)" size="small">{{
-                    taskStatusText(task.status)
-                  }}</el-tag>
-                </div>
-                <div v-if="task.progressText" class="task-monitor-item__progress">
-                  {{ task.progressText }}
-                </div>
-                <div v-if="task.message" class="task-monitor-item__message">{{ task.message }}</div>
-                <div v-if="task.error" class="task-monitor-item__error">{{ task.error }}</div>
-                <div class="task-monitor-item__footer">
-                  <span>{{ formatTaskTime(task.updatedAt) }}</span>
-                  <div class="task-monitor-item__actions">
-                    <el-button
-                      v-if="task.actions?.includes('finish')"
-                      link
-                      type="success"
-                      @click="handleTaskMonitorAction(task, 'finish')"
-                    >
-                      完成
-                    </el-button>
-                    <el-button
-                      v-if="task.actions?.includes('terminate')"
-                      link
-                      type="danger"
-                      @click="handleTaskMonitorAction(task, 'terminate')"
-                    >
-                      终止
-                    </el-button>
-                    <el-button
-                      v-if="task.status === 'running'"
-                      link
-                      @click="clearTaskMonitorItem(task)"
-                    >
-                      隐藏
-                    </el-button>
-                    <el-button
-                      v-else
-                      link
-                      @click="clearTaskMonitorItem(task)"
-                    >
-                      清理
-                    </el-button>
-                    <el-button
-                      v-if="task.routeTarget"
-                      link
-                      type="primary"
-                      @click="openTaskRoute(task.routeTarget)"
-                    >
-                      查看详情
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </el-popover>
-        <el-link
-          href="https://ptn-wiki.sqing33.dpdns.org"
-          target="_blank"
-          :underline="false"
-          class="desktop-link-action"
-        >
-          <el-icon><Link /></el-icon>
-          Wiki
-        </el-link>
-        <el-link
-          href="https://github.com/sqing33/PTNexus"
-          target="_blank"
-          :underline="false"
-          class="desktop-link-action"
-        >
-          <el-icon><Link /></el-icon>
-          GitHub
-        </el-link>
-        <el-tag size="small" class="version-tag" @click="showVersionDialog">{{
-          currentVersion
-        }}</el-tag>
-        <el-button
-          type="primary"
-          plain
-          :icon="Download"
-          :loading="exportingLogs"
-          @click="handleExportLogs"
-        >
-          导出后端日志
-        </el-button>
-        <el-link href="https://github.com/sqing33/PTNexus/issues" target="_blank" :underline="false">
-          <el-button type="primary" plain>反馈</el-button>
-        </el-link>
-        <el-button
-          type="success"
-          @click="handleGlobalRefresh"
-          :loading="isRefreshing"
+  <header v-if="!isLoginPage" class="star-shell" :class="{ 'star-shell--mobile': showMobileNav }">
+    <div class="star-shell__bar desktop-drag-region" @dblclick="handleDesktopNavDoubleClick">
+      <RouterLink to="/" class="star-brand desktop-no-drag">
+        <img src="/starpt.svg" width="34" height="34" alt="" />
+        <span>STARPT</span>
+      </RouterLink>
+      <span class="star-shell__location">{{ currentRouteTitle }}</span>
+      <div class="star-shell__actions desktop-no-drag">
+        <button
+          v-if="!showMobileNav && canRefresh"
+          type="button"
+          class="star-icon-button"
+          aria-label="刷新当前页面缓存"
+          title="刷新当前页面缓存"
+          :aria-busy="isRefreshing"
           :disabled="isRefreshing"
-          plain
+          @click="handleGlobalRefresh"
         >
-          刷新
-        </el-button>
+          <component
+            :is="isRefreshing ? Loading : Refresh"
+            :class="{ 'star-spinner': isRefreshing }"
+            aria-hidden="true"
+          />
+        </button>
+        <button
+          type="button"
+          class="star-icon-button star-shell__tasks"
+          :aria-label="'后台任务，' + runningCount + ' 运行中，' + failedCount + ' 失败'"
+          title="后台任务"
+          aria-haspopup="dialog"
+          :aria-expanded="taskDrawerVisible"
+          @click="taskDrawerVisible = true"
+        >
+          <Monitor aria-hidden="true" />
+          <span v-if="taskMonitorBadge > 0" class="star-shell__task-count" aria-hidden="true">
+            {{ taskMonitorBadge > 99 ? '99+' : taskMonitorBadge }}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="star-icon-button"
+          :aria-label="showMobileNav ? '打开导航' : '打开工具'"
+          :title="showMobileNav ? '导航' : '工具'"
+          aria-haspopup="dialog"
+          :aria-expanded="navigationDrawerVisible"
+          @click="navigationDrawerVisible = true"
+        >
+          <component :is="showMobileNav ? Expand : More" aria-hidden="true" />
+        </button>
       </div>
       <DesktopWindowControls
-        v-if="showDesktopWindowControlsInNav"
-        class="main-nav__window-controls desktop-no-drag"
+        v-if="isWindowsDesktop"
+        class="star-shell__window-controls"
         :is-maximised="isMaximised"
         @minimise="minimiseWindow"
         @toggle-maximise="handleWindowMaximiseToggle"
@@ -185,184 +87,207 @@
       />
     </div>
 
-    <div v-else class="mobile-nav glass-nav">
-      <div class="mobile-brand">
-        <img src="/favicon.png" alt="Logo" height="26" class="brand-logo" />
-        <div class="mobile-brand-text">
-          <span class="mobile-brand-title">PT Nexus</span>
-          <span class="mobile-brand-subtitle">{{ currentRouteTitle }}</span>
-        </div>
-      </div>
-      <div class="mobile-top-actions">
-        <el-badge :value="taskMonitorBadge" :hidden="taskMonitorBadge <= 0" :max="99">
-          <el-button plain size="small" @click="mobileTaskMonitorVisible = true">任务</el-button>
-        </el-badge>
-        <el-button
-          type="success"
-          plain
-          @click="handleGlobalRefresh"
-          :loading="isRefreshing"
-          :disabled="isRefreshing"
-          size="small"
-        >
-          刷新
-        </el-button>
-        <el-button type="primary" plain :icon="Menu" @click="mobileMenuVisible = true" size="small">
-          菜单
-        </el-button>
-      </div>
-    </div>
-
-    <el-drawer
-      v-model="mobileMenuVisible"
-      direction="ltr"
-      size="82%"
-      :with-header="false"
-      append-to-body
-      class="mobile-nav-drawer"
-    >
-      <div class="drawer-header">
-        <div class="drawer-title">PT Nexus 导航</div>
-        <el-tag size="small" style="cursor: pointer" @click="showVersionDialog">{{
-          currentVersion
-        }}</el-tag>
-      </div>
-
-      <el-menu
-        :default-active="activeRoute"
-        class="mobile-nav-menu"
-        router
-        @select="mobileMenuVisible = false"
+    <nav v-if="!showMobileNav" aria-label="主导航" class="star-shell__nav">
+      <RouterLink
+        v-for="item in primaryNavigation"
+        :key="item.to"
+        :to="item.to"
+        class="star-nav-link"
+        :class="{ 'star-nav-link--active': activeRoute === item.to }"
       >
-        <el-menu-item index="/">首页</el-menu-item>
-        <el-menu-item index="/info">流量统计</el-menu-item>
-        <el-menu-item index="/torrents">一种多站</el-menu-item>
-        <el-menu-item index="/data">一站多种</el-menu-item>
-        <el-menu-item index="/seed-maintenance">维护种子</el-menu-item>
-        <el-menu-item index="/publish-logs">发种日志</el-menu-item>
-        <el-menu-item index="/sites">做种检索</el-menu-item>
-        <el-menu-item index="/settings">设置</el-menu-item>
-        <el-menu-item index="/settings/general" class="mobile-settings-sub-item">
-          基础设置
-        </el-menu-item>
-        <el-menu-item index="/settings/downloader" class="mobile-settings-sub-item">
-          下载器设置
-        </el-menu-item>
-        <el-menu-item index="/settings/cookie" class="mobile-settings-sub-item">
-          站点管理
-        </el-menu-item>
-        <el-menu-item index="/settings/automation" class="mobile-settings-sub-item">自动化</el-menu-item>
-        <el-menu-item index="/settings/site-profiles" class="mobile-settings-sub-item">站点配置</el-menu-item>
-        <el-menu-item index="/settings/api" class="mobile-settings-sub-item">API 管理</el-menu-item>
-      </el-menu>
+        <component :is="item.icon" aria-hidden="true" />
+        {{ item.label }}
+      </RouterLink>
+    </nav>
+  </header>
 
-      <div class="drawer-actions">
-        <el-button
-          type="primary"
-          plain
-          :icon="Download"
-          :loading="exportingLogs"
-          @click="handleExportLogs"
+  <el-drawer
+    v-if="!isLoginPage"
+    v-model="navigationDrawerVisible"
+    :title="showMobileNav ? '导航' : '工具'"
+    :direction="showMobileNav ? 'ltr' : 'rtl'"
+    size="min(360px, calc(100% - 24px))"
+    append-to-body
+    class="star-drawer"
+    @closed="openQueuedVersionDialog"
+  >
+    <nav v-if="showMobileNav" aria-label="主导航" class="star-drawer__nav">
+      <RouterLink
+        v-for="item in primaryNavigation"
+        :key="item.to"
+        :to="item.to"
+        class="star-drawer__action"
+        :class="{ 'star-drawer__action--active': activeRoute === item.to }"
+        @click="closeDrawerOnLink"
+      >
+        <component :is="item.icon" aria-hidden="true" />
+        {{ item.label }}
+      </RouterLink>
+    </nav>
+    <div class="star-drawer__tools" role="group" aria-label="工具操作">
+      <button
+        v-if="showMobileNav && canRefresh"
+        type="button"
+        class="star-drawer__action"
+        :disabled="isRefreshing"
+        @click="handleGlobalRefresh"
+      >
+        <component
+          :is="isRefreshing ? Loading : Refresh"
+          :class="{ 'star-spinner': isRefreshing }"
+          aria-hidden="true"
+        />
+        {{ isRefreshing ? '正在刷新…' : '刷新当前页面缓存' }}
+      </button>
+      <button
+        type="button"
+        class="star-drawer__action"
+        :disabled="exportingLogs"
+        @click="handleExportLogs"
+      >
+        <component
+          :is="exportingLogs ? Loading : Download"
+          :class="{ 'star-spinner': exportingLogs }"
+          aria-hidden="true"
+        />
+        {{ exportingLogs ? '正在导出…' : '导出后端日志' }}
+      </button>
+      <button type="button" class="star-drawer__action" @click="showVersionDialog">
+        <InfoFilled aria-hidden="true" />
+        版本与更新
+        <span class="star-drawer__detail">{{ currentVersion }}</span>
+      </button>
+      <a :href="sourceUrl" target="_blank" rel="noopener noreferrer" class="star-drawer__action">
+        <Link aria-hidden="true" />
+        项目源码
+        <TopRight class="star-drawer__detail" aria-hidden="true" />
+      </a>
+      <a :href="issuesUrl" target="_blank" rel="noopener noreferrer" class="star-drawer__action">
+        <ChatDotRound aria-hidden="true" />
+        问题反馈
+        <TopRight class="star-drawer__detail" aria-hidden="true" />
+      </a>
+    </div>
+  </el-drawer>
+
+  <el-drawer
+    v-if="!isLoginPage"
+    v-model="taskDrawerVisible"
+    title="后台任务"
+    size="min(460px, calc(100% - 24px))"
+    append-to-body
+    class="star-drawer"
+  >
+    <div class="task-monitor-panel">
+      <div class="task-monitor-panel__header">
+        <span>{{ runningCount }} 运行中 · {{ failedCount }} 失败</span>
+        <button
+          v-if="hasFinishedTasks"
+          type="button"
+          class="star-button"
+          @click="clearFinishedTasks"
         >
-          导出后端日志
-        </el-button>
-        <el-button
-          type="success"
-          plain
-          @click="handleGlobalRefresh"
-          :loading="isRefreshing"
-          :disabled="isRefreshing"
-        >
-          刷新缓存
-        </el-button>
-        <el-link href="https://ptn-wiki.sqing33.dpdns.org" target="_blank" :underline="false">
-          <el-icon><Link /></el-icon>
-          Wiki
-        </el-link>
-        <el-link href="https://github.com/sqing33/PTNexus" target="_blank" :underline="false">
-          <el-icon><Link /></el-icon>
-          GitHub
-        </el-link>
-        <el-link href="https://github.com/sqing33/PTNexus/issues" target="_blank" :underline="false">
-          <el-button type="primary" plain>反馈</el-button>
-        </el-link>
+          清理已结束
+        </button>
       </div>
-    </el-drawer>
-    <el-drawer v-model="mobileTaskMonitorVisible" title="全局任务监控" size="88%" append-to-body>
-      <div class="task-monitor-panel task-monitor-panel--mobile">
-        <div class="task-monitor-panel__header">
-          <span>后台任务</span>
-          <el-button link @click="clearFinishedTasks">清理已结束</el-button>
-        </div>
-        <div v-if="taskList.length === 0" class="task-monitor-panel__empty">暂无后台任务</div>
-        <div v-else class="task-monitor-list">
-          <div v-for="task in taskList" :key="task.key" class="task-monitor-item">
-            <div class="task-monitor-item__top">
-              <span class="task-monitor-item__title">{{ task.title }}</span>
-              <el-tag :type="taskStatusTagType(task.status)" size="small">{{
-                taskStatusText(task.status)
-              }}</el-tag>
-            </div>
-            <div v-if="task.progressText" class="task-monitor-item__progress">
-              {{ task.progressText }}
-            </div>
-            <div v-if="task.message" class="task-monitor-item__message">{{ task.message }}</div>
-            <div v-if="task.error" class="task-monitor-item__error">{{ task.error }}</div>
-            <div class="task-monitor-item__footer">
-              <span>{{ formatTaskTime(task.updatedAt) }}</span>
-              <div class="task-monitor-item__actions">
-                <el-button
-                  v-if="task.actions?.includes('finish')"
-                  link
-                  type="success"
-                  @click="handleTaskMonitorAction(task, 'finish')"
-                >
-                  完成
-                </el-button>
-                <el-button
-                  v-if="task.actions?.includes('terminate')"
-                  link
-                  type="danger"
-                  @click="handleTaskMonitorAction(task, 'terminate')"
-                >
-                  终止
-                </el-button>
-                <el-button
-                  v-if="task.routeTarget"
-                  link
-                  type="primary"
-                  @click="openTaskRoute(task.routeTarget)"
-                >
-                  查看详情
-                </el-button>
-              </div>
+      <p v-if="taskList.length === 0" class="task-monitor-panel__empty">暂无后台任务</p>
+      <div v-else class="task-monitor-list">
+        <article v-for="task in presentedTasks" :key="task.key" class="task-monitor-item">
+          <div class="task-monitor-item__top">
+            <h2>{{ task.title }}</h2>
+            <div class="task-monitor-item__states">
+              <span
+                class="task-monitor-item__status"
+                :class="'task-monitor-item__status--' + task.display.tone"
+              >
+                {{ task.display.label }}
+              </span>
+              <span
+                v-if="task.autoAddStatus === 'failed'"
+                class="task-monitor-item__status task-monitor-item__status--failed"
+              >
+                添加失败
+              </span>
             </div>
           </div>
-        </div>
+          <p v-if="task.progressText && task.progressText !== task.display.label">
+            {{ task.progressText }}
+          </p>
+          <p v-if="task.message">{{ task.message }}</p>
+          <p v-if="task.error" class="task-monitor-item__error">{{ task.error }}</p>
+          <div class="task-monitor-item__footer">
+            <span>{{ formatTaskTime(task.updatedAt) }}</span>
+            <div class="task-monitor-item__actions">
+              <el-button
+                v-if="task.actions?.includes('finish')"
+                link
+                type="success"
+                @click="handleTaskMonitorAction(task, 'finish')"
+                >完成</el-button
+              >
+              <el-button
+                v-if="task.actions?.includes('terminate')"
+                link
+                type="danger"
+                @click="handleTaskMonitorAction(task, 'terminate')"
+                >终止</el-button
+              >
+              <el-button link @click="clearTaskMonitorItem(task)">
+                {{ task.status === 'running' ? '隐藏' : '清理' }}
+              </el-button>
+              <el-button
+                v-if="task.routeTarget"
+                link
+                type="primary"
+                @click="openTaskRoute(task.routeTarget)"
+                >查看详情</el-button
+              >
+            </div>
+          </div>
+        </article>
       </div>
-    </el-drawer>
-  </div>
+    </div>
+  </el-drawer>
 
   <main
-    :class="[
-      'main-content',
-      isLoginPage ? 'no-nav' : '',
-      showMobileNav && !isLoginPage ? 'mobile-nav-content' : '',
-    ]"
+    id="main-content"
+    ref="mainContent"
+    class="main-content"
+    :class="{ 'no-nav': isLoginPage }"
+    tabindex="-1"
   >
     <router-view v-slot="{ Component }">
       <component :is="Component" @ready="handleComponentReady" />
     </router-view>
   </main>
 
-  <!-- Version Update Component (outside navigation bar) -->
-  <VersionUpdate @version-loaded="(version) => (currentVersion = version)" ref="versionUpdateRef" />
+  <VersionUpdate ref="versionUpdateRef" @version-loaded="(version) => (currentVersion = version)" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Download, Link, Menu } from '@element-plus/icons-vue'
+import {
+  ChatDotRound,
+  Connection,
+  DataAnalysis,
+  Document,
+  Download,
+  Expand,
+  Grid,
+  House,
+  InfoFilled,
+  Link,
+  Loading,
+  Monitor,
+  More,
+  Operation,
+  Refresh,
+  Search,
+  Setting,
+  Switch,
+  TopRight,
+} from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import DesktopWindowControls from '@/components/desktop/DesktopWindowControls.vue'
@@ -375,64 +300,76 @@ import {
   type TaskMonitorStatus,
 } from '@/stores/taskMonitor'
 import { ElMessage } from '@/utils/uiNotify'
+import { getTaskDisplayStatus, redactPrivateText } from '@/utils/publishPresentation'
 
 const route = useRoute()
 const router = useRouter()
 const taskMonitorStore = useTaskMonitorStore()
-const {
-  hideWindowToTray,
-  isDesktopShell,
-  isMaximised,
-  isWindowsDesktop,
-  minimiseWindow,
-  toggleWindowMaximise,
-} = useDesktopWindowControls()
+const { hideWindowToTray, isMaximised, isWindowsDesktop, minimiseWindow, toggleWindowMaximise } =
+  useDesktopWindowControls()
 
-// 由服务端 EnsureDefaultBackgrounds 写入的内置背景；自定义配置仍支持本地或远程 URL。
-const DEFAULT_BACKGROUND_URL = '/backgrounds/wallpaper_1744788002_8050.jpg'
-const backgroundUrl = ref(DEFAULT_BACKGROUND_URL)
-
-// 版本信息
-const currentVersion = ref('加载中...')
-
-const mobileMenuVisible = ref(false)
-const mobileTaskMonitorVisible = ref(false)
-const isMobile = ref(false)
-const MOBILE_BREAKPOINT = 768
-
+const primaryNavigation = [
+  { to: '/', label: '首页', icon: House },
+  { to: '/info', label: '流量统计', icon: DataAnalysis },
+  { to: '/torrents', label: '一种多站', icon: Switch },
+  { to: '/data', label: '一键多种', icon: Connection },
+  { to: '/seed-maintenance', label: '种子维护', icon: Operation },
+  { to: '/publish-logs', label: '任务记录', icon: Document },
+  { to: '/sites', label: '做种检索', icon: Search },
+  { to: '/plugins', label: '插件', icon: Grid },
+  { to: '/settings', label: '设置', icon: Setting },
+]
 const routeTitleMap: Record<string, string> = {
-  '/': '首页',
-  '/info': '流量统计',
-  '/torrents': '一种多站',
-  '/data': '一站多种',
-  '/publish-logs': '发种日志',
-  '/sites': '做种检索',
-  '/settings': '设置',
+  ...Object.fromEntries(primaryNavigation.map(({ to, label }) => [to, label])),
+  '/settings/general': '基础设置',
+  '/settings/downloader': '下载器设置',
+  '/settings/cookie': '站点管理',
   '/settings/automation': '自动化设置',
   '/settings/site-profiles': '站点配置',
   '/settings/api': 'API 管理',
   '/settings/ai': 'API 管理',
-  '/seed-maintenance': '维护种子信息',
 }
 
-const isLoginPage = computed(() => route.path === '/login')
-
-const activeRoute = computed(() => {
-  if (route.matched.length > 0) {
-    return route.matched[0].path
-  }
-  return route.path
+const sourceUrl = 'https://gitee.com/star1999/gpt-ptmove'
+const issuesUrl = sourceUrl + '/issues'
+const mainContent = ref<HTMLElement>()
+const currentVersion = ref('加载中…')
+const navigationDrawerVisible = ref(false)
+const taskDrawerVisible = ref(false)
+const showMobileNav = ref(false)
+const MOBILE_BREAKPOINT = 880
+const backgroundUrl = ref('')
+const backgroundImage = computed(() => {
+  if (isLoginPage.value || !backgroundUrl.value) return ''
+  return 'url(' + JSON.stringify(backgroundUrl.value) + ')'
 })
-
-const currentRouteTitle = computed(() => routeTitleMap[route.path] || routeTitleMap[activeRoute.value] || '导航')
-const desktopCompactSubtitle = computed(() =>
-  isLoginPage.value ? '登录' : currentRouteTitle.value,
+const isLoginPage = computed(() => route.path === '/login')
+const activeRoute = computed(() => route.matched[0]?.path || route.path)
+const currentRouteTitle = computed(
+  () => routeTitleMap[route.path] || routeTitleMap[activeRoute.value] || '导航',
 )
-const showMobileNav = computed(() => isMobile.value && !isDesktopShell.value)
 const showDesktopCompactTitleBar = computed(() => isWindowsDesktop.value && isLoginPage.value)
-const showDesktopWindowControlsInNav = computed(() => isWindowsDesktop.value && !isLoginPage.value)
+
+const focusMain = () => mainContent.value?.focus()
+const closeDrawerOnLink = (event: MouseEvent) => {
+  if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+    navigationDrawerVisible.value = false
+  }
+}
 
 const taskList = computed(() => taskMonitorStore.taskList)
+const presentedTasks = computed(() =>
+  taskList.value.map((task) => ({
+    ...task,
+    title: redactPrivateText(task.title),
+    message: redactPrivateText(task.message),
+    error: redactPrivateText(task.error),
+    progressText: redactPrivateText(task.progressText),
+    actionHint: redactPrivateText(task.actionHint || ''),
+    display: getTaskDisplayStatus(task),
+  })),
+)
+const hasFinishedTasks = computed(() => taskList.value.some((task) => task.status !== 'running'))
 const runningCount = computed(() => taskMonitorStore.runningCount)
 const failedCount = computed(() => taskMonitorStore.failedCount)
 const taskMonitorBadge = computed(() => runningCount.value + failedCount.value)
@@ -452,6 +389,8 @@ type ServerTaskItem = {
   message?: string
   error?: string
   progress_text?: string
+  outcome?: string
+  auto_add_status?: string
   started_at?: string | number | null
   updated_at?: string | number | null
   actions?: unknown[]
@@ -464,18 +403,6 @@ const parseServerTaskTime = (value: string | number | null | undefined) => {
   if (typeof value !== 'string' || !value.trim()) return undefined
   const timestamp = Date.parse(value.trim())
   return Number.isNaN(timestamp) ? undefined : timestamp
-}
-
-const taskStatusText = (status: TaskMonitorStatus) => {
-  if (status === 'running') return '运行中'
-  if (status === 'failed') return '失败'
-  return '已完成'
-}
-
-const taskStatusTagType = (status: TaskMonitorStatus): 'primary' | 'success' | 'danger' => {
-  if (status === 'running') return 'primary'
-  if (status === 'failed') return 'danger'
-  return 'success'
 }
 
 const formatTaskTime = (timestamp: number) => {
@@ -537,9 +464,11 @@ const handleTaskMonitorAction = async (task: TaskMonitorItem, action: TaskMonito
 }
 
 const syncTaskMonitor = async () => {
-  if (isLoginPage.value || !localStorage.getItem('token')) return
+  const token = localStorage.getItem('token')
+  if (isLoginPage.value || !token) return
   try {
     const response = await axios.get('/api/migrate/task_monitor')
+    if (isLoginPage.value || localStorage.getItem('token') !== token) return
     const payload = response.data
     const tasks = Array.isArray(payload?.tasks) ? (payload.tasks as ServerTaskItem[]) : []
     const normalizeRouteQuery = (query?: Record<string, unknown>) => {
@@ -565,6 +494,8 @@ const syncTaskMonitor = async () => {
         message: String(task.message || '').trim(),
         error: String(task.error || '').trim(),
         progressText: String(task.progress_text || '').trim(),
+        outcome: typeof task.outcome === 'string' ? task.outcome : undefined,
+        autoAddStatus: typeof task.auto_add_status === 'string' ? task.auto_add_status : undefined,
         startedAt: parseServerTaskTime(task.started_at),
         updatedAt: parseServerTaskTime(task.updated_at),
         actions: normalizeTaskMonitorActions(task.actions),
@@ -585,7 +516,7 @@ const syncTaskMonitor = async () => {
 
 const openTaskRoute = (routeTarget?: { path: string; query?: Record<string, string> }) => {
   if (!routeTarget?.path) return
-  mobileTaskMonitorVisible.value = false
+  taskDrawerVisible.value = false
   void router.push({ path: routeTarget.path, query: routeTarget.query })
 }
 
@@ -603,7 +534,9 @@ const isRefreshSupportedRoute = (path: string) => {
   )
 }
 
-// VersionUpdate组件引用
+const canRefresh = computed(() => isRefreshSupportedRoute(route.path))
+
+// VersionUpdate 组件引用
 const versionUpdateRef = ref()
 
 const activeComponentRefresher = ref<(() => Promise<void>) | null>(null)
@@ -624,9 +557,12 @@ const handleGlobalRefresh = async () => {
     return
   }
 
-  const refreshTaskKey = `global_refresh:${route.path}`
+  const refreshPath = route.path
+  const refreshTitle = currentRouteTitle.value
+  const refreshComponent = activeComponentRefresher.value
+  const refreshTaskKey = `global_refresh:${refreshPath}`
   const refreshRouteTarget = {
-    path: route.path,
+    path: refreshPath,
     query: Object.fromEntries(
       Object.entries(route.query)
         .filter(([, value]) => value !== undefined && value !== null && String(value).trim())
@@ -639,26 +575,26 @@ const handleGlobalRefresh = async () => {
     key: refreshTaskKey,
     kind: 'refresh',
     title: '刷新缓存',
-    message: `正在刷新${currentRouteTitle.value}`,
+    message: `正在刷新${refreshTitle}`,
     progressText: '已提交刷新请求',
     routeTarget: refreshRouteTarget,
   })
   ElMessage.info('后台正在刷新缓存...')
 
   try {
-    if (shouldDelegateRefreshToComponent(route.path) && activeComponentRefresher.value) {
-      await activeComponentRefresher.value()
+    if (shouldDelegateRefreshToComponent(refreshPath) && refreshComponent) {
+      await refreshComponent()
     } else {
       await axios.post('/api/refresh_data')
-      if (activeComponentRefresher.value) {
-        await activeComponentRefresher.value()
+      if (refreshComponent && route.path === refreshPath) {
+        await refreshComponent()
       }
     }
 
     taskMonitorStore.markSuccess(refreshTaskKey, {
       kind: 'refresh',
       title: '刷新缓存',
-      message: `${currentRouteTitle.value}已刷新`,
+      message: `${refreshTitle}已刷新`,
       progressText: '刷新完成',
       routeTarget: refreshRouteTarget,
     })
@@ -672,7 +608,7 @@ const handleGlobalRefresh = async () => {
     taskMonitorStore.markFailed(refreshTaskKey, {
       kind: 'refresh',
       title: '刷新缓存',
-      message: `刷新${currentRouteTitle.value}失败`,
+      message: `刷新${refreshTitle}失败`,
       error: message || '数据更新失败',
       progressText: '刷新失败',
       routeTarget: refreshRouteTarget,
@@ -802,73 +738,57 @@ const loadBackgroundSettings = async () => {
     // A response from the previous session must not restore its custom background.
     if (isLoginPage.value || localStorage.getItem('token') !== token) return
     const configured = response.data?.ui_settings?.background_url
-    if (typeof configured === 'string' && configured.trim()) {
-      backgroundUrl.value = configured.trim()
-      updateBackground(backgroundUrl.value)
-    }
+    backgroundUrl.value = typeof configured === 'string' ? configured.trim() : ''
   } catch (error) {
     console.error('加载背景设置失败:', error)
   }
 }
 
-// 更新背景图片
-const updateBackground = (url: string) => {
-  const appElement = document.getElementById('app')
-  if (appElement) {
-    const finalUrl = (url || backgroundUrl.value || DEFAULT_BACKGROUND_URL).trim()
-    appElement.style.backgroundImage = `url('${finalUrl}')`
-  }
-}
-
-// 监听背景更新事件
 type BackgroundUpdateDetail = { backgroundUrl: string }
 const handleBackgroundUpdate = (event: Event) => {
-  const customEvent = event as CustomEvent<BackgroundUpdateDetail>
-  const newUrl = customEvent.detail?.backgroundUrl
-  if (typeof newUrl !== 'string') return
-  backgroundUrl.value = newUrl
-  updateBackground(newUrl)
+  const newUrl = (event as CustomEvent<BackgroundUpdateDetail>).detail?.backgroundUrl
+  if (!isLoginPage.value && typeof newUrl === 'string') backgroundUrl.value = newUrl.trim()
 }
 
-// 显示版本更新对话框
+// Wait for the drawer to release focus before opening the version dialog.
+let versionDialogQueued = false
 const showVersionDialog = () => {
-  if (versionUpdateRef.value) {
-    versionUpdateRef.value.show()
-  }
+  versionDialogQueued = true
+  navigationDrawerVisible.value = false
+}
+const openQueuedVersionDialog = () => {
+  if (!versionDialogQueued) return
+  versionDialogQueued = false
+  if (!isLoginPage.value) versionUpdateRef.value?.show()
 }
 
 const handleWindowMaximiseToggle = () => {
   void toggleWindowMaximise()
 }
-
 const handleDesktopNavDoubleClick = (event: MouseEvent) => {
-  if (!showDesktopWindowControlsInNav.value) {
-    return
-  }
-
-  if (event.target !== event.currentTarget) {
-    return
-  }
-
+  if (!isWindowsDesktop.value) return
+  if (event.target instanceof Element && event.target.closest('a, button')) return
   handleWindowMaximiseToggle()
 }
 
 const updateIsMobile = () => {
-  isMobile.value = window.innerWidth <= MOBILE_BREAKPOINT
+  showMobileNav.value = window.innerWidth <= MOBILE_BREAKPOINT
 }
 
 watch(
   () => route.path,
   () => {
-    mobileMenuVisible.value = false
-    mobileTaskMonitorVisible.value = false
+    navigationDrawerVisible.value = false
+    taskDrawerVisible.value = false
+    activeComponentRefresher.value = null
   },
+  { flush: 'sync' },
 )
 
 watch(isLoginPage, (loginPage) => {
   if (loginPage) {
-    backgroundUrl.value = DEFAULT_BACKGROUND_URL
-    updateBackground(DEFAULT_BACKGROUND_URL)
+    backgroundUrl.value = ''
+    versionDialogQueued = false
     return
   }
   void loadBackgroundSettings()
@@ -901,394 +821,4 @@ onUnmounted(() => {
 })
 </script>
 
-<style>
-#app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  min-height: 100vh;
-  overflow: hidden;
-  position: relative;
-  background-image: url('/backgrounds/wallpaper_1744788002_8050.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-
-#app::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.5);
-  pointer-events: none;
-  z-index: 0;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-}
-
-/* 禁止 Element Plus 对话框滚动 */
-.el-overlay-dialog {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
-
-.el-overlay-dialog .el-dialog {
-  margin: 0;
-}
-</style>
-
-<style scoped>
-.app-nav-wrapper {
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.desktop-main-nav {
-  position: relative;
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.main-nav {
-  border-bottom: solid 1px var(--el-menu-border-color);
-  flex-shrink: 0;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  z-index: 1;
-}
-
-.main-nav :deep(.el-menu-item),
-.main-nav :deep(.el-sub-menu) {
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  --wails-draggable: no-drag;
-}
-
-.brand-block {
-  padding: 5px 15px;
-  line-height: 32px;
-  display: flex;
-  align-items: center;
-}
-
-.brand-logo {
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.right-buttons-container {
-  position: absolute;
-  right: 20px;
-  top: 3px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 2;
-}
-
-.right-buttons-container--with-window-controls {
-  right: 150px;
-}
-
-.desktop-link-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.version-tag {
-  cursor: pointer;
-}
-
-.main-nav__window-controls {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 100%;
-  z-index: 3;
-}
-
-.desktop-titlebar {
-  flex-shrink: 0;
-  height: 38px;
-  display: flex;
-  align-items: stretch;
-  border-bottom: 1px solid rgba(209, 218, 229, 0.8);
-  position: relative;
-  z-index: 1;
-}
-
-.desktop-titlebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 12px;
-}
-
-.desktop-titlebar__logo {
-  margin-right: 0;
-}
-
-.desktop-titlebar__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.05;
-}
-
-.desktop-titlebar__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #243347;
-}
-
-.desktop-titlebar__subtitle {
-  font-size: 11px;
-  color: #6f8094;
-}
-
-.desktop-titlebar__spacer {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.desktop-titlebar__controls {
-  margin-left: auto;
-}
-
-.desktop-drag-region {
-  --wails-draggable: drag;
-}
-
-.desktop-no-drag {
-  --wails-draggable: no-drag;
-}
-
-.mobile-nav {
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--el-menu-border-color);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.mobile-brand {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.mobile-brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-  min-width: 0;
-}
-
-.mobile-brand-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.mobile-brand-subtitle {
-  font-size: 12px;
-  color: #606266;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mobile-nav-content {
-  overflow: auto;
-}
-
-.drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.drawer-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.mobile-nav-menu {
-  border-right: none;
-  margin-bottom: 16px;
-}
-
-.mobile-nav-menu :deep(.mobile-settings-sub-item) {
-  padding-left: 38px !important;
-  color: #606266;
-  font-size: 13px;
-}
-
-.drawer-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.drawer-actions :deep(.el-button + .el-button) {
-  margin-left: 0 !important;
-}
-
-.drawer-actions .el-link {
-  width: fit-content;
-}
-
-.task-monitor-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-monitor-button__summary {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.task-monitor-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.task-monitor-panel--mobile {
-  min-height: 100%;
-}
-
-.task-monitor-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-weight: 600;
-}
-
-.task-monitor-panel__empty {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  padding: 8px 0;
-}
-
-.task-monitor-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 420px;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.task-monitor-panel--mobile .task-monitor-list {
-  max-height: none;
-}
-
-.task-monitor-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.task-monitor-item__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.task-monitor-item__title {
-  color: var(--el-text-color-primary);
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.task-monitor-item__progress,
-.task-monitor-item__message,
-.task-monitor-item__footer {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.task-monitor-item__error {
-  color: var(--el-color-danger);
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.task-monitor-item__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.task-monitor-item__footer span {
-  min-width: 0;
-}
-
-.task-monitor-item__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.main-content {
-  flex: 1 1 auto;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.main-content.no-nav {
-  overflow: auto;
-}
-
-@media (max-width: 768px) {
-  #app {
-    background-attachment: scroll;
-  }
-
-  .main-content {
-    overflow: auto;
-  }
-}
-</style>
+<style src="@/assets/styles/star-shell.scss"></style>

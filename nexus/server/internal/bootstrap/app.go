@@ -183,6 +183,11 @@ func NewApp() (*App, error) {
 	engine.Use(middleware.JWTGuard(authService))
 	registerForkUpdateRoutes(engine)
 	handler.NewSiteProfilesHandler(profilesService).RegisterRoutes(engine.Group("/api"))
+	handler.RegisterPlugins(engine.Group("/api/plugins"), paths.DataDir, store.DB)
+	engine.GET("/api/migrate/source-restriction", func(c *gin.Context) {
+		result, status := migrateService.CheckSourceRestriction(strings.TrimSpace(c.Query("task_id")))
+		c.JSON(status, result)
+	})
 	handler.NewAutomationHandler(automationService).RegisterRoutes(engine.Group("/api/automation"))
 	machineHandler := handler.NewMachineHandler(machineService, profilesService, automationService)
 	machineHandler.RegisterAdmin(engine.Group("/api"))

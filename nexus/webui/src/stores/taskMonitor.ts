@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { redactPrivateText } from '@/utils/publishPresentation'
 
 export type TaskMonitorStatus = 'running' | 'success' | 'failed'
 export type TaskMonitorAction = 'finish' | 'terminate'
@@ -11,6 +12,8 @@ export type TaskMonitorItem = {
   source?: 'local' | 'server'
   title: string
   status: TaskMonitorStatus
+  outcome?: string
+  autoAddStatus?: string
   message: string
   error: string
   progressText: string
@@ -31,6 +34,8 @@ type UpsertTaskInput = {
   source?: 'local' | 'server'
   title: string
   status?: TaskMonitorStatus
+  outcome?: string
+  autoAddStatus?: string
   message?: string
   error?: string
   progressText?: string
@@ -47,6 +52,8 @@ type UpsertTaskInput = {
 type ClearedServerTaskState = {
   updatedAt: number
   status: TaskMonitorStatus
+  outcome?: string
+  autoAddStatus?: string
   message: string
   error: string
   progressText: string
@@ -62,6 +69,7 @@ const normalizeActions = (value: unknown): TaskMonitorAction[] | undefined => {
   )
   return actions.length > 0 ? actions : undefined
 }
+const privateText = (value: unknown) => redactPrivateText(normalizeText(value))
 const TASK_MONITOR_STORAGE_KEY = 'ptnexus.taskMonitor.v1'
 const TASK_MONITOR_CLEARED_STORAGE_KEY = 'ptnexus.taskMonitor.cleared.v1'
 
@@ -94,16 +102,19 @@ const loadPersistedTasks = (): Record<string, TaskMonitorItem> => {
             key,
             kind: normalizeText(task.kind) || 'generic',
             rawId: normalizeText(task.rawId) || null,
-            title: normalizeText(task.title) || '后台任务',
+            source: task.source === 'server' ? 'server' : 'local',
+            outcome: normalizeText(task.outcome) || undefined,
+            autoAddStatus: normalizeText(task.autoAddStatus) || undefined,
+            title: privateText(task.title) || '后台任务',
             status:
               task.status === 'running' || task.status === 'success' || task.status === 'failed'
                 ? task.status
                 : 'running',
-            message: normalizeText(task.message),
-            error: normalizeText(task.error),
-            progressText: normalizeText(task.progressText),
+            message: privateText(task.message),
+            error: privateText(task.error),
+            progressText: privateText(task.progressText),
             actions: normalizeActions(task.actions),
-            actionHint: normalizeText(task.actionHint),
+            actionHint: privateText(task.actionHint),
             startedAt: typeof task.startedAt === 'number' ? task.startedAt : Date.now(),
             updatedAt: typeof task.updatedAt === 'number' ? task.updatedAt : Date.now(),
             routeTarget:
@@ -118,7 +129,9 @@ const loadPersistedTasks = (): Record<string, TaskMonitorItem> => {
       ]
     })
 
-    return Object.fromEntries(restoredEntries)
+    const restored: Record<string, TaskMonitorItem> = Object.fromEntries(restoredEntries)
+    persistTasks(restored)
+    return restored
   } catch {
     return {}
   }
@@ -171,9 +184,11 @@ const loadClearedServerTasks = (): Record<string, ClearedServerTaskState> => {
             {
               updatedAt: task.updatedAt,
               status,
-              message: normalizeText((task as Partial<ClearedServerTaskState>).message),
-              error: normalizeText((task as Partial<ClearedServerTaskState>).error),
-              progressText: normalizeText((task as Partial<ClearedServerTaskState>).progressText),
+              outcome: normalizeText(task.outcome) || undefined,
+              autoAddStatus: normalizeText(task.autoAddStatus) || undefined,
+              message: privateText(task.message),
+              error: privateText(task.error),
+              progressText: privateText(task.progressText),
             } satisfies ClearedServerTaskState,
           ],
         ]
@@ -205,7 +220,12 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
   )
 
   const runningTasks = computed(() => taskList.value.filter((task) => task.status === 'running'))
-  const failedTasks = computed(() => taskList.value.filter((task) => task.status === 'failed'))
+  const failedTasks = computed(() =>
+    taskList.value.filter(
+      (task) =>
+        task.status === 'failed' || (task.status !== 'running' && task.autoAddStatus === 'failed'),
+    ),
+  )
   const runningCount = computed(() => runningTasks.value.length)
   const failedCount = computed(() => failedTasks.value.length)
   const hasAttention = computed(() => runningCount.value > 0 || failedCount.value > 0)
@@ -218,16 +238,18 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
       kind: input.kind,
       rawId: input.rawId ?? existing?.rawId ?? null,
       source: input.source ?? existing?.source ?? 'local',
-      title: normalizeText(input.title) || existing?.title || '后台任务',
+      title: privateText(input.title) || existing?.title || '后台任务',
       status: input.status ?? existing?.status ?? 'running',
-      message: normalizeText(input.message) || '',
-      error: normalizeText(input.error) || '',
-      progressText: normalizeText(input.progressText) || '',
+      outcome: input.outcome ?? (input.status ? undefined : existing?.outcome),
+      autoAddStatus: input.autoAddStatus ?? (input.status ? undefined : existing?.autoAddStatus),
+      message: privateText(input.message) || '',
+      error: privateText(input.error) || '',
+      progressText: privateText(input.progressText) || '',
       actions: Object.prototype.hasOwnProperty.call(input, 'actions')
         ? normalizeActions(input.actions)
         : existing?.actions,
       actionHint: Object.prototype.hasOwnProperty.call(input, 'actionHint')
-        ? normalizeText(input.actionHint)
+        ? privateText(input.actionHint)
         : existing?.actionHint,
       startedAt: input.startedAt ?? existing?.startedAt ?? now,
       updatedAt: input.updatedAt ?? now,
@@ -263,6 +285,8 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
       progressText: patch.progressText ?? existing?.progressText ?? '',
       error: '',
       status: 'success',
+      outcome: patch.outcome,
+      autoAddStatus: patch.autoAddStatus,
     })
   }
 
@@ -287,6 +311,8 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
       progressText: patch.progressText ?? existing?.progressText ?? '',
       error: patch.error ?? existing?.error ?? patch.message ?? '',
       status: 'failed',
+      outcome: patch.outcome,
+      autoAddStatus: patch.autoAddStatus,
     })
   }
 
@@ -307,6 +333,8 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
       [task.key]: {
         updatedAt: task.updatedAt,
         status: task.status,
+        outcome: task.outcome,
+        autoAddStatus: task.autoAddStatus,
         message: task.message,
         error: task.error,
         progressText: task.progressText,
@@ -351,13 +379,15 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
         kind: normalizeText(task.kind) || existing?.kind || 'generic',
         rawId: task.rawId ?? existing?.rawId ?? null,
         source: 'server',
-        title: normalizeText(task.title) || existing?.title || '后台任务',
+        title: privateText(task.title) || existing?.title || '后台任务',
         status: task.status ?? existing?.status ?? 'running',
-        message: normalizeText(task.message) || '',
-        error: normalizeText(task.error) || '',
-        progressText: normalizeText(task.progressText) || '',
+        outcome: normalizeText(task.outcome) || undefined,
+        autoAddStatus: normalizeText(task.autoAddStatus) || undefined,
+        message: privateText(task.message) || '',
+        error: privateText(task.error) || '',
+        progressText: privateText(task.progressText) || '',
         actions: normalizeActions(task.actions),
-        actionHint: normalizeText(task.actionHint),
+        actionHint: privateText(task.actionHint),
         startedAt: task.startedAt ?? existing?.startedAt ?? task.updatedAt ?? Date.now(),
         updatedAt: task.updatedAt ?? existing?.updatedAt ?? Date.now(),
         routeTarget: Object.prototype.hasOwnProperty.call(task, 'routeTarget')
@@ -369,6 +399,8 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
         !!clearedState &&
         normalizedTask.status !== 'running' &&
         clearedState.status === normalizedTask.status &&
+        clearedState.outcome === normalizedTask.outcome &&
+        clearedState.autoAddStatus === normalizedTask.autoAddStatus &&
         normalizedTask.message === clearedState.message &&
         normalizedTask.error === clearedState.error &&
         normalizedTask.progressText === clearedState.progressText

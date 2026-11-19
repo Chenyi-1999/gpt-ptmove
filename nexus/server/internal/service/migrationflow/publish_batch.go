@@ -3,6 +3,7 @@ package migrationflow
 import (
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
@@ -12,6 +13,10 @@ import (
 )
 
 func (s *MigrateService) Publish(payload map[string]any) (map[string]any, int) {
+	return s.publishWithSourceCheck(payload, s.inspectSourceRestriction)
+}
+
+func (s *MigrateService) publishWithSourceCheck(payload map[string]any, check func(publishworkflow.Context) publishworkflow.SourceRestriction) (map[string]any, int) {
 	startedAt := time.Now()
 
 	normalizedPayload := s.normalizePublishPayloadWithCrossSeedDefaults(payload)
@@ -37,6 +42,7 @@ func (s *MigrateService) Publish(payload map[string]any) (map[string]any, int) {
 		},
 		publishworkflow.PublishFromPayloadDeps{
 			ContextState:            s.contextState,
+			CheckSourceRestriction:  check,
 			GetSiteByName:           s.repo.GetSiteByName,
 			FindSiteNicknameByGroup: s.repo.FindSiteNicknameByGroup,
 			ResolveTorrentPath: func(ctx publishworkflow.Context) string {
@@ -126,6 +132,19 @@ func (s *MigrateService) StartPublishBatch(payload map[string]any) (map[string]a
 }
 
 func (s *MigrateService) runPublishBatch(batchID string, payload map[string]any, targets []string, concurrency int) {
+	var once sync.Once
+	var sourceContext publishworkflow.Context
+	var sourceCheck publishworkflow.SourceRestriction
+	check := func(ctx publishworkflow.Context) publishworkflow.SourceRestriction {
+		once.Do(func() {
+			sourceContext = ctx
+			sourceCheck = s.inspectSourceRestriction(ctx)
+		})
+		if ctx != sourceContext {
+			return unknownSourceRestriction("批量发布的源站上下文已改变，请重新准备")
+		}
+		return sourceCheck
+	}
 	publishworkflow.RunManagedBatchPublishFromPayload(
 		publishworkflow.ManagedBatchFromPayloadInput{
 			BatchID:     batchID,
@@ -134,8 +153,10 @@ func (s *MigrateService) runPublishBatch(batchID string, payload map[string]any,
 			Payload:     payload,
 		},
 		publishworkflow.ManagedBatchFromPayloadDeps{
-			State:          s.publishState,
-			PublishPayload: s.Publish,
+			State: s.publishState,
+			PublishPayload: func(payload map[string]any) (map[string]any, int) {
+				return s.publishWithSourceCheck(payload, check)
+			},
 		},
 	)
 }

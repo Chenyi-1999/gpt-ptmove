@@ -3,6 +3,7 @@ import axios from 'axios'
 import { ElNotification } from '@/utils/uiNotify'
 import { openSSE, type EventSourceLike } from '@/desktop/sse'
 import { useTaskMonitorStore } from '@/stores/taskMonitor'
+import { getAutoAddPresentation, getPublishDisplayStatus, getPublishResponseStatus, redactPrivateText, safeTrackerResultUrl } from '@/utils/publishPresentation'
 
 import type {
   LimitAlert,
@@ -10,6 +11,7 @@ import type {
   PublishDisplayResult,
   PublishDisplayStatus,
   ReverseMappings,
+  SourceRestriction,
   StandardParamKey,
   TitleComponent,
   TorrentData,
@@ -34,6 +36,7 @@ export type PublishFlowDeps = {
   isEnqueueing: Ref<boolean>
 
   taskId: Ref<string | null>
+  sourceRestriction: Ref<SourceRestriction>
   torrentData: Ref<TorrentData>
   reverseMappings: Ref<ReverseMappings>
 
@@ -111,6 +114,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     isLoading,
     isEnqueueing,
     taskId,
+    sourceRestriction,
     torrentData,
     reverseMappings,
     publishBatchId,
@@ -178,50 +182,23 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
 
   const normalizePublishResult = (siteName: string, raw: unknown): RawPublishResult => {
     const rawResult = (typeof raw === 'object' && raw !== null ? raw : {}) as RawPublishResultServer
-    const logs = typeof rawResult.logs === 'string' ? rawResult.logs : ''
-    const fallbackMessage = rawResult.success === false ? '发布失败' : '发布成功'
-    const result: RawPublishResult = {
+    const logs = typeof rawResult.logs === 'string' ? redactPrivateText(rawResult.logs) : ''
+    const status = getPublishResponseStatus(rawResult)
+    const autoAdd = getAutoAddPresentation(status, rawResult.auto_add_result)
+    const downloaderName = downloaderList.value.find((d) => d.id === rawResult.auto_add_result?.downloader_id)?.name
+    return {
       ...rawResult,
       siteName,
-      message: getCleanMessage(logs || fallbackMessage),
+      logs,
+      url: safeTrackerResultUrl(rawResult.url),
+      isExisted: status === 'exists' || status === 'edited',
+      message: typeof rawResult.message === 'string'
+        ? redactPrivateText(rawResult.message)
+        : getCleanMessage(logs) || getPublishDisplayStatus(status).label,
+      downloaderStatus: rawResult.auto_add_result && autoAdd.label !== '未执行'
+        ? { success: autoAdd.tone === 'success', message: autoAdd.detail, downloaderName }
+        : null,
     }
-
-    if (rawResult.is_existing_torrent === true) {
-      result.isExisted = true
-    } else if (logs && (logs.includes('种子已存在') || logs.includes('该种子已存在'))) {
-      result.isExisted = true
-    }
-
-    // 发布前校验失败
-    if (rawResult.pre_check === true && rawResult.limit_reached === true) {
-      result.downloaderStatus = {
-        success: false,
-        message: logs || '发布前校验失败',
-        downloaderName: '发布前校验',
-      }
-      return result
-    }
-
-    // 自动添加到下载器结果
-    if (rawResult.auto_add_result) {
-      const addResult = rawResult.auto_add_result
-      let downloaderName = '自动检测'
-
-      if (addResult.limit_reached) {
-        downloaderName = '限制触发'
-      } else if (addResult.downloader_id) {
-        const downloader = downloaderList.value.find((d) => d.id === addResult.downloader_id)
-        if (downloader) downloaderName = downloader.name
-      }
-
-      result.downloaderStatus = {
-        success: addResult.success,
-        message: addResult.message,
-        downloaderName,
-      }
-    }
-
-    return result
   }
 
   const rebuildFinalResultsList = () => {
@@ -264,11 +241,10 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     }
   }
 
-  const createPublishMonitorKey = (mode: 'batch' | 'serial' | 'queue', rawId?: string | null) =>
+  const createPublishMonitorKey = (mode: 'batch' | 'queue', rawId?: string | null) =>
     `publish:${mode}:${rawId || taskId.value || Date.now()}`
 
   const batchPublishMonitorKey = ref('')
-  const serialPublishMonitorKey = ref('')
   const queuePublishMonitorKey = ref('')
 
   const getPublishProgressText = () => {
@@ -290,7 +266,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     isBatchPublishing.value = true
   }
 
-  const handlePublishBatch = async (): Promise<boolean> => {
+  const handlePublishBatch = async (): Promise<void> => {
     stopPublishBatchSSE()
     resetBatchPublishRuntime()
 
@@ -323,7 +299,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
         showClose: true,
       })
       isLoading.value = false
-      return false
+      return
     }
 
     try {
@@ -380,7 +356,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
 
             case 'batch_stopped': {
               const reason = data.reason as string
-              const message = data.message as string
+              const message = typeof data.message === 'string' ? redactPrivateText(data.message) : ''
               const title =
                 reason === 'limit_reached'
                   ? '发种限制触发'
@@ -468,6 +444,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
             }
 
             case 'batch_finished': {
+              const completedBatchId = publishBatchId.value
               resetBatchPublishRuntime()
               stopPublishBatchSSE()
               ElNotification.closeAll()
@@ -476,25 +453,42 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
               rebuildProgress()
 
               const results = finalResultsList.value
+              if (results.length < selectedTargetSites.value.length) {
+                limitAlert.value = { visible: true, title: '部分结果未完成', message: '请查看任务记录确认缺失结果' }
+              }
               const totalCount = selectedTargetSites.value.length
-              const publishSuccessCount = results.filter((r) => r.success).length
+              const publishSuccessCount = results.filter((r) => getPublishResponseStatus(r) === 'success').length
+              const existsCount = results.filter((r) => r.isExisted).length
+              const failedCount = results.filter((r) => getPublishResponseStatus(r) === 'failed').length
+              const incompleteCount = totalCount - publishSuccessCount - existsCount - failedCount
+              const autoAddFailed = results.some((r) => r.downloaderStatus?.success === false)
+              const summary = [
+                `发布成功 ${publishSuccessCount}`,
+                existsCount ? `已存在 ${existsCount}` : '',
+                failedCount ? `失败 ${failedCount}` : '',
+                incompleteCount > 0 ? `未完成 ${incompleteCount}` : '',
+              ].filter(Boolean).join(' · ')
               const addSuccessCount = results.filter((r) => r.downloaderStatus?.success).length
 
-              ElNotification.success({
-                title: '发布完成',
-                message: `发布成功 ${publishSuccessCount} / ${totalCount}，下载器添加成功 ${addSuccessCount} / ${totalCount}。`,
+              ElNotification({
+                type: failedCount || incompleteCount || autoAddFailed ? 'warning' : 'success',
+                title: '批量发种结果',
+                message: summary,
               })
               if (batchPublishMonitorKey.value) {
-                taskMonitorStore.markSuccess(batchPublishMonitorKey.value, {
+                taskMonitorStore.upsertTask({
+                  key: batchPublishMonitorKey.value,
+                  status: failedCount || incompleteCount ? 'failed' : 'success',
+                  outcome: incompleteCount ? 'incomplete' : undefined,
+                  autoAddStatus: autoAddFailed ? 'failed' : undefined,
                   kind: 'publish_batch',
-                  rawId: publishBatchId.value || taskId.value,
+                  rawId: completedBatchId || taskId.value,
                   title: '批量发布种子',
-                  message: `发布成功 ${publishSuccessCount} / ${totalCount}`,
+                  message: summary,
                   progressText: `下载器添加成功 ${addSuccessCount} / ${totalCount}`,
                   routeTarget: buildPublishLogsRouteTarget({
                     trigger: 'batch_publish',
                     scene: publishScene,
-                    status: publishSuccessCount === totalCount ? 'success' : 'failed',
                   }),
                 })
               }
@@ -537,14 +531,15 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
         }
       }
 
-      publishBatchEventSource.value.onerror = (error) => {
-        console.error('批量发布 SSE 连接错误:', error)
+      publishBatchEventSource.value.onerror = () => {
+        console.error('批量发布 SSE 连接中断')
         resetBatchPublishRuntime()
         stopPublishBatchSSE()
         ElNotification.closeAll()
+        limitAlert.value = { visible: true, title: '进度连接中断', message: '当前结果未确认，请查看任务记录' }
         ElNotification.error({
           title: '连接错误',
-          message: '批量发布进度连接中断，请稍后重试',
+          message: '批量发布进度连接中断，请查看任务记录',
           duration: 0,
           showClose: true,
         })
@@ -555,37 +550,31 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
             title: '批量发布种子',
             message: '批量发布进度连接中断',
             progressText: getPublishProgressText(),
-            error: '批量发布进度连接中断，请稍后重试',
+            outcome: 'incomplete',
+            error: '批量发布进度连接中断，请查看任务记录',
             routeTarget: buildPublishLogsRouteTarget({
               trigger: 'batch_publish',
               scene: publishScene,
-              status: 'failed',
             }),
           })
         }
         isLoading.value = false
       }
 
-      return true
     } catch (error: unknown) {
-      console.error('批量发布启动失败:', error)
+      const restrictionDenied = readRestrictionRejection(error)
+      const message = restrictionDenied ? sourceRestriction.value.message : '批量发布状态未确认，请查看任务记录'
+      limitAlert.value = { visible: true, title: restrictionDenied ? '源站转种限制' : '发布未确认', message }
       resetBatchPublishRuntime()
       stopPublishBatchSSE()
       ElNotification.closeAll()
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data as { logs?: string; message?: string } | undefined)?.logs ||
-          (error.response?.data as { message?: string } | undefined)?.message ||
-          error.message ||
-          '批量发布启动失败'
-        : error instanceof Error
-          ? error.message || '批量发布启动失败'
-          : '批量发布启动失败'
       if (batchPublishMonitorKey.value) {
         taskMonitorStore.markFailed(batchPublishMonitorKey.value, {
           kind: 'publish_batch',
           rawId: taskId.value,
           title: '批量发布种子',
-          message: '批量发布启动失败',
+          message: restrictionDenied ? '源站转种限制' : '批量发布状态未确认',
+          outcome: restrictionDenied ? 'failed' : 'incomplete',
           progressText: getPublishProgressText(),
           error: message,
           routeTarget: buildPublishLogsRouteTarget({
@@ -595,423 +584,39 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
           }),
         })
       }
-      handleApiError(error, '批量发布启动失败')
+      ElNotification.error({ title: restrictionDenied ? '源站转种限制' : '批量发布未确认', message, duration: 0, showClose: true })
       isLoading.value = false
-      return false
     }
   }
 
-  const handlePublishSerial = async () => {
-    resetBatchPublishRuntime()
-    activeStep.value = 3
-    isLoading.value = true
-    finalResultsList.value = []
-    publishResultsBySite.value = {}
-    publishingSites.value = []
-
-    const serialMonitorKey = createPublishMonitorKey('serial', taskId.value)
-    serialPublishMonitorKey.value = serialMonitorKey
-    taskMonitorStore.markRunning({
-      key: serialMonitorKey,
-      kind: 'publish_serial',
-      rawId: taskId.value,
-      title: '串行发布种子',
-      message: `准备向 ${selectedTargetSites.value.length} 个站点发布`,
-      progressText: '等待逐站发布',
-      routeTarget: buildPublishLogsRouteTarget({
-        trigger: 'serial_publish',
-        scene: publishScene,
-        status: 'running',
-      }),
-    })
-
-    // Initialize progress tracking - 确保进度条立即显示
-    const siteCount = selectedTargetSites.value.length
-    publishProgress.value = { current: 0, total: siteCount }
-    downloaderProgress.value = { current: 0, total: siteCount }
-
-    ElNotification({
-      title: '正在发布',
-      message: `准备向 ${selectedTargetSites.value.length} 个站点发布种子...`,
-      type: 'info',
-      duration: 0,
-    })
-
-    const currentTorrent = torrent.value
-    if (!currentTorrent) {
-      ElNotification.closeAll()
-      ElNotification.error({
-        title: '参数错误',
-        message: '当前种子为空，请刷新后重试',
-        duration: 0,
-        showClose: true,
-      })
-      taskMonitorStore.markFailed(serialMonitorKey, {
-        kind: 'publish_serial',
-        rawId: taskId.value,
-        title: '串行发布种子',
-        message: '参数错误',
-        progressText: getPublishProgressText(),
-        error: '当前种子为空，请刷新后重试',
-        routeTarget: buildPublishLogsRouteTarget({
-          trigger: 'serial_publish',
-          scene: publishScene,
-          status: 'failed',
-        }),
-      })
-      isLoading.value = false
-      return
+  const readRestrictionRejection = (error: unknown) => {
+    if (!axios.isAxiosError(error)) return false
+    const status = error.response?.data?.source_restriction_status
+    if (status !== 'denied' && status !== 'unknown') return false
+    const reason = error.response?.data?.message
+    sourceRestriction.value = {
+      status,
+      message: typeof reason === 'string' ? redactPrivateText(reason) : '源站转种限制未通过',
     }
+    return true
+  }
 
-    const results = []
-
-    for (const siteName of selectedTargetSites.value) {
-      publishingSites.value = [siteName]
-      taskMonitorStore.markRunning({
-        key: serialMonitorKey,
-        kind: 'publish_serial',
-        rawId: taskId.value,
-        title: '串行发布种子',
-        message: `正在发布到 ${siteName}`,
-        progressText: getPublishProgressText(),
-        routeTarget: buildPublishLogsRouteTarget({
-          trigger: 'serial_publish',
-          scene: publishScene,
-          status: 'running',
-          targetSite: siteName,
-        }),
-      })
-      try {
-        const response = await axios.post('/api/migrate/publish', {
-          task_id: taskId.value,
-          upload_data: {
-            ...torrentData.value,
-            save_path: currentTorrent.save_path, // 添加 save_path
-          },
-          targetSite: siteName,
-          sourceSite: sourceSite.value,
-          downloaderId: currentTorrent.downloaderId, // 新增：传递下载器ID
-          auto_add_to_downloader: true, // 新增：启用自动添加
-          auto_add_existing_to_downloader: autoAddExistingToDownloader.value,
-          auto_update_existing_torrent: autoUpdateExistingTorrent.value,
-          publish_scene: publishScene,
-        })
-
-        const fallbackMessage = response.data?.success === false ? '发布失败' : '发布成功'
-        const result = {
-          siteName,
-          message: getCleanMessage(response.data.logs || fallbackMessage),
-          ...response.data,
-        }
-
-        if (response.data?.is_existing_torrent === true) {
-          result.isExisted = true
-        } else if (
-          response.data?.logs &&
-          (response.data.logs.includes('种子已存在') || response.data.logs.includes('该种子已存在'))
-        ) {
-          result.isExisted = true
-        }
-
-        // 🚫 检查发种限制状态
-        if (result.auto_add_result && result.auto_add_result.limit_reached) {
-          // 提取限制信息用于突出显示
-          const limitInfo = result.auto_add_result.message
-
-          result.downloaderStatus = {
-            success: false,
-            message: result.auto_add_result.message,
-            downloaderName: '限制触发',
-            limit_reached: true,
-          }
-
-          results.push(result)
-          finalResultsList.value = [...results]
-          publishResultsBySite.value[siteName] = result
-
-          // 🚫 显示限制提示
-          limitAlert.value = {
-            visible: true,
-            title: '发种限制触发',
-            message: limitInfo,
-          }
-
-          // 在日志顶部突出显示限制信息
-          logContent.value =
-            `\n\n=== 🚫 发种限制触发 ===\n${limitInfo}\n\n=== 🛑 批量发布已停止 ===\n由于发种限制触发，后续 ${selectedTargetSites.value.length - results.length} 个站点发布已暂停。\n\n` +
-            logContent.value
-
-          taskMonitorStore.markFailed(serialMonitorKey, {
-            kind: 'publish_serial',
-            rawId: taskId.value,
-            title: '串行发布种子',
-            message: `${siteName} 触发发种限制`,
-            progressText: getPublishProgressText(),
-            error: limitInfo,
-            routeTarget: buildPublishLogsRouteTarget({
-              trigger: 'serial_publish',
-              scene: publishScene,
-              status: 'failed',
-              targetSite: siteName,
-            }),
-          })
-
-          // 显示限制通知
-          ElNotification({
-            title: '发种限制触发',
-            message: `${siteName} 发布成功但因限制无法添加到下载器\n${limitInfo}\n后续站点发布已自动停止。`,
-            type: 'warning',
-            duration: 0,
-            showClose: true,
-          })
-
-          // 跳出循环
-          break
-        }
-
-        // 检查发布前校验状态
-        if (result.pre_check && result.limit_reached) {
-          const limitInfo = result.message.replace(/^发布前校验失败:\s*/, '')
-
-          result.downloaderStatus = {
-            success: false,
-            message: result.message,
-            downloaderName: '发布前校验',
-            limit_reached: true,
-            pre_check: true,
-          }
-
-          results.push(result)
-          finalResultsList.value = [...results]
-          publishResultsBySite.value[siteName] = result
-
-          // 显示校验提示
-          limitAlert.value = {
-            visible: true,
-            title: '发布前校验失败',
-            message: limitInfo,
-          }
-
-          // 在日志顶部突出显示校验信息
-          logContent.value =
-            `\n\n=== ⚠️ 发布前校验失败 ===\n${limitInfo}\n\n=== 🛑 批量发布已停止 ===\n由于发布前校验失败，后续 ${selectedTargetSites.value.length - results.length} 个站点发布已暂停。\n\n` +
-            logContent.value
-
-          taskMonitorStore.markFailed(serialMonitorKey, {
-            kind: 'publish_serial',
-            rawId: taskId.value,
-            title: '串行发布种子',
-            message: `${siteName} 发布前校验失败`,
-            progressText: getPublishProgressText(),
-            error: limitInfo,
-            routeTarget: buildPublishLogsRouteTarget({
-              trigger: 'serial_publish',
-              scene: publishScene,
-              status: 'failed',
-              targetSite: siteName,
-            }),
-          })
-
-          // 显示发布前校验通知
-          ElNotification({
-            title: '发布前校验失败',
-            message: `${siteName} 因发布前校验失败无法发布\n${limitInfo}\n后续站点发布已自动停止。`,
-            type: 'warning',
-            duration: 0,
-            showClose: true,
-          })
-
-          // 跳出循环
-          break
-        }
-
-        // 立即更新下载器状态
-        if (result.auto_add_result) {
-          // 获取实际的下载器名称
-          let downloaderName = '自动检测'
-          if (result.auto_add_result.downloader_id) {
-            const downloader = downloaderList.value.find(
-              (d) => d.id === result.auto_add_result.downloader_id,
-            )
-            if (downloader) {
-              downloaderName = downloader.name
-            }
-          }
-
-          result.downloaderStatus = {
-            success: result.auto_add_result.success,
-            message: result.auto_add_result.message,
-            downloaderName: downloaderName,
-          }
-
-          // 立即更新下载器进度
-          if (result.auto_add_result.success) {
-            downloaderProgress.value.current++
-          }
-        }
-
-        results.push(result)
-        finalResultsList.value = [...results]
-        publishResultsBySite.value[siteName] = result
-
-        if (result.success) {
-          if (result.downloaderStatus?.success === false) {
-            ElNotification.warning({
-              title: `发布成功但添加失败 - ${siteName}`,
-              message: result.downloaderStatus.message || '自动添加到下载器失败',
-            })
-          } else {
-            ElNotification.success({
-              title: `发布成功 - ${siteName}`,
-              message: '种子已成功发布到该站点',
-            })
-          }
-        }
-      } catch (error: unknown) {
-        const logs = axios.isAxiosError(error)
-          ? (error.response?.data as { logs?: string; message?: string } | undefined)?.logs ||
-            (error.response?.data as { message?: string } | undefined)?.message ||
-            error.message
-          : error instanceof Error
-            ? error.message
-            : String(error)
-        const result = {
-          siteName,
-          success: false,
-          logs,
-          url: null,
-          message: `发布到 ${siteName} 时发生错误，请查看日志。`,
-          downloaderStatus: {
-            success: false,
-            message: '发布失败，无法添加到下载器',
-            downloaderName: '错误',
-          },
-        }
-        results.push(result)
-        finalResultsList.value = [...results]
-        publishResultsBySite.value[siteName] = result
-        ElNotification.error({
-          title: `发布失败 - ${siteName}`,
-          message: result.message,
-        })
-      }
-      // Update publish progress
-      publishProgress.value.current++
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    }
-
-    ElNotification.closeAll()
-    const totalCount = selectedTargetSites.value.length
-    const publishSuccessCount = results.filter((r) => r.success).length
-    const addSuccessCount = results.filter((r) => r?.downloaderStatus?.success).length
-    const failedResults = results.filter((r) => !r.success)
-    const shouldMarkSerialFailed = failedResults.length > 0 || limitAlert.value.visible
-    if (serialMonitorKey) {
-      const latestFailed = failedResults[failedResults.length - 1]
-      const failureError = limitAlert.value.message || latestFailed?.message || ''
-      const routeTarget = buildPublishLogsRouteTarget({
-        trigger: 'serial_publish',
-        scene: publishScene,
-        status: shouldMarkSerialFailed ? 'failed' : 'success',
-        targetSite: latestFailed?.siteName,
-      })
-      if (shouldMarkSerialFailed) {
-        taskMonitorStore.markFailed(serialMonitorKey, {
-          kind: 'publish_serial',
-          rawId: taskId.value,
-          title: '串行发布种子',
-          message: `发布成功 ${publishSuccessCount} / ${totalCount}`,
-          progressText: `下载器添加成功 ${addSuccessCount} / ${totalCount}`,
-          error: failureError,
-          routeTarget,
-        })
-      } else {
-        taskMonitorStore.markSuccess(serialMonitorKey, {
-          kind: 'publish_serial',
-          rawId: taskId.value,
-          title: '串行发布种子',
-          message: `发布成功 ${publishSuccessCount} / ${totalCount}`,
-          progressText: `下载器添加成功 ${addSuccessCount} / ${totalCount}`,
-          routeTarget,
-        })
-      }
-    }
-    ElNotification.success({
-      title: '发布完成',
-      message: `发布成功 ${publishSuccessCount} / ${totalCount}，下载器添加成功 ${addSuccessCount} / ${totalCount}。`,
+  const canSubmit = () => {
+    if (sourceRestriction.value.status === 'allowed') return true
+    ElNotification.warning({
+      title: '源站转种限制',
+      message: sourceRestriction.value.message || '等待核验源站转种限制',
     })
-
-    // 处理自动添加到下载器的结果
-    logContent.value += '\n\n--- [自动添加任务结果] ---'
-    const downloaderStatusMap: Record<
-      string,
-      { success: boolean; message: string; downloaderName: string }
-    > = {}
-
-    // 从 Python 返回的结果中提取 auto_add_result
-    results.forEach((result) => {
-      if (result.auto_add_result) {
-        // 优先使用已经存在的 downloaderStatus 中的名称（已在上面正确设置）
-        const existingDownloaderName = result.downloaderStatus?.downloaderName || '自动检测'
-
-        downloaderStatusMap[result.siteName] = {
-          success: result.auto_add_result.success,
-          message: result.auto_add_result.message,
-          downloaderName: existingDownloaderName,
-        }
-        const statusIcon = result.auto_add_result.success ? '✅' : '❌'
-        const statusText = result.auto_add_result.success ? '成功' : '失败'
-        logContent.value += `\n[${result.siteName}] ${statusIcon} ${statusText}: ${result.auto_add_result.message}`
-      } else if (result.success && result.url) {
-        // 如果没有 auto_add_result，说明可能跳过了自动添加
-        logContent.value += `\n[${result.siteName}] ⚠️  未执行自动添加`
-      }
-    })
-    logContent.value += '\n--- [自动添加任务结束] ---'
-
-    const siteLogs = results.map((r) => {
-      let logEntry = `--- Log for ${r.siteName} ---\n${r.logs || 'No logs available.'}`
-      if (downloaderStatusMap[r.siteName]) {
-        const status = downloaderStatusMap[r.siteName]
-        logEntry += `\n\n--- Downloader Status for ${r.siteName} ---`
-        if (status.success) {
-          logEntry += `\n✅ 成功: ${status.message}`
-        } else {
-          logEntry += `\n❌ 失败: ${status.message}`
-        }
-      }
-      return logEntry
-    })
-    logContent.value = siteLogs.join('\n\n')
-
-    finalResultsList.value = results.map((result) => ({
-      ...result,
-      downloaderStatus: downloaderStatusMap[result.siteName],
-    }))
-
-    // 触发种子数据刷新
-    try {
-      await axios.post('/api/refresh_data')
-      ElNotification.success({
-        title: '数据刷新',
-        message: '种子数据已刷新',
-      })
-    } catch (error) {
-      console.warn('刷新种子数据失败:', error)
-    }
-
-    isLoading.value = false
+    return false
   }
 
   const handlePublish = async () => {
-    const started = await handlePublishBatch()
-    if (!started) {
-      await handlePublishSerial()
-    }
+    if (isLoading.value || isEnqueueing.value || selectedTargetSites.value.length === 0 || !canSubmit()) return
+    await handlePublishBatch()
   }
 
   const handleEnqueue = async () => {
-    if (isEnqueueing.value || isLoading.value) return
+    if (isEnqueueing.value || isLoading.value || !canSubmit()) return
     if (selectedTargetSites.value.length === 0) {
       ElNotification.warning({ title: '提示', message: '请先选择要发布的目标站点。' })
       return
@@ -1083,6 +688,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
       })
       emit('cancel')
     } catch (error: unknown) {
+      readRestrictionRejection(error)
       const message = axios.isAxiosError(error)
         ? (error.response?.data as { logs?: string; message?: string } | undefined)?.logs ||
           (error.response?.data as { message?: string } | undefined)?.message ||
@@ -1174,10 +780,10 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   }
 
   const getCleanMessage = (logs: string): string => {
-    if (!logs || logs === '发布成功') return '发布成功'
+    if (!logs) return ''
     if (logs === '发布失败') return '发布失败'
     if (logs.includes('种子已存在')) {
-      return '种子已存在，发布成功'
+      return '种子已存在'
     }
     const lines = logs
       .split('\n')
@@ -1190,7 +796,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
           !line.startsWith('直链下载:'),
       )
     const cleanLines = lines.map((line) => line.replace(/^\d{2}:\d{2}:\d{2} - \w+ - /, ''))
-    return cleanLines.filter(Boolean).pop() || (logs.includes('失败') ? '发布失败' : '发布成功')
+    return cleanLines.filter(Boolean).pop() || ''
   }
 
   const handleApiError = (error: unknown, defaultMessage: string) => {
@@ -1202,7 +808,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
       : error instanceof Error
         ? error.message || defaultMessage
         : defaultMessage
-    ElNotification.error({ title: '操作失败', message, duration: 0, showClose: true })
+    ElNotification.error({ title: '操作失败', message: redactPrivateText(message), duration: 0, showClose: true })
   }
 
   // 辅助函数：获取映射后的中文值
@@ -1804,9 +1410,11 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     return selectedTargetSites.value.map((siteName) => {
       const existing = resultsBySite.get(siteName)
       if (existing) {
-        let displayStatus: PublishDisplayStatus = existing.success ? 'success' : 'error'
-        if (existing.success && existing.downloaderStatus?.success === false) {
-          displayStatus = 'warning'
+        const outcome = getPublishResponseStatus(existing)
+        let displayStatus: PublishDisplayStatus = 'incomplete'
+        if (outcome === 'failed') displayStatus = 'error'
+        if (outcome === 'success' || outcome === 'exists' || outcome === 'edited') {
+          displayStatus = existing.downloaderStatus?.success === false ? 'warning' : 'success'
         }
         return {
           ...existing,
@@ -1818,7 +1426,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
       if (runningSites.has(siteName)) {
         displayStatus = 'publishing'
       } else if (isStopped) {
-        displayStatus = 'paused'
+        displayStatus = 'incomplete'
       }
 
       return {
@@ -1830,8 +1438,8 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
         message:
           displayStatus === 'publishing'
             ? '发布中...'
-            : displayStatus === 'paused'
-              ? '已暂停'
+            : displayStatus === 'incomplete'
+              ? '未完成'
               : '等待中',
       }
     })
@@ -1874,7 +1482,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   const isResultWithUrl = (
     result: PublishDisplayResult,
   ): result is PublishDisplayResult & { url: string } =>
-    result.success === true && typeof result.url === 'string' && result.url.length > 0
+    result.success === true && Boolean(safeTrackerResultUrl(result.url))
 
   // 检查行中是否有有效的URL
   const hasValidUrlsInRow = (row: PublishDisplayResult[]) => row.some(isResultWithUrl)
@@ -1896,8 +1504,8 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
 
     // 批量打开所有链接，并过滤掉URL中的uploaded参数
     validResults.forEach((result) => {
-      const filteredUrl = filterUploadedParam(result.url)
-      window.open(filteredUrl, '_blank', 'noopener,noreferrer')
+      const filteredUrl = safeTrackerResultUrl(result.url)
+      if (filteredUrl) window.open(filteredUrl, '_blank', 'noopener,noreferrer')
     })
 
     ElNotification.success({
@@ -1917,38 +1525,7 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     logProgressTaskId.value = ''
   }
 
-  // 过滤URL中的uploaded参数
-  const filterUploadedParam = (url: string): string => {
-    if (!url) return url
-
-    try {
-      const normalizeRousiViewUrl = (urlObj: URL) => {
-        if (urlObj.hostname === 'rousi.pro' && urlObj.pathname.startsWith('/api/v1/torrents/')) {
-          urlObj.pathname = urlObj.pathname.replace('/api/v1/torrents/', '/torrent/')
-        }
-      }
-
-      // 处理包含 |DIRECT_DOWNLOAD: 的复合链接
-      if (url.includes('|DIRECT_DOWNLOAD:')) {
-        // 分割链接，只保留前半部分的查看链接
-        const viewUrl = url.split('|DIRECT_DOWNLOAD:')[0]
-        const urlObj = new URL(viewUrl)
-        normalizeRousiViewUrl(urlObj)
-        urlObj.searchParams.delete('uploaded')
-        return urlObj.toString()
-      }
-
-      // 处理普通链接
-      const urlObj = new URL(url)
-      normalizeRousiViewUrl(urlObj)
-      urlObj.searchParams.delete('uploaded')
-      return urlObj.toString()
-    } catch (error) {
-      // 如果URL格式不正确，返回原始URL
-      console.warn('Invalid URL format:', url, error)
-      return url
-    }
-  }
+  const filterUploadedParam = safeTrackerResultUrl
 
   return {
     stopPublishBatchSSE,

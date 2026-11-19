@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
 	"golang.org/x/net/html"
 )
@@ -150,16 +149,8 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 // Inspect 读取详情中的明确权限、做种数和完整 torrent。未知结构保持拒绝。
 func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie, id string) (policy.Candidate, error) {
 	c := policy.Candidate{ID: id, Seeders: -1, Leechers: -1}
-	detail, err := Endpoint(source, source.Paths.Detail, id, "", "")
-	if err != nil {
-		return c, err
-	}
+	doc, detail, err := s.sourceDetail(ctx, source, sourceCookie, id)
 	c.DetailURL = detail
-	body, err := s.get(ctx, detail, sourceCookie, 4<<20)
-	if err != nil {
-		return c, err
-	}
-	doc, err := html.Parse(strings.NewReader(string(body)))
 	if err != nil {
 		return c, err
 	}
@@ -196,26 +187,9 @@ func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCoo
 			c.Official = true
 		}
 	}
-	download, err := Endpoint(source, source.Paths.Download, id, "", "")
+	data, meta, err := s.sourceTorrent(ctx, source, sourceCookie, id, doc)
 	if err != nil {
 		return c, err
-	}
-	if nodes := Select(doc, source.Selectors.DownloadLink); len(nodes) > 0 && attr(nodes[0], "href") != "" {
-		download, err = sameOrigin(source.BaseURL, attr(nodes[0], "href"))
-		if err != nil {
-			return c, err
-		}
-	}
-	data, err := s.get(ctx, download, sourceCookie, 8<<20)
-	if err != nil {
-		return c, err
-	}
-	meta, err := acquirefetch.ParseTorrentMeta(data)
-	if err != nil {
-		return c, errors.New("种子元数据无效")
-	}
-	if err = acquirefetch.ValidateTorrentNetwork(data, source.AnnounceHosts...); err != nil {
-		return c, errors.New("源种子元数据、私有标记或 tracker 声明校验失败")
 	}
 	c.Torrent = data
 	c.Size = meta.Size
@@ -227,7 +201,7 @@ func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCoo
 	if err != nil {
 		return c, err
 	}
-	body, err = s.get(ctx, search, targetCookie, 4<<20)
+	body, err := s.get(ctx, search, targetCookie, 4<<20)
 	if err != nil {
 		return c, err
 	}
@@ -294,10 +268,13 @@ func sameOrigin(base, ref string) (string, error) {
 	}
 	return u.String(), nil
 }
-func (s *Scanner) get(ctx context.Context, target, cookie string, limit int64) ([]byte, error) {
+func (s *Scanner) get(ctx context.Context, target, cookie string, limit int64, acceptURL ...func(*url.URL) bool) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, errors.New("读取地址无效")
+	}
+	if len(acceptURL) > 0 && !acceptURL[0](req.URL) {
+		return nil, errors.New("读取地址的种子标识无效")
 	}
 	req.Header.Set("Cookie", cookie)
 	req.Header.Set("User-Agent", "PTNexus-Automation/1.0")
@@ -306,8 +283,11 @@ func (s *Scanner) get(ctx context.Context, target, cookie string, limit int64) (
 		if len(via) >= 3 {
 			return errors.New("站点重定向过多")
 		}
-		if req.URL.Scheme != via[0].URL.Scheme || !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+		if req.URL.Scheme != via[0].URL.Scheme || !strings.EqualFold(req.URL.Host, via[0].URL.Host) || req.URL.User != nil || req.URL.Fragment != "" {
 			return errors.New("拒绝跨站重定向")
+		}
+		if len(acceptURL) > 0 && !acceptURL[0](req.URL) {
+			return errors.New("拒绝跳转到其他源站资源")
 		}
 		return nil
 	}

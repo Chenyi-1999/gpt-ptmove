@@ -140,7 +140,7 @@ func (r *PublishQueueRepository) CountActiveTasks() (int64, error) {
 	return count, nil
 }
 
-// ListActiveTasks 读取当前处于 queued/running/success 的队列任务。
+// ListActiveTasks 读取当前处于 queued/running 的队列任务。
 // 参数/返回：limit 为最大返回数量；返回任务切片与 error。
 // 失败场景：数据库未初始化或查询失败返回 error。
 // 副作用：读取 publish_queue_tasks。
@@ -154,7 +154,7 @@ func (r *PublishQueueRepository) ListActiveTasks(limit int) ([]PublishQueueTask,
 
 	rows := make([]PublishQueueTask, 0)
 	if err := r.store.DB.Table("publish_queue_tasks").
-		Where("status IN ?", []string{PublishQueueStatusQueued, PublishQueueStatusRunning, PublishQueueStatusSuccess}).
+		Where("status IN ?", []string{PublishQueueStatusQueued, PublishQueueStatusRunning}).
 		Order("updated_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {

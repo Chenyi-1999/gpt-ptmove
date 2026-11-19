@@ -1,12 +1,12 @@
 {
   "version": "0.3.1",
-  "date": "2026-11-18",
+  "date": "2026-11-19",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:0.3.1-pull.1",
-  "image_id": "sha256:cd023e8073aae7407bf468121425fc388e69b168a44b897b29e36c2df86044f5",
+  "image": "ptmove-nexus:0.3.1-starpt.1",
+  "image_id": "sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829",
   "architecture": "linux/amd64",
   "image_archive_sha256": null,
   "access": "http://152.136.236.238:18120",
@@ -59,7 +59,7 @@
   "real_nas_deployment_performed": true,
   "real_nas_tracker_publish_verified": false,
   "protected_81_access_performed": false,
-  "rollback_native_image": "ptmove-nexus:0.3.1-pixhost.1",
+  "rollback_native_image": "ptmove-nexus:0.3.1-pull.1",
   "legacy_directory": "/opt/gpt-ptmove",
   "legacy_container_stopped_retained": true,
   "release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1",
@@ -157,5 +157,16 @@
     "source_metadata": "fixture",
     "publish_queue_entries": 0,
     "tracker_publish": false
+  },
+  "starpt": {
+    "brand": "STARPT",
+    "verified_at": "2026-11-19T20:58:12+08:00",
+    "plugin_directory": "/opt/gpt-ptmove-nexus/data/plugins",
+    "plugin_ui": "http://152.136.236.238:18120/plugins",
+    "frontend_typecheck_and_build": true,
+    "go_full_tests_linux_docker": true,
+    "browser_canary_desktop_and_mobile": true,
+    "real_tracker_publish_test": false,
+    "gitee_release_for_this_image": false
   }
 }

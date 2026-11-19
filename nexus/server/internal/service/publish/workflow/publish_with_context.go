@@ -17,6 +17,7 @@ type PublishWithContextInput struct {
 type PublishWithContextDeps struct {
 	GetSiteByName           func(name string) (map[string]any, error)
 	ResolveTorrentPath      func(ctx Context) string
+	CheckSourceRestriction  func(ctx Context) SourceRestriction
 	AddToDownloader         func(payload map[string]any) (map[string]any, int)
 	FindSiteNicknameByGroup func(releaseGroup string) (string, error)
 }
@@ -46,6 +47,14 @@ func ExecutePublishWithContext(input PublishWithContextInput, deps PublishWithCo
 		return map[string]any{"success": false, "logs": "错误: 站点 '" + targetSite + "' 未启用目标站迁移。", "url": nil}, 403
 	}
 
+	check := SourceRestriction{Status: SourceRestrictionUnknown}
+	if deps.CheckSourceRestriction != nil {
+		check = deps.CheckSourceRestriction(input.Context)
+	}
+	if check.Status != SourceRestrictionAllowed {
+		return SourceRestrictionFailure(check), 409
+	}
+
 	torrentPath := strings.TrimSpace(input.TorrentPath)
 	if torrentPath == "" && deps.ResolveTorrentPath != nil {
 		torrentPath = strings.TrimSpace(deps.ResolveTorrentPath(input.Context))
@@ -65,6 +74,8 @@ func ExecutePublishWithContext(input PublishWithContextInput, deps PublishWithCo
 			TargetInfo:           targetInfo,
 			UploadData:           uploadData,
 			SourceSiteNickname:   input.Context.SourceNickname,
+			SourceRestriction:    check,
+			SourceTorrentHash:    input.Context.Hash,
 			TorrentPath:          torrentPath,
 			Payload:              input.Payload,
 			FallbackSavePath:     input.Context.SavePath,

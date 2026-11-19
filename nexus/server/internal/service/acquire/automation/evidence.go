@@ -11,18 +11,34 @@ import (
 )
 
 var errMissingTorrentID = errors.New("详情地址缺少种子标识")
-var restrictedTerms = []string{"禁转", "禁轉", "禁止转载", "禁止轉載", "禁止转发", "禁止轉發", "限转", "限轉", "仅限本站", "僅限本站", "do not repost", "no repost", "do not reupload", "do not re-upload", "reupload forbidden"}
+var restrictedTerms = []string{
+	"禁转", "禁轉", "禁止转载", "禁止轉載", "严禁转载", "嚴禁轉載", "谢绝转载", "謝絕轉載",
+	"禁止转发", "禁止轉發", "禁止转种", "禁止轉種", "限转", "限轉", "仅限本站", "僅限本站",
+	"do not repost", "no repost", "do not reupload", "do not re-upload", "reupload forbidden",
+	"do not cross-seed", "no cross-seeding", "cross-seeding prohibited",
+}
 
 // Restrictions 将全页限制优先于任意自定义允许选择器，未知页面结构保持拒绝。
 func Restrictions(doc *html.Node, p Profile) (bool, bool) {
 	plain := strings.ToLower(text(doc))
+	badges := Select(doc, "[title], [alt], [aria-label]")
 	for _, term := range restrictedTerms {
 		if strings.Contains(plain, term) {
 			return true, false
 		}
+		for _, badge := range badges {
+			for _, key := range []string{"title", "alt", "aria-label"} {
+				if strings.Contains(strings.ToLower(attr(badge, key)), term) {
+					return true, false
+				}
+			}
+		}
 	}
 	if len(Select(doc, p.Selectors.RestrictionDenied)) > 0 {
 		return true, false
+	}
+	if len(Select(doc, `input[type="password"]`)) > 0 {
+		return false, false
 	}
 	if len(Select(doc, p.Selectors.RestrictionAllowed)) > 0 {
 		return true, true
@@ -34,9 +50,6 @@ func Restrictions(doc *html.Node, p Profile) (bool, bool) {
 			metadata = true
 			break
 		}
-	}
-	if len(Select(doc, `input[type="password"]`)) > 0 {
-		return false, false
 	}
 	return recognized && metadata, recognized && metadata
 }

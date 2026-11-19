@@ -43,13 +43,13 @@
             <span>同步Cookie</span>
           </el-button>
           <el-link
-            href="https://github.com/sqing33/PTNexus/releases/latest/download/pt-nexus-browser-extension.zip"
+            href="https://gitee.com/star1999/gpt-ptmove/tree/master/nexus/extension"
             target="_blank"
             rel="noopener noreferrer"
             type="primary"
             class="browser-extension-link"
           >
-            下载浏览器插件
+            浏览器扩展源码
           </el-link>
         </el-form-item>
       </el-form>
