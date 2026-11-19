@@ -8,7 +8,7 @@
   "image": "ptmove-nexus:0.3.1-starpt.1",
   "image_id": "sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829",
   "architecture": "linux/amd64",
-  "image_archive_sha256": null,
+  "image_archive_sha256": "ae74d061ffa1b9567eb1a74e1d536597a271e35cee0574269d9791c51186954e",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "upstream_repository": "https://github.com/sqing33/PTNexus",
@@ -167,6 +167,16 @@
     "go_full_tests_linux_docker": true,
     "browser_canary_desktop_and_mobile": true,
     "real_tracker_publish_test": false,
-    "gitee_release_for_this_image": false
+    "gitee_release_for_this_image": true,
+    "release_tag": "v0.3.1-starpt.1",
+    "release_commit": "2547a69dc599a0505a074cb8276726a87845370d",
+    "docker_archive_bytes": 423231489,
+    "docker_archive_sha256": "ae74d061ffa1b9567eb1a74e1d536597a271e35cee0574269d9791c51186954e",
+    "release_verified_at": "2026-11-19T21:33:36+08:00",
+    "github_private_release": false,
+    "gitee_release_url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1-starpt.1",
+    "gitee_attachment_format": "Verified Docker delta; requires released v0.3.1 amd64 base",
+    "gitee_attachment_bytes": 54310451,
+    "gitee_attachment_sha256": "7a7b8c9ba35a1950a3c4f1311ac0dc1a8f88c9202e01e04465fa3af5334f87f6"
   }
 }
