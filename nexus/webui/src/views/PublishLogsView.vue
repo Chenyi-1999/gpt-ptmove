@@ -80,14 +80,27 @@
             formatDateTime(row.updated_at || row.created_at)
           }}</time>
           <div class="record-outcome">
+            <span class="record-field-label">发布结果</span>
             <span class="status" :data-tone="row.outcome.tone">{{ row.outcome.label }}</span>
           </div>
           <div class="record-add">
+            <span class="record-field-label">自动添加</span>
             <span class="status" :data-tone="row.autoAdd.tone">{{ row.autoAdd.label }}</span>
             <small v-if="row.autoAdd.detail">{{ row.autoAdd.detail }}</small>
           </div>
-          <div class="record-actions">
-            <el-button :icon="Document" text @click="openLogs(row)">日志</el-button>
+          <div class="record-actions" role="group" aria-label="任务操作">
+            <el-button class="record-action-log" :icon="Document" text @click="openLogs(row)">
+              日志
+            </el-button>
+            <el-button
+              v-if="row.published_edit_available"
+              class="record-action-edit"
+              :icon="EditPen"
+              text
+              @click="openPublishedEdit(row)"
+            >
+              编辑已发布
+            </el-button>
             <a
               v-if="row.safeUrl"
               :href="row.safeUrl"
@@ -97,6 +110,7 @@
               >查看种子 <el-icon><TopRight /></el-icon
             ></a>
             <el-button
+              class="record-action-remove"
               :icon="Delete"
               text
               :disabled="!canDeleteLog(row)"
@@ -123,6 +137,11 @@
     </div>
 
     <LogViewerCard v-model="dialogVisible" :title="dialogTitle" :content="dialogContent" />
+    <PublishedTorrentEditDialog
+      v-model="publishedEditVisible"
+      :log-id="publishedEditLogId"
+      @saved="fetchLogs()"
+    />
   </section>
 </template>
 
@@ -131,8 +150,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import { Delete, Document, Refresh, Search, TopRight } from '@element-plus/icons-vue'
+import { Delete, Document, EditPen, Refresh, Search, TopRight } from '@element-plus/icons-vue'
 import LogViewerCard from '@/components/LogViewerCard.vue'
+import PublishedTorrentEditDialog from '@/components/PublishedTorrentEditDialog.vue'
 import {
   getAutoAddPresentation,
   getPublishDisplayStatus,
@@ -159,6 +179,7 @@ type PublishLogRow = {
   queue_task_id?: number | string | null
   logs?: string | null
   auto_add_result?: string | null
+  published_edit_available?: boolean
   [key: string]: unknown
 }
 
@@ -206,6 +227,8 @@ const targetSiteFilter = ref('')
 const dialogVisible = ref(false)
 const dialogTitle = ref('日志')
 const dialogContent = ref('')
+const publishedEditVisible = ref(false)
+const publishedEditLogId = ref<number | string | null>(null)
 
 const POLL_INTERVAL_MS = 3000
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -388,6 +411,12 @@ const openLogs = (row: PublishLogRow) => {
   ]
   dialogContent.value = lines.filter(Boolean).join('\n\n')
   dialogVisible.value = true
+}
+
+const openPublishedEdit = (row: PublishLogRow) => {
+  if (!row.published_edit_available) return
+  publishedEditLogId.value = row.id
+  publishedEditVisible.value = true
 }
 
 const canDeleteLog = (row: PublishLogRow) => {
@@ -583,8 +612,7 @@ watch(
 }
 
 .logs-heading,
-.pagination-controls,
-.record-actions {
+.pagination-controls {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -640,10 +668,9 @@ watch(
 .record-header,
 .record {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(108px, 0.75fr) minmax(86px, 0.55fr) minmax(
-      118px,
-      1fr
-    ) minmax(168px, auto);
+  grid-template-columns:
+    minmax(0, 2fr) minmax(110px, 0.8fr) minmax(88px, 0.55fr) minmax(118px, 1fr)
+    minmax(184px, 1fr);
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
@@ -659,12 +686,19 @@ watch(
 }
 
 .record-title,
+.record-outcome,
 .record-add {
   display: grid;
   justify-items: start;
   gap: 4px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.record-field-label {
+  display: none;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .record small,
@@ -708,7 +742,8 @@ watch(
   white-space: nowrap;
   font-size: 13px;
   text-decoration: none;
-  padding-block: 8px;
+  min-height: 32px;
+  padding-inline: 6px;
 }
 
 .record-link:hover,
@@ -717,12 +752,42 @@ watch(
 }
 
 .record-actions {
-  flex-wrap: wrap;
-  column-gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(70px, max-content) minmax(0, 1fr);
+  grid-template-areas:
+    'log edit'
+    'link remove';
+  align-items: center;
+  justify-items: start;
+  gap: 3px 8px;
+  min-width: 0;
 }
 
 .record-actions .el-button {
+  max-width: 100%;
   padding-inline: 6px;
+  margin: 0;
+}
+
+.record-action-log {
+  grid-area: log;
+}
+
+.record-action-edit {
+  grid-area: edit;
+}
+
+.record-actions .record-link {
+  grid-area: link;
+}
+
+.record-actions .record-action-remove {
+  grid-area: remove;
+  color: var(--el-text-color-secondary);
+}
+
+.record-actions .record-action-remove:hover {
+  color: var(--el-color-danger);
 }
 
 .pagination-controls {
@@ -740,13 +805,7 @@ watch(
   }
 }
 
-@media (max-width: 780px) {
-  .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .filters > :first-child {
-    grid-column: 1 / -1;
-  }
+@media (max-width: 920px) {
   .record-header {
     display: none;
   }
@@ -762,9 +821,26 @@ watch(
   .record-actions {
     grid-column: 1 / -1;
   }
+  .record-field-label {
+    display: block;
+  }
+  .record-actions {
+    grid-template-columns: 88px minmax(0, 1fr);
+    border-top: 1px solid var(--el-border-color-lighter);
+    padding-top: 3px;
+  }
   .record-actions .el-button,
   .record-link {
     min-height: 44px;
+  }
+}
+
+@media (max-width: 780px) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters > :first-child {
+    grid-column: 1 / -1;
   }
   .pagination-controls :deep(.el-pagination__sizes) {
     display: none;

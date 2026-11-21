@@ -172,3 +172,65 @@ func TestQueryDataReviewStatusUsesPublishableClassification(t *testing.T) {
 		t.Fatalf("expected unreviewed total 3, got %#v", unreviewed["total"])
 	}
 }
+
+func TestQueryDataTagVisibilityFiltersBeforePaginationAndCombinesReview(t *testing.T) {
+	store := newCrossSeedTestStore(t)
+	service := NewCrossSeedService(repository.NewCrossSeedRepository(store))
+	insertCrossSeedReviewRow(t, store.DB, "2001", "Restricted", "team.other", ` ["tag.禁转"] `, `[]`, 1)
+	insertCrossSeedReviewRow(t, store.DB, "2002", "Episode", "team.other", `分集, `, `[]`, 1)
+	insertCrossSeedReviewRow(t, store.DB, "2003", "Allowed", "team.other", ` ["tag.禁转预告"] `, `[]`, 1)
+	insertCrossSeedReviewRow(t, store.DB, "2004", "OtherRestricted", "team.other", `限转`, `[]`, 1)
+
+	// With both visibility filters on, filtering happens before offset/limit and
+	// the total reports only the visible rows. Exact matching keeps similar tags.
+	firstPage, err := service.QueryData(CrossSeedQueryParams{Page: 1, PageSize: 1, HideRestrictedTags: true, HideEpisodeTags: true})
+	if err != nil {
+		t.Fatalf("QueryData filtered page 1 returned error: %v", err)
+	}
+	secondPage, err := service.QueryData(CrossSeedQueryParams{Page: 2, PageSize: 1, HideRestrictedTags: true, HideEpisodeTags: true})
+	if err != nil {
+		t.Fatalf("QueryData filtered page 2 returned error: %v", err)
+	}
+	if firstPage["total"].(int) != 1 || secondPage["total"].(int) != 1 {
+		t.Fatalf("expected filtered total 1 on each page, got %v and %v", firstPage["total"], secondPage["total"])
+	}
+	if firstPage["count"].(int) != 1 || firstPage["data"].([]map[string]any)[0]["torrent_id"] != "2003" {
+		t.Fatalf("expected the similar but nonmatching tag on page 1, got %#v", firstPage["data"])
+	}
+	if secondPage["count"].(int) != 0 {
+		t.Fatalf("expected empty page 2 after filtering, got %#v", secondPage["data"])
+	}
+
+	// IncludeTaggedReviewed allows otherwise valid tagged rows through the
+	// reviewed display query, but is_publishable remains false and hide wins.
+	showTagged, err := service.QueryData(CrossSeedQueryParams{Page: 1, PageSize: 20, ReviewStatus: "reviewed", IncludeTaggedReviewed: true})
+	if err != nil {
+		t.Fatalf("QueryData include tagged reviewed returned error: %v", err)
+	}
+	if showTagged["total"].(int) != 3 {
+		t.Fatalf("expected three reviewed rows including tagged items, got %#v", showTagged["total"])
+	}
+	for _, row := range showTagged["data"].([]map[string]any) {
+		if row["torrent_id"] == "2001" || row["torrent_id"] == "2002" || row["torrent_id"] == "2004" {
+			if row["is_publishable"] != false {
+				t.Fatalf("tagged row must remain unpublishable: %#v", row)
+			}
+		}
+	}
+	showAndHide, err := service.QueryData(CrossSeedQueryParams{Page: 1, PageSize: 20, ReviewStatus: "reviewed", IncludeTaggedReviewed: true, HideRestrictedTags: true, HideEpisodeTags: true})
+	if err != nil {
+		t.Fatalf("QueryData include and hide returned error: %v", err)
+	}
+	if showAndHide["total"].(int) != 0 {
+		t.Fatalf("hide must override tagged inclusion, got %#v", showAndHide["total"])
+	}
+
+	// Omitted options preserve the API's previous unfiltered behavior.
+	legacy, err := service.QueryData(CrossSeedQueryParams{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("QueryData legacy returned error: %v", err)
+	}
+	if legacy["total"].(int) != 4 {
+		t.Fatalf("expected legacy total 4, got %#v", legacy["total"])
+	}
+}

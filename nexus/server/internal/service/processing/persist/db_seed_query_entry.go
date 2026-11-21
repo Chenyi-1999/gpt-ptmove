@@ -24,6 +24,7 @@ type DBSeedQueryEntryDeps struct {
 	NewContextID      func() string
 	RegisterDBContext func(contextID string, lookup DBSeedLookupResult, torrentID string)
 	ReverseMappings   map[string]any
+	PrepareSeed       func(lookup DBSeedLookupResult) (prepared DBSeedLookupResult, warning string, conflict bool)
 }
 
 // ExecuteDBSeedQueryEntry 执行数据库种子查询入口流程，并返回标准接口响应。
@@ -56,6 +57,21 @@ func ExecuteDBSeedQueryEntry(input DBSeedQueryEntryInput, deps DBSeedQueryEntryD
 		}
 		return map[string]any{"success": false, "message": "数据库读取失败: " + err.Error()}, 500, nil
 	}
+	warning := ""
+	if deps.PrepareSeed != nil {
+		prepared, prepareWarning, conflict := deps.PrepareSeed(lookupResult)
+		if conflict {
+			if taskID != "" && deps.EmitLog != nil {
+				deps.EmitLog("数据库查询", "种子资料在准备期间已改变，请重新打开转种准备", "error")
+			}
+			if taskID != "" && deps.CloseLog != nil {
+				deps.CloseLog()
+			}
+			return map[string]any{"success": false, "message": "种子资料在准备期间已改变，请重新打开转种准备"}, 409, nil
+		}
+		lookupResult = prepared
+		warning = strings.TrimSpace(prepareWarning)
+	}
 
 	contextID := ""
 	if deps.NewContextID != nil {
@@ -66,17 +82,25 @@ func ExecuteDBSeedQueryEntry(input DBSeedQueryEntryInput, deps DBSeedQueryEntryD
 	}
 	if taskID != "" && deps.EmitLog != nil {
 		deps.EmitLog("数据库查询", "数据库读取完成", "success")
-		deps.EmitLog("完成", "数据加载完成", "success")
+		message := "数据加载完成"
+		if warning != "" {
+			message += "；MediaInfo 自动补全未完成"
+		}
+		deps.EmitLog("完成", message, "success")
 	}
 	if taskID != "" && deps.CloseLog != nil {
 		deps.CloseLog()
 	}
 
-	return map[string]any{
+	response := map[string]any{
 		"success":          true,
 		"data":             lookupResult.Normalized,
 		"source":           "database",
 		"task_id":          contextID,
 		"reverse_mappings": deps.ReverseMappings,
-	}, 200, &lookupResult
+	}
+	if warning != "" {
+		response["mediainfo_prepare_error"] = warning
+	}
+	return response, 200, &lookupResult
 }

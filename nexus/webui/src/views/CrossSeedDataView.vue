@@ -490,6 +490,7 @@
         <div class="cross-seed-content">
           <CrossSeedPanel
             v-if="prefetchedDbSeedInfo && crossSeedStore.taskId"
+            :key="crossSeedStore.taskId"
             :show-complete-button="true"
             publish-scene="maintenance"
             :prefetched-db-seed-info="prefetchedDbSeedInfo"
@@ -613,6 +614,7 @@ interface SourceSiteOption {
 }
 
 interface SeedInfoData extends Record<string, unknown> {
+  hash?: string
   name?: string
   title?: string
   save_path?: string
@@ -673,6 +675,7 @@ const recordDialogVisible = ref(false)
 const maintenanceDialogVisible = ref(false)
 const maintenanceLoading = ref(false)
 const refetching = ref(false)
+let maintenanceRequestVersion = 0
 const prefetchedDbSeedInfo = ref<SeedInfoResponse | undefined>(undefined)
 const sourceSiteOptions = ref<SourceSiteOption[]>([])
 const selectedSourceSite = ref('')
@@ -1037,6 +1040,7 @@ const fetchData = async () => {
       include_unique_paths: '0',
     })
     contentFiltersStore.appendQuery(params)
+    contentFiltersStore.appendSeedTagQuery(params, isCrossSeedMode.value)
 
     const response = await axios.get(`/api/cross-seed-data?${params.toString()}`)
     const result = response.data
@@ -1341,11 +1345,11 @@ const applySeedInfo = (seedInfoResult: SeedInfoResponse, rowKey?: string) => {
   crossSeedStore.reset()
   crossSeedStore.setParams(buildWorkingTorrent(seedInfoResult.data))
 
-  const fallbackSourceName = selectedSourceSite.value || seedInfoResult.data.site_name
+  const { site_name: savedSite, torrent_id: savedTorrent } = seedInfoResult.data
   const sourceInfo: ISourceInfo = {
-    name: fallbackSourceName,
-    site: resolveSiteCode(fallbackSourceName),
-    torrentId: sourceTorrentId.value || seedInfoResult.data.torrent_id,
+    name: savedSite,
+    site: resolveSiteCode(savedSite),
+    torrentId: savedTorrent,
   }
   crossSeedStore.setSourceInfo(sourceInfo)
 
@@ -1368,8 +1372,10 @@ const openMaintenance = async (opts: {
     return
   }
 
+  const requestVersion = ++maintenanceRequestVersion
   maintenanceDialogVisible.value = true
   maintenanceLoading.value = true
+  refetching.value = false
   maintenanceTargetTorrentId.value = torrentId
   maintenanceTargetSiteName.value = siteName
   maintenanceRowId.value = String(opts.rowId || '').trim()
@@ -1386,6 +1392,7 @@ const openMaintenance = async (opts: {
     const response = await axios.get(
       `/api/migrate/get_db_seed_info?torrent_id=${encodeURIComponent(torrentId)}&site_name=${encodeURIComponent(siteName)}`,
     )
+    if (requestVersion !== maintenanceRequestVersion) return
     const result = response.data as SeedInfoResponse
     if (!result.success) {
       throw new Error(result.error || '获取种子参数失败')
@@ -1393,6 +1400,7 @@ const openMaintenance = async (opts: {
 
     applySeedInfo(result, maintenanceRowId.value || `${siteName}_${torrentId}`)
   } catch (err: unknown) {
+    if (requestVersion !== maintenanceRequestVersion) return
     const message = axios.isAxiosError(err)
       ? (err.response?.data as { message?: string; error?: string } | undefined)?.message ||
         (err.response?.data as { error?: string } | undefined)?.error ||
@@ -1405,7 +1413,7 @@ const openMaintenance = async (opts: {
     prefetchedDbSeedInfo.value = undefined
     crossSeedStore.reset()
   } finally {
-    maintenanceLoading.value = false
+    if (requestVersion === maintenanceRequestVersion) maintenanceLoading.value = false
   }
 }
 
@@ -1418,10 +1426,11 @@ const handleMaintain = (row: SeedParameter) => {
 }
 
 const refetchSeedInfo = async () => {
-  if (!canRefetch.value || !prefetchedDbSeedInfo.value) {
+  if (refetching.value || !canRefetch.value || !prefetchedDbSeedInfo.value) {
     return
   }
 
+  const requestVersion = maintenanceRequestVersion
   refetching.value = true
   try {
     const prefetchedSeedData = prefetchedDbSeedInfo.value.data
@@ -1433,10 +1442,12 @@ const refetchSeedInfo = async () => {
       downloaderId: String(prefetchedSeedData.downloader_id || ''),
       target_torrent_id: maintenanceTargetTorrentId.value,
       target_site_name: maintenanceTargetSiteName.value,
+      target_hash: prefetchedSeedData.hash,
       screenshotReviewMode: 'interactive',
       task_id: crossSeedStore.taskId || undefined,
     }
     const response = await axios.post('/api/migrate/refetch_maintenance_seed', payload)
+    if (requestVersion !== maintenanceRequestVersion) return
     const result = response.data as SeedInfoResponse
     if (!result.success) {
       throw new Error(result.message || result.error || '重新拉取失败')
@@ -1445,6 +1456,7 @@ const refetchSeedInfo = async () => {
     applySeedInfo(result)
     ElMessage.success('重新拉取完成')
   } catch (err: unknown) {
+    if (requestVersion !== maintenanceRequestVersion) return
     const message = axios.isAxiosError(err)
       ? (err.response?.data as { message?: string; error?: string } | undefined)?.message ||
         (err.response?.data as { error?: string } | undefined)?.error ||
@@ -1454,11 +1466,12 @@ const refetchSeedInfo = async () => {
         : '网络错误'
     ElMessage.error(message)
   } finally {
-    refetching.value = false
+    if (requestVersion === maintenanceRequestVersion) refetching.value = false
   }
 }
 
 const closeMaintenanceDialog = () => {
+  maintenanceRequestVersion++
   maintenanceDialogVisible.value = false
   maintenanceLoading.value = false
   refetching.value = false
@@ -1692,6 +1705,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  maintenanceRequestVersion++
   if (searchDebounceTimer !== null) {
     window.clearTimeout(searchDebounceTimer)
   }

@@ -1,0 +1,21 @@
+# STARPT 镜像离线部署。先通过 docker load 导入发行附件。
+name: starpt
+
+services:
+  starpt:
+    image: ptmove-nexus:0.3.1-starpt.8
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "${PTMOVE_BIND:-0.0.0.0}:${PTMOVE_PORT:-18120}:5275"
+    env_file:
+      - path: .env.ptmove
+        required: false
+    volumes:
+      - "${PTMOVE_DATA_DIR:-./starpt-data}:/app/data"
+    mem_limit: 768m
+    cpus: 1.0
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"

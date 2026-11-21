@@ -135,9 +135,17 @@ func (s *MigrateService) ListPublishLogs(query repository.PublishLogQuery) (map[
 		pageSize = 20
 	}
 
+	type publishedLogView struct {
+		repository.PublishLogEntry
+		PublishedEditAvailable bool `json:"published_edit_available,omitempty"`
+	}
+	data := make([]publishedLogView, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, publishedLogView{PublishLogEntry: row, PublishedEditAvailable: s.publishedEditRepo != nil && publishedEditCandidate(&row) != ""})
+	}
 	return map[string]any{
 		"success":    true,
-		"data":       rows,
+		"data":       data,
 		"total":      total,
 		"page":       query.Page,
 		"page_size":  pageSize,

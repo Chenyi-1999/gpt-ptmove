@@ -54,7 +54,7 @@ func FinalizeFetchedSeed(input FinalizeFetchedSeedInput) (FinalizeFetchedSeedRes
 	}
 
 	formatIsMediainfo, formatIsBDInfo, formatReason := processingmedia.ValidateMediaInfoFormat(draft.Mediainfo)
-	mediainfoValid := formatIsMediainfo || formatIsBDInfo
+	mediainfoValid := formatIsMediainfo || formatIsBDInfo || processingmedia.HasUsableMediaReport(draft.Mediainfo)
 
 	mediumBefore, mediumAfter, titleBefore, titleAfter := "", "", "", ""
 	if mediainfoValid {

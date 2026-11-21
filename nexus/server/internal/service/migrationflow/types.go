@@ -27,9 +27,11 @@ type MigrateService struct {
 	publishState    *publishworkflow.BatchState
 	bdinfoState     *processingbdflow.BDInfoState
 
-	queueRepo      *repository.PublishQueueRepository
-	publishLogRepo *repository.PublishLogRepository
-	statsRepo      *repository.StatsRepository
+	queueRepo         *repository.PublishQueueRepository
+	publishLogRepo    *repository.PublishLogRepository
+	publishedEditRepo *repository.PublishedEditRepository
+	publishedEditKey  [32]byte
+	statsRepo         *repository.StatsRepository
 
 	queueStartOnce sync.Once
 	queueStopCh    chan struct{}

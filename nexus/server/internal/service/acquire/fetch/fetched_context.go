@@ -22,6 +22,7 @@ type EnrichFetchedContextInput struct {
 	DownloaderID  string
 	DetailURL     string
 	DetailTimeout time.Duration
+	DetailOrigin  string
 }
 
 // EnrichFetchedContextResult 定义抓取后上下文补全输出。
@@ -89,10 +90,11 @@ func EnrichFetchedContext(repo CurrentTorrentLookupRepo, input EnrichFetchedCont
 		if timeout <= 0 {
 			timeout = 45 * time.Second
 		}
-		page, pageErr := FetchPageWithCookie(
+		page, pageErr := fetchPageWithCookieAtOrigin(
 			detailURL,
 			strings.TrimSpace(toStringAny(input.SourceInfo["cookie"], "")),
 			timeout,
+			input.DetailOrigin,
 		)
 		if pageErr != nil {
 			detailFetchError = pageErr

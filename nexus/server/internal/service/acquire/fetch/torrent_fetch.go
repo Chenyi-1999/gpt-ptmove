@@ -89,6 +89,19 @@ func PrepareSourceSite(reader SiteInfoReader, siteName string) (map[string]any, 
 // 失败场景：详情页不可访问、下载链接无效、下载内容不是 torrent、写文件失败。
 // 副作用：会发起网络请求并在 data/tmp/torrents 写入临时文件。
 func DownloadTorrentForSource(sourceInfo map[string]any, torrentID string) (string, string, []byte, error) {
+	return downloadTorrentForSource(sourceInfo, torrentID, "")
+}
+
+// DownloadTorrentFromConfiguredOrigin 下载维护所需的种子，限制详情页、候选链接和跳转为配置的站点来源。
+func DownloadTorrentFromConfiguredOrigin(sourceInfo map[string]any, torrentID string) (string, string, []byte, error) {
+	origin := normalizeSiteBaseURL(toStringAny(sourceInfo["base_url"], ""))
+	if origin == "" {
+		return "", "", nil, errors.New("缺少可核验的站点地址")
+	}
+	return downloadTorrentForSource(sourceInfo, torrentID, origin)
+}
+
+func downloadTorrentForSource(sourceInfo map[string]any, torrentID, origin string) (string, string, []byte, error) {
 	trimmedID := strings.TrimSpace(torrentID)
 	if trimmedID == "" {
 		logx.Warnf(sourceDownloadLogModule, "参数校验失败 torrent_id 为空")
@@ -119,7 +132,7 @@ func DownloadTorrentForSource(sourceInfo map[string]any, torrentID string) (stri
 		downloadCandidates = append(downloadCandidates, direct)
 	}
 
-	html, htmlErr := fetchPageWithCookie(detailURL, cookie, 45*time.Second)
+	html, htmlErr := fetchPageWithCookieAtOrigin(detailURL, cookie, 45*time.Second, origin)
 	if htmlErr != nil && errors.Is(htmlErr, ErrSourceCookieExpired) && strings.TrimSpace(passkey) == "" {
 		logx.Warnf(sourceDownloadLogModule, "详情页鉴权失败 source_site=%s torrent_id=%s detail_url=%s err=%v", siteName, trimmedID, detailURL, htmlErr)
 		return "", detailURL, nil, htmlErr
@@ -147,10 +160,14 @@ func DownloadTorrentForSource(sourceInfo map[string]any, torrentID string) (stri
 	var lastErr error
 	var cookieExpiredErr error
 	for _, candidate := range downloadCandidates {
-		logx.Infof(sourceDownloadLogModule, "尝试下载候选 source_site=%s torrent_id=%s candidate=%s", siteName, trimmedID, candidate)
-		body, err := fetchBinaryWithCookie(candidate, detailURL, cookie, 90*time.Second)
+		candidateForLog := candidate
+		if origin != "" {
+			candidateForLog = "站点下载地址"
+		}
+		logx.Infof(sourceDownloadLogModule, "尝试下载候选 source_site=%s torrent_id=%s candidate=%s", siteName, trimmedID, candidateForLog)
+		body, err := fetchBinaryWithCookieAtOrigin(candidate, detailURL, cookie, 90*time.Second, origin)
 		if err != nil {
-			logx.Warnf(sourceDownloadLogModule, "候选下载失败 source_site=%s torrent_id=%s candidate=%s err=%v", siteName, trimmedID, candidate, err)
+			logx.Warnf(sourceDownloadLogModule, "候选下载失败 source_site=%s torrent_id=%s candidate=%s err=%v", siteName, trimmedID, candidateForLog, err)
 			if errors.Is(err, ErrSourceCookieExpired) {
 				cookieExpiredErr = err
 				if strings.TrimSpace(passkey) == "" {
@@ -162,12 +179,12 @@ func DownloadTorrentForSource(sourceInfo map[string]any, torrentID string) (stri
 			continue
 		}
 		if !isLikelyTorrent(body) {
-			logx.Warnf(sourceDownloadLogModule, "候选内容无效 source_site=%s torrent_id=%s candidate=%s bytes=%d", siteName, trimmedID, candidate, len(body))
-			lastErr = fmt.Errorf("下载内容不是 torrent 文件: %s", candidate)
+			logx.Warnf(sourceDownloadLogModule, "候选内容无效 source_site=%s torrent_id=%s candidate=%s bytes=%d", siteName, trimmedID, candidateForLog, len(body))
+			lastErr = fmt.Errorf("下载内容不是 torrent 文件: %s", candidateForLog)
 			continue
 		}
 		torrentBytes = body
-		logx.Infof(sourceDownloadLogModule, "候选下载成功 source_site=%s torrent_id=%s candidate=%s bytes=%d", siteName, trimmedID, candidate, len(body))
+		logx.Infof(sourceDownloadLogModule, "候选下载成功 source_site=%s torrent_id=%s candidate=%s bytes=%d", siteName, trimmedID, candidateForLog, len(body))
 		break
 	}
 	if len(torrentBytes) == 0 {
@@ -653,17 +670,24 @@ func deduplicateURLs(urls []string) []string {
 }
 
 func fetchPageWithCookie(targetURL, cookie string, timeout time.Duration) (string, error) {
-	body, err := fetchBinaryWithCookie(targetURL, "", cookie, timeout)
+	return fetchPageWithCookieAtOrigin(targetURL, cookie, timeout, "")
+}
+
+func fetchPageWithCookieAtOrigin(targetURL, cookie string, timeout time.Duration, origin string) (string, error) {
+	body, err := fetchBinaryWithCookieAtOrigin(targetURL, "", cookie, timeout, origin)
 	if err != nil {
 		return "", err
 	}
 	return string(body), nil
 }
 
-func fetchBinaryWithCookie(targetURL, referer, cookie string, timeout time.Duration) ([]byte, error) {
+func fetchBinaryWithCookieAtOrigin(targetURL, referer, cookie string, timeout time.Duration, origin string) ([]byte, error) {
 	request, err := http.NewRequest(http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, err
+	}
+	if origin != "" && !matchesConfiguredOrigin(request.URL, origin) {
+		return nil, errors.New("种子地址不属于配置的站点")
 	}
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36")
 	if strings.TrimSpace(cookie) != "" {
@@ -677,6 +701,9 @@ func fetchBinaryWithCookie(targetURL, referer, cookie string, timeout time.Durat
 		Timeout: timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			redirectCount = len(via)
+			if origin != "" && !matchesConfiguredOrigin(req.URL, origin) {
+				return errors.New("种子请求跳转至其他来源")
+			}
 			if len(via) >= 10 {
 				return errors.New("stopped after 10 redirects")
 			}
@@ -685,12 +712,24 @@ func fetchBinaryWithCookie(targetURL, referer, cookie string, timeout time.Durat
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		var requestError *neturl.Error
+		if origin != "" && errors.As(err, &requestError) {
+			return nil, requestError.Err
+		}
 		return nil, err
 	}
 	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
+	var reader io.Reader = response.Body
+	const maximumScopedBody = 8 << 20
+	if origin != "" {
+		reader = io.LimitReader(reader, maximumScopedBody+1)
+	}
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
+	}
+	if origin != "" && len(body) > maximumScopedBody {
+		return nil, errors.New("站点响应超过允许大小")
 	}
 	finalURL := ""
 	if response.Request != nil && response.Request.URL != nil {
@@ -713,6 +752,25 @@ func fetchBinaryWithCookie(targetURL, referer, cookie string, timeout time.Durat
 		return nil, fmt.Errorf("HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return body, nil
+}
+
+func matchesConfiguredOrigin(candidate *neturl.URL, origin string) bool {
+	configured, err := neturl.Parse(origin)
+	if err != nil || candidate.User != nil || configured.User != nil || candidate.Scheme != configured.Scheme ||
+		(candidate.Scheme != "http" && candidate.Scheme != "https") ||
+		candidate.Hostname() == "" || !strings.EqualFold(candidate.Hostname(), configured.Hostname()) {
+		return false
+	}
+	port := func(u *neturl.URL) string {
+		if explicit := u.Port(); explicit != "" {
+			return explicit
+		}
+		if u.Scheme == "https" {
+			return "443"
+		}
+		return "80"
+	}
+	return port(candidate) == port(configured)
 }
 
 func redactURLQuery(raw string) string {

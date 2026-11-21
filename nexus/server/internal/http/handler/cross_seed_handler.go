@@ -34,15 +34,18 @@ func (h *CrossSeedHandler) Data(c *gin.Context) {
 	}
 
 	params := service.CrossSeedQueryParams{
-		Page:               intQuery(c, "page", 1),
-		PageSize:           intQuery(c, "page_size", 20),
-		Search:             c.Query("search"),
-		PathFilters:        stringSliceQuery(c, "path_filters"),
-		IsDeleted:          c.Query("is_deleted"),
-		ExcludeTargetSites: c.Query("exclude_target_sites"),
-		ReviewStatus:       c.Query("review_status"),
-		IncludeUniquePaths: includeUniquePaths,
-		VideoOnly:          boolQuery(c, "video_only"),
+		Page:                  intQuery(c, "page", 1),
+		PageSize:              intQuery(c, "page_size", 20),
+		Search:                c.Query("search"),
+		PathFilters:           stringSliceQuery(c, "path_filters"),
+		IsDeleted:             c.Query("is_deleted"),
+		ExcludeTargetSites:    c.Query("exclude_target_sites"),
+		ReviewStatus:          c.Query("review_status"),
+		IncludeUniquePaths:    includeUniquePaths,
+		VideoOnly:             boolQuery(c, "video_only"),
+		HideRestrictedTags:    boolQuery(c, "hide_restricted_tags"),
+		HideEpisodeTags:       boolQuery(c, "hide_episode_tags"),
+		IncludeTaggedReviewed: boolQuery(c, "include_tagged_reviewed"),
 	}
 	result, err := h.service.QueryData(params)
 	if err != nil {

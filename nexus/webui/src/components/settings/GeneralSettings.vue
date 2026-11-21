@@ -131,6 +131,11 @@
               />
             </el-form-item>
 
+            <el-form-item label="种子列表显示" class="form-item">
+              <el-checkbox v-model="showRestrictedTags">显示禁转或限转条目</el-checkbox>
+              <el-checkbox v-model="showEpisodeTags">显示分集条目</el-checkbox>
+            </el-form-item>
+
             <el-form-item v-if="isDesktopRuntime" label="数据库配置文件" class="form-item">
               <div style="display: flex; flex-direction: column; gap: 8px">
                 <el-button type="primary" plain @click="openDatabaseConfigFile">
@@ -1000,6 +1005,8 @@ import { ElMessage } from '@/utils/uiNotify'
 import { useContentFiltersStore } from '@/stores/contentFilters'
 const router = useRouter()
 const contentFiltersStore = useContentFiltersStore()
+const showRestrictedTags = ref(false)
+const showEpisodeTags = ref(false)
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (axios.isAxiosError(error)) {
@@ -1394,7 +1401,9 @@ const fetchSettings = async () => {
     if (config.ui_settings && config.ui_settings.background_url) {
       backgroundForm.background_url = config.ui_settings.background_url
     }
-    contentFiltersStore.setVideoOnly(config.ui_settings?.content_filters?.video_only === true)
+    contentFiltersStore.applySavedSettings(config.ui_settings?.content_filters)
+    showRestrictedTags.value = contentFiltersStore.showRestrictedTags
+    showEpisodeTags.value = contentFiltersStore.showEpisodeTags
 
     // 获取网络代理设置
     if (config.network_proxy) {
@@ -1641,11 +1650,14 @@ const saveBackgroundSettings = async () => {
         background_url: backgroundForm.background_url,
         content_filters: {
           video_only: contentFiltersStore.videoOnly,
+          show_restricted_tags: showRestrictedTags.value,
+          show_episode_tags: showEpisodeTags.value,
         },
       },
     }
     await axios.post('/api/settings', uiSettings)
-    ElMessage.success('背景设置已保存！')
+    contentFiltersStore.applySavedSettings(uiSettings.ui_settings.content_filters)
+    ElMessage.success('界面设置已保存')
 
     // 立即更新App.vue的背景
     window.dispatchEvent(

@@ -18,12 +18,13 @@ type FetchAcquireRepo interface {
 
 // FetchAcquireInput 定义抓取获取流程输入参数。
 type FetchAcquireInput struct {
-	SourceSite   string
-	SearchTerm   string
-	TorrentName  string
-	SavePath     string
-	DownloaderID string
-	TaskID       string
+	SourceSite           string
+	SearchTerm           string
+	TorrentName          string
+	SavePath             string
+	DownloaderID         string
+	TaskID               string
+	RestrictSourceOrigin bool
 }
 
 // FetchAcquireDeps 定义抓取获取流程依赖。
@@ -43,6 +44,7 @@ type FetchAcquireResult struct {
 
 	TorrentPath string
 	DetailURL   string
+	TorrentData []byte
 
 	SiteIdentifier     string
 	Nickname           string
@@ -77,7 +79,13 @@ func AcquireSeedForFetch(input FetchAcquireInput, deps FetchAcquireDeps) (FetchA
 	}
 
 	emit("下载种子", "正在下载源站种子文件...", "processing")
-	torrentPath, detailURL, torrentBytes, err := DownloadTorrentForSource(sourceInfo, searchTerm)
+	download := DownloadTorrentForSource
+	var detailOrigin string
+	if input.RestrictSourceOrigin {
+		download = DownloadTorrentFromConfiguredOrigin
+		detailOrigin = NormalizeSiteBaseURL(toStringAny(sourceInfo["base_url"], ""))
+	}
+	torrentPath, detailURL, torrentBytes, err := download(sourceInfo, searchTerm)
 	if err != nil {
 		statusCode := 500
 		displayMessage := err.Error()
@@ -117,6 +125,7 @@ func AcquireSeedForFetch(input FetchAcquireInput, deps FetchAcquireDeps) (FetchA
 		DownloaderID:  strings.TrimSpace(input.DownloaderID),
 		DetailURL:     detailURL,
 		DetailTimeout: 45 * time.Second,
+		DetailOrigin:  detailOrigin,
 	})
 	html := enriched.DetailHTML
 	if detailURL != "" {
@@ -136,6 +145,7 @@ func AcquireSeedForFetch(input FetchAcquireInput, deps FetchAcquireDeps) (FetchA
 
 		TorrentPath: torrentPath,
 		DetailURL:   detailURL,
+		TorrentData: torrentBytes,
 
 		SiteIdentifier:     enriched.SiteIdentifier,
 		Nickname:           enriched.Nickname,

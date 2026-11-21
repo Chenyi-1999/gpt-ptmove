@@ -8,6 +8,7 @@ import (
 	"github.com/pt-nexus/server/internal/platform/logx"
 	parser "github.com/pt-nexus/server/internal/service/acquire/extract"
 	processingack "github.com/pt-nexus/server/internal/service/processing/acknowledgment"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingrepair "github.com/pt-nexus/server/internal/service/processing/repair"
 )
 
@@ -65,6 +66,14 @@ func RunFetchPersistPipeline(input FetchPersistPipelineInput, deps FetchPersistP
 	}
 	if deps.Repo == nil {
 		return FetchPersistPipelineResult{}, errors.New("repo is nil")
+	}
+
+	// 源站省略媒体报告时沿用相同种子载荷的完整报告，避免二次读取视频。
+	if !processingmedia.HasUsableMediaReport(input.ReviewData.Mediainfo) {
+		cached, err := deps.Repo.GetSeedParameterByKey(input.Hash, input.TorrentID, input.SiteIdentifier)
+		if report := toStringAny(cached["mediainfo"], ""); err == nil && processingmedia.HasUsableMediaReport(report) {
+			input.ReviewData.Mediainfo = report
+		}
 	}
 
 	repairFinalizeResult, finalizeErr := RunFetchRepairAndFinalize(

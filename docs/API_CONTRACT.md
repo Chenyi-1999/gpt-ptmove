@@ -56,3 +56,18 @@ Native Go/Vue 0.3.1 API management is documented in [API_MANAGEMENT.md](API_MANA
 Backend agent owns `ptmove/api.py`, `ptmove/db.py`, `ptmove/models.py`, `ptmove/policy.py`, `ptmove/security.py`, `ptmove/scheduler.py`, `tests/test_controller.py`, `tests/test_policy.py`. Export FastAPI `app` from api.py, Store from db.py. Policy exports `evaluate_candidates(items, rule)` -> list enriched/ranked dicts.
 
 Frontend agent owns `ptmove/static/*` only. Root owns worker/adapters, packaging, docs, integration tests and CHANGELOG.md; root appends consolidated child records to avoid races.
+
+## STARPT 任务记录中的 NovaHD 资料编辑
+
+以下接口适用于原生 Go 服务的管理员 JWT。记录必须指向已成功发布的 NovaHD 详情，服务端在读取、生成草稿、预览、保存时均重新核对绑定账号归属及编辑权限。
+
+| 方法和路径 | 输入 | 成功结果 |
+| --- | --- | --- |
+| GET `/api/publish_logs/:id/published_edit` | 发布日志 ID | `revision`、`screenshot_bbcode`、`mediainfo`、`details_url`、可核对时的 `cover_url` |
+| POST `/api/publish_logs/:id/published_edit/media` | `screenshots`、`mediainfo` 布尔选择 | 飞牛返回 `screenshot_bbcode` 或 `mediainfo`。部分失败附 `field_errors` |
+| POST `/api/publish_logs/:id/published_edit/preview` | `revision` 及变更字段 `screenshot_bbcode`、`mediainfo` | 简介、截图和 MediaInfo 的前后差异及 15 分钟有效的 `confirmation` |
+| POST `/api/publish_logs/:id/published_edit/save` | 预览时的同一内容及 `confirmation` | 已回读核验时返回 `status: verified` |
+
+截图只追加 Pixhost 图片并按图片去重。MediaInfo 文本经预览后可补充或更改。生成草稿会上传所选截图至 Pixhost，预览只读取站上资料。实际编辑前保存原文与预期改动，同一目标版本只提交一次。回读不一致或超时时返回 `status: unknown`，打开编辑重新读取站上资料即可核对。不会调用发布队列或改变 qB 做种状态。
+
+更换封面时，预览仅传 `revision` 和 `cover_url`。服务端接受 Pixhost HTTPS 展示页、图片直链和对应缩略图地址，解析并核验可加载的原图。预览返回 `cover_url_before`、`cover_url_after` 和 `confirmation`。保存须传同一份 `revision`、`cover_url`，以及将 `cover_url_after` 原样传入的 `resolved_cover_url` 和 `confirmation`。封面操作需要单独提交，截图和 MediaInfo 字段禁止混传。保存后回读封面和站点表单，只有匹配预览时才返回已验证。

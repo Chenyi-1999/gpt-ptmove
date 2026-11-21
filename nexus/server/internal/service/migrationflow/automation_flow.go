@@ -14,6 +14,7 @@ import (
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
 	"github.com/pt-nexus/server/internal/service/downloaderclient"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
@@ -183,9 +184,16 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 			s.failTask(task, "原生资料读取失败，未重新抓取", false)
 			return
 		}
-		if storedErr == nil && strings.ToLower(strings.TrimSpace(processingshared.ToString(stored["screenshot_review_status"], ""))) != processingshared.ScreenshotReviewStatusNone {
+		reuseDraft := storedErr == nil && strings.ToLower(strings.TrimSpace(processingshared.ToString(stored["screenshot_review_status"], ""))) != processingshared.ScreenshotReviewStatusNone
+		if reuseDraft {
 			if _, err := s.migrate.automationSeedForPublish(task, snapshot); err != nil {
 				s.failTask(task, err.Error(), false)
+				return
+			}
+			// 缓存草稿绕过抓取的媒体修复；已确认截图的草稿可在这里补齐。
+			mediaErr := s.migrate.prepareSeedMediaInfo(task.ID, task.InfoHash, task.SourceID, processingshared.ToString(stored["site_name"], ""), task.DownloaderID)
+			if mediaErr != nil && !errors.Is(mediaErr, errPrepareMediaUnavailable) {
+				s.failTask(task, "MediaInfo 自动补全失败："+mediaErr.Error(), false)
 				return
 			}
 		} else {
@@ -202,6 +210,13 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		if err != nil || !strings.EqualFold(lookup.Hash, task.InfoHash) {
 			s.failTask(task, "原生资料对应载荷不一致", false)
 			return
+		}
+		if s.cfg != nil && !processingmedia.HasUsableMediaReport(processingshared.ToString(lookup.Normalized["mediainfo"], "")) {
+			downloader, proxy, _ := downloaderclient.DecideProxy(s.cfg.Get(), task.DownloaderID)
+			if proxy.Enabled && downloader.Type == "qbittorrent" {
+				s.failTask(task, "MediaInfo 尚未补全，请核对飞牛媒体代理或在种子资料中补全后重试", false)
+				return
+			}
 		}
 		if _, err = s.migrate.automationSeedForPublish(task, snapshot); err != nil {
 			s.failTask(task, err.Error(), false)

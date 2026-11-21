@@ -1104,6 +1104,7 @@ func extractHostFallback(hostValue string) string {
 type AutomationTorrentStatus struct {
 	Found                       bool
 	Hash, State, SavePath, Name string
+	ContentPath                 string
 	Progress                    float64
 	AmountLeft, Downloaded      int64
 }
@@ -1175,7 +1176,12 @@ func automationStatus(c *qbClient, hash string) (AutomationTorrentStatus, error)
 	for _, row := range rows {
 		if strings.EqualFold(toString(row["hash"], ""), hash) {
 			progress, _ := row["progress"].(float64)
-			return AutomationTorrentStatus{Found: true, Hash: hash, State: toString(row["state"], ""), SavePath: toString(row["save_path"], ""), Name: toString(row["name"], ""), Progress: progress, AmountLeft: automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"])}, nil
+			return AutomationTorrentStatus{
+				Found: true, Hash: hash, State: toString(row["state"], ""),
+				SavePath: toString(row["save_path"], ""), Name: toString(row["name"], ""),
+				ContentPath: toString(row["content_path"], ""), Progress: progress,
+				AmountLeft: automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"]),
+			}, nil
 		}
 	}
 	return AutomationTorrentStatus{}, nil

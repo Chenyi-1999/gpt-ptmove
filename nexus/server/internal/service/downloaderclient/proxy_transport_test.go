@@ -1,6 +1,7 @@
 package downloaderclient
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,6 +22,8 @@ func TestProxyCallsUseDedicatedBearer(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/api/file/check":
+			fmt.Fprint(w, `{"success":true,"exists":false}`)
 		case "/api/media/screenshot":
 			fmt.Fprint(w, `{"success":true,"bbcode":"[img]https://img99.pixhost.to/images/1/a.png[/img]"}`)
 		case "/api/media/mediainfo":
@@ -68,7 +71,10 @@ func TestProxyCallsUseDedicatedBearer(t *testing.T) {
 	if _, err := d.FetchTorrents(); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 7 {
+	if exists, err := d.CheckMediaPathByProxy(context.Background(), "/media/a.mkv"); exists || err != nil {
+		t.Fatalf("file check exists=%v error=%v", exists, err)
+	}
+	if calls != 8 {
 		t.Fatalf("calls=%d", calls)
 	}
 }

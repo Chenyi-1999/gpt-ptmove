@@ -274,6 +274,28 @@
 - 验收。152 上通过 Pull 全量 Docker Go 测试、go vet 和主程序全量 Go 测试，临时空库镜像启动通过。公网 TLS 校验 IP SAN 成功，未认证领取返回 401。新路径真实读到 qB “重复”标签下 29 个完成任务。选取《皇冠高地》真实视频，停掉旧 SSH 转发后，生产管理接口返回 5 张预览，原生后台修复用模拟来源资料从 0 张补齐 5 张，在隔离 SQLite 入库并通过标准草稿查询读回。字幕确认状态为 confirmed_chinese，草稿状态 none，发布队列和日志都是 0。Pixhost 返回五张 1920×800 PNG，152 下载、FFmpeg 完整解码和不同 SHA256 校验成功。验收尺寸最初套用了上一部电影的 1920×1080，读取 PNG 头后修正并复用原链接，没有再次上传。SFTP 首次写入空文件错误已用明确读写模式恢复。
 - 交付。更新 `docs/REMOTE_SCREENSHOTS.md`、`docs/SCREENSHOT_REPLACEMENT_DESIGN.html`、`docs/DEPLOYMENT.json`。三个主程序守卫源文件和部署元数据已同步至 152，部署 JSON 哈希一致。未在本机启动生产服务。自动化、月度计划和自动发种均未启用，真实站点发种和物理 ARM 硬件不在本次实测范围。记录时改动待提交及推送到 Gitee；原 v0.3.1 的发行附件保留对应历史镜像。本次运行 URL 为 http://152.136.236.238:18120/ 。
 
+
+## PTM-20261119-034 — 2026-11-19T14:35:52+08:00 — Codex root，81 PTNexus 数据复制到 152
+
+- 范围。已按 81 服务器保护规则分别取得两轮明确确认。81 只读定位正式 `pt-nexus` 容器的 `/app/data`，使用 SQLite 内存备份生成一致性快照。81 上未写文件、停机或改配置。初次流式打包遇 Python 3.11 tarfile 参数差异，改为显式 gzip 流后通过。源库及配置、两份站点/扫描缓存只传到 152，位于 `/opt/gpt-ptmove-nexus/imports/ptnexus81-20261119-x1gya610`，目录和文件限制为 root 访问，SHA256 和源副本完整性通过。
+- 导入。用户明确无需备份 152 原有数据。在线事务先模拟并回滚，再实际合并 152 的 `data/pt_stats.db`。导入 69 条转种资料、135 条旧种子历史、467 条上传统计历史。旧飞牛下载器域名和现有 329 个可见种子哈希均匹配，转到当前飞牛下载器 ID，保留已有实时记录。旧种子历史按目标程序的隐藏规则导入，以免被当成当前在库资源。目标总计 464 条种子记录、796 条上传统计。95 个同网址站点补齐空白账户字段，1 个网址不一致的站点账户以及旧版独有的批量优化记录和 ID 迁移表保留于 152 上的源快照。未导入运行中任务，目标账号、飞牛 HTTPS 领单配置及应用镜像未改。日志中不包含站点凭据。
+- 验证。源库与目标 SQLite 的 integrity_check 均通过。69 条资料键全部匹配，抽查 3 条经正式 PTNexus 草稿接口读回。旧资料中 22 条需截图审核，发布队列、发布日志、自动化运行与任务均为 0。自动化、定时和自动发布仍关闭，未执行转种操作。未重启容器、未备份 152 原有数据、未修改应用代码。项目本地仅追加本记录，本轮未提交或推送 Git。
+
+
+## PTM-20261119-035 — 2026-11-19T18:35:39+08:00 — Codex root，发布核验与 152 登录账户更新
+
+- 权限。用户明确终止 81 上次复制任务的操作授权。本轮全部读取、账户更新及验证均未连接 81。NovaHD 和 Pixhost 验证仅经 152 对已经确认的 HTTPS 域名发送 GET，未重发或编辑站点记录。
+- 发布。152 的手动发布队列第 1 条在 18:28:57 完成，源为织梦、目标为 NovaHD。外层队列结果为 success，站点发布记录为 exists，对应详情 ID 28365。结构化结果显示目标已存在且未执行自动编辑。自动添加到飞牛 qB 请求失败，HTTP 403。核对详情页返回 HTTP 200，正文中的五张 Pixhost 地址全部与任务中准备的五张匹配。逐张 GET Range 返回 HTTP 206，PNG 头均为 3840×2160。
+- 账户。通过 152 PTNexus 的原生认证 API 更新用户名与密码，已用新凭据验证登录及受保护设置接口，bcrypt 哈希持久化，非认证配置经比较保持原样。只修改 152 的应用认证配置，密码未写入记录。应用未重启，未改应用代码。项目本地仅追加本条，本轮未提交或推送 Git。
+
+
+## PTM-20261119-036 — 2026-11-19T20:27:03+08:00 — Codex root，修复飞牛 HTTPS 领单的发种后添加 403
+
+- 原因。152 原 Hub 对 POST /api/v2/torrents/add 返回 HTTP 403 和白名单拒绝提示，飞牛 qB 尚未收到请求。发种自动添加在受支持站点取到种子字节后，由 PTNexus 原生客户端提交 multipart 文件。修复包括 `nexus/proxy/pull/protocol.go`、`qb_add.go`、`hub.go`、`agent.go`、对应回归测试和两端 Compose。放行固定路径的一个 .torrent 文件，总请求最多 4 MiB，其他 API 保持原限额和权限。URL 表单、磁力链接、种子导出、删除、重检及改 Tracker 不在该权限内，站点下载器只拿到直链而未成功读取文件时仍无法走本接口。继续使用 HTTPS 领单、原租约及结果回传规则。
+- 兼容。首轮临时无 Tracker 种子成功添加，但飞牛 qB v5.3.0 未按旧 paused 参数停止，已精确清理该测试项。最终 Agent 校验请求后自动补发等值 stopped 字段，保留原文件内容和 paused 以兼容旧版本。测试覆盖最大请求边界、非原生表单拒绝、回执重传与本机 qB 操作只执行一次。
+- 验证。152 上隔离 Docker 执行 gofmt、Go 全量 Pull 测试和 go vet 通过。最终实际使用 PTNexus 的 AddTorrentDataWithOptions 对 98,464 字节、无 Tracker 的临时种子经 152 和飞牛 HTTPS 领单完成添加。按准确 info hash 读回正确目录与 stoppedDL 状态。飞牛本机仅清理该临时测试条目，未删文件，PTNexus 两张种子缓存表均无测试残留。上线后 qB 查询 200、截图接口探针 405 符合原协议，URL 添加和删除 403。发布队列和发布日志最后一次更新均在本轮之前，未重新发种。亲验状态时初始断言误以为只有第 1 条历史发布记录，已根据实际 7 条历史记录的时间重新核验。
+- 部署。152 的 Hub 与飞牛 Agent 均升级 `ptmove-pull:0.3.1-pull.3`。Hub 镜像 ID `sha256:d5387e28bc00fc660f9679dd5a08f1f069e758dc332696e490e35e13b6d438c6`，飞牛 amd64 config ID `sha256:fb86f7ac3f52af9cf7a9f52404d76da2dec6777640a478b684efcaefa332cc27`。152 PTNexus 原容器健康，服务地址 http://152.136.236.238:18120/ 。旧转发仍停用。飞牛安装仅使用其独立管理入口，运行链路经 152 HTTPS 28443，未操作 81 主机或中转配置。更新 `docs/DEPLOYMENT.json`、`docs/REMOTE_SCREENSHOTS.md`，部署 JSON 已同步至 152 并比对 SHA256。工作区保留前两条未提交记录，本轮未提交或推送 Git。
+
 ## PTM-20261119-037 — 2026-11-19T20:59:00+08:00 — Codex root，STARPT 界面、任务状态、源站禁转保护和插件
 
 - 源站限制。修改 `nexus/server/internal/service/{acquire,migrationflow,publish}` 及 HTTP 路由。统一直接发布、批次和队列的可信源站判定。在上传前读取同源详情，拒绝禁转或权限未知的资源，并绑定源站种子标识和实际发布字节。客户端不能通过改资料或提交允许字段覆盖。历史队列缺少可信种子标识时会停止。已存在记录的后续自动编辑和自动添加同样受入口限制。
@@ -282,11 +304,13 @@
 - 验证。152 上 Gofmt、无网络 Docker 全量 Go 测试和编译、Vue 全量类型检查和生产构建通过。状态与脱敏 Node 测试六项通过。隔离应用验证 JWT 边界、插件加载和移除、无效文件诊断、未知源预检、资料缺项、未完成筛选、站点结果与自动添加独立。Edge Playwright 桌面和手机验证登录、导航、插件、任务记录、种子维护，通过后清理隔离容器、测试数据和临时凭据。首次隔离网络不映射宿主端口，改用容器私网地址及 152 SSH 隧道复测通过。真实站点发布及 81 操作次数均为零。
 - 部署及 Git。152 的 `ptmove-nexus-ptmove-nexus-1` 已升级 `ptmove-nexus:0.3.1-starpt.1`，镜像 ID `sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829`。公网首页和健康接口返回 HTTP 200，生产数据沿用现有挂载。飞牛 HTTPS 领单组件未变动。生产 `/opt/gpt-ptmove-nexus/data/plugins` 已建，部署清单与本地 `docs/DEPLOYMENT.json` 校验一致。自动调度保持关闭。本轮未提交、推送或追加 Gitee 发行版。
 
+
 ## PTM-20261119-038 — 2026-11-19T21:14:38+08:00 — Codex root，准备 STARPT 双平台发行
 
 - 交付范围。提交已在 152 验证的 61 个 STARPT 源码文件和对应部署记录。此前的飞牛 403 修复、实际站点记录和其他本地历史继续保留在工作区。本次标签为 v0.3.1-starpt.1，与发布镜像的构建号一致。
 - 检查。逐文件比对 152 构建使用的 STARPT 工作树和发布源码。确认运行镜像 `ptmove-nexus:0.3.1-starpt.1` 为 linux/amd64，镜像 ID 为 `sha256:d902217b5e7cccfe6dd3762f38df7ca5f5f483ed7656f3a9e5ab665730536829`，152 容器健康。扫描待提交文件和已有 Git 历史的常见密钥、凭据和运行时文件，无阻塞项。
 - Git 及部署。准备提交、打标签并发布到 Gitee 与 GitHub 私有仓库，发行及附件状态在验证后追加。生产应用继续运行已验证的同一镜像。本轮无实际发种、无 81 操作。
+
 
 ## PTM-20261119-039 — 2026-11-19T21:33:36+08:00 — Codex root，核对 STARPT 发行和镜像附件
 
@@ -294,3 +318,110 @@
 - 镜像。导出 152 上健康运行的 linux/amd64 应用镜像。完整 Docker 归档 423,231,489 字节，SHA256 ae74d061ffa1b9567eb1a74e1d536597a271e35cee0574269d9791c51186954e。服务器与本地哈希一致，已检查归档元数据与镜像层，归档不包含容器数据卷。
 - 历史归档。已在 D 盘归档带标签源码及 Docker 镜像，校验 ZIP CRC 与两个载荷 SHA256，完整 ZIP SHA256 eda80ba69dea00dcfb0ee8393265855ae4de85233727def8b3c7ad0993545891。项目索引与总索引已追加。Go 测试、Vue 构建及浏览器验收沿用部署记录，本轮增跑六项状态辅助函数回归。
 - 部署。152 继续使用原已验证镜像，本次只导出和发布版本。实际发种次数为零，81 操作次数为零。预先存在的飞牛修复、站点测试记录和部署资料保留本地。
+
+
+## PTM-20261119-040 — 2026-11-19T22:42:12+08:00 — Codex root，发布 STARPT 到 GitHub 私有仓库
+
+- GitHub。已创建并核对私有仓库 https://github.com/Chenyi-1999/gpt-ptmove。master 指向 d1258a23e62ac843bff7b90258ab3c5dd777dac6，标签 v0.3.1-starpt.1 指向 2547a69dc599a0505a074cb8276726a87845370d，与 Gitee 标签一致。正式发行 https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v0.3.1-starpt.1 已核对。
+- 镜像。已上传 152 导出的完整 linux/amd64 Docker 归档及 SHA-256 校验文件。GitHub API 返回附件状态 uploaded、长度 423,231,489 字节、SHA-256 ae74d061ffa1b9567eb1a74e1d536597a271e35cee0574269d9791c51186954e，与本机及 152 归档一致。
+- 验证和范围。通过 Git Credential Manager 的授权确认账号。直接推送遇到 HTTP 408 和连接重置，经 152 临时 SSH 转发完成 GitHub HTTPS 推送和上传。凭据未写入项目或 152。无需改动生产容器，本轮实际发种和 81 操作均为零。既有本地未提交修改保留。
+- 记录。CHANGELOG.md 和 docs/DEPLOYMENT.json 已记录本次结果。此条为本地发行记录，发布标签未移动。
+
+
+## PTM-20261120-041 — 2026-11-20T00:21:55+08:00 — Codex root，修复种子维护「重新拉取数据」404
+
+- 原因。152 连续三次记录到 POST /api/migrate/refetch_maintenance_seed 返回 404。维护页面从旧版引用该路径，Go 路由一直缺少对应接口。
+- 修复文件。nexus/server/internal/bootstrap、http/handler/migrate、service 和 repository 和 nexus/webui/src/views/CrossSeedDataView.vue。先核验原记录身份，才同源拉取。跨站需核验来源限制和内容一致性，更新按原记录的键及旧值执行。缺项保留，失败或竞争保留旧资料。页面忽略已关闭弹窗的迟到结果，成功后重载原记录编辑器。
+- 验证。152 无外部网络的 Docker Go 全量测试、Vue 全量类型检查与生产构建通过。隔离容器的健康 200、无权限 401 和登录后的空请求 400 验证通过。源站同源鉴权、转载限制、内容比对、保存范围和 SQLite 并发回归通过。首轮 Go 构建移除多余 import 后通过，随后 152 SSH 短时断开，重连后完成镜像和隔离验证。
+- 部署与 Git。152 已替换工作台镜像 ptmove-nexus:0.3.1-starpt.2，ID sha256:cfc6c508c87995ca68b446dc87844fe237b9a9154b8477a25e83c1cd9e0ae857。上线前发布队列为空、自动化停用，上线后首页及健康接口确认。已发布版本的标签和附件沿用原记录。实际站点重抓未代为测试，实际发种和 81 操作均为零。本轮改动已保留在工作区，未提交或推送。
+
+## CODEX-FOLDER-MIGRATE-20261120-phase2-final-GPT-PTMOVE
+
+- 时间 2026-11-20T11:40:42+08:00（Asia/Shanghai），执行者 Codex /root。
+- 整目录迁移 C:\Users\50578\Desktop\GPT-PTMOVE → C:\A-GPTProject\GPT-PTMOVE。目录标识与迁移前一致，保留工作区内容。
+- 迁后核对目录、各 Git 仓库 HEAD、分支、索引、状态和配置。覆盖 5 个 Git 工作区，修复 3 个 worktree 路径。
+- 本机 Codex 入口检查见迁移管理记录。应用级验收未执行。未提交、推送或部署。
+
+## PTM-20261121-043 — 2026-11-21T12:48:33+08:00 — Codex root，种子列表标签显示及截图失败排查
+
+- 列表。修改 nexus/server/internal/http/handler/cross_seed_handler.go、service/crossseed/{helpers,query,query_test,types}.go 和 nexus/webui/src/{components/settings/GeneralSettings.vue,stores/contentFilters.ts,views/CrossSeedDataView.vue}。种子维护及一键多种列表默认隐藏禁转、限转和分集条目。通用设置可分别打开限制类及分集显示并持久保存。列表筛选在分页前执行，默认设置不改变旧 API 客户端。显示禁转条目后仍不可批量选择或发布。
+- 排查。152 日志显示 Harboring 2023 WEB-DL 2160p HEVC AAC-ZmWeb 的「重新获取」于 12:30:45 发起。当时另外一项任务在生成 12 张候选图，两次等待飞牛领取均超过 6 秒并返回 503，当前种子未产生图片。前一个任务 12:31:32 完成。按用户要求使用现有截图入口，先前的独立截图按钮改动未纳入本次镜像。未主动重试真实截图、上传 Pixhost 或修改飞牛，未验证重试能否生成图片。
+- 验证。152 上无外网 Docker 全量 Go 测试及 Vue 类型检查和生产构建通过。首次 Go 回归夹具使用了额外未识别标签，修正验证数据后通过；独立容器测试改用隔离的数据挂载，按设置接口的实际响应重新验证。隔离 API 验证了权限、两个独立开关、分页、只读显示及保存；Edge 浏览器对已构建页面验证默认隐藏、保存和刷新后读取。生产健康接口及种子维护页面均返回 HTTP 200。
+- 部署与 Git。152 的 STARPT 已更新至 ptmove-nexus:0.3.1-starpt.3，镜像 ID sha256:bee04f368095be95fd040693f574e15d97495426114f364182bbdb9e3d4b5bb9。现有数据继续挂载，旧镜像留作回滚。上线前确认发布及自动化队列为空、自动调度关闭。已更新 docs/DEPLOYMENT.json 及服务器部署记录。实际发种与 81 操作均为零。本轮未提交、推送、发布或导出附件。
+
+## PTM-20261121-044 — 2026-11-21T18:41:12+08:00 — Codex root，飞牛刷流机中文路径 MediaInfo 提取
+
+- 原因。152 日志显示 Harboring 的截图请求能命中远端视频并生成图片，MediaInfo 请求到达飞牛后返回 500。152 的本地路径回退报 /keep/TEST 不存在，掩盖了代理错误。在飞牛容器中复现：默认 POSIX 语言环境下，MediaInfo 对含中文的文件路径只返回一个换行。C.UTF-8 下同一文件可正常分析。ffprobe 的默认媒体摘要输出在 stderr，原回退只取 stdout。
+- 修改。nexus/proxy/Dockerfile.nas 为 NAS 镜像设置 LANG=C.UTF-8。nexus/proxy/runtime_helpers.go 读取 ffprobe 成功返回的 stdout 或 stderr。nexus/proxy/runtime_helpers_integration_test.go 覆盖中文文件路径和回退。保留挂载和访问限制。docs/DEPLOYMENT.json 及 152 的部署记录更新。
+- 验证。152 无外网 Docker 中代理全量 Go 测试与 go vet 通过。首轮镜像测试有一项因缺少 opt-in 跳过，补齐开关后重建并通过中文路径提取、ffprobe 回退和合成视频的截图预览。飞牛容器内 MediaInfo 接口实测返回 General、Video、Audio。调用 STARPT 原生 MediaInfo 刷新接口，经既有 HTTPS 领单取得 2715 字节，已写回该条织梦草稿，数据库状态为 completed，截图字段比对一致。实际视频为 HEVC、3840×1736，音频 AAC LC。
+- 部署。152 构建 linux/amd64 媒体镜像 ptmove-media-agent:0.3.1-mediainfo.1，飞牛用同一 SHA256 的二进制升级了媒体容器。飞牛镜像 ID sha256:2e7aa2a332884ac57a76b7e85bc40b1bf3965acc9cf27cdb1c3e7c1acf43e637，原镜像可用于回滚。152 STARPT 本体和领单容器继续运行，健康接口 HTTP 200。以独立飞牛目标 SSH 主机密钥核验管理连接，未登录或更改 81 本机。未发种或上传图床。本次未实测 ARM、未提交、推送或发布。
+
+## PTM-20261121-045 — 2026-11-21T18:55:09+08:00 — Codex root，转种准备自动补全 MediaInfo
+
+- 准备流程。nexus/server/internal/service/migrationflow/{prepare_mediainfo,db_seed_query,fetch_store,publish_queue,automation_flow}.go、processing/{media, persist} 及 downloaderclient/client.go 接入缺失检测。已存在可用的 MediaInfo、BDInfo 或 ffprobe 报告时不请求飞牛。缺失时按种子 infohash 查询已完成 qB 条目，使用实际内容路径经原有 HTTPS 领单。找不到独立内容路径时保留缺项，禁止扫描共用保存目录。源站缺报告且同载荷已有完整报告时沿用。受限和正在执行 BDInfo 的条目不启动媒体提取。
+- 保存与入口。repository/prepare_mediainfo_repository.go 以原种子键和旧媒体文本、旧状态为条件回填，保留并发编辑。bootstrap/app.go、http/handler/migrate/db_seed_publish.go、processing/persist/db_seed_query_entry.go、webui 的 cross-seed/panel/seedFlow.ts 加入授权的单种准备入口。已有的只读资料接口和维护页仍可正常查询。单种补全失败保留草稿并提示；批量和自动任务对代理提取失败分别记录跳过或未就绪。发布保护和调度开关按原设置执行。
+- 验证。152 隔离 Docker 的全量 Go 测试、Vue 类型检查和生产构建通过。测试覆盖完整、空白及占位报告、受限、下载未完成、失败和并发回填。首轮 Go 构建发现维护接口参数签名回归，恢复原签名后通过。隔离验收首轮修正 SQLite 保留字的引用；另一轮收到补全警告，未保留具体诊断，追加诊断后通过。仅将 Harboring 对应草稿和 qB 缓存条目写入临时数据库，网络节制为 152 的领单入口。缺失报告经飞牛返回 2715 字节且回填至草稿和响应。关闭测试容器到领单入口的访问后，已有报告原样复用。隔离发布队列、发布日志、自动任务均为 0。线上同一条草稿正常载入，前后数据库行及任务计数一致。
+- 部署及 Git。152 的 STARPT 更新为 ptmove-nexus:0.3.1-starpt.4，镜像 ID sha256:d625e147738c03ef351349b87f569b36fed886fb6ce6435d1e81fe0de53141bb，旧镜像留作回滚。健康接口及新资料准备接口均返回 HTTP 200，线上前端包含新接口。docs/DEPLOYMENT.json 与服务器部署记录已更新。飞牛继续使用现有 HTTPS 领单容器，本轮未重新截图、发种或操作 81。未提交、推送或发布。
+
+## PTM-20261121-046 — 2026-11-21T19:28:40+08:00 — Codex root，媒体客户端 Web 连接设置
+
+- 功能。nexus/proxy/pull 增加 admin.html、admin_server.go、admin_link.go 与对应测试，修改 agent.go、Dockerfile，新增 compose.agent-admin.yaml。页面支持 IP 或域名与端口、更新令牌、上传或粘贴 PEM 证书、选择系统 CA，保存前先无副作用验证 TLS 和令牌。设置经原子操作写入权限 0600 的独立文件，失败保留旧连接，领单通道在当前请求结束后读取新配置。旧租约结果交回原服务端。界面无令牌回显，只在本机可访问并要求独立密码。
+- 验证。152 上无外网 Docker 全量 Go 测试和 go vet 通过。覆盖双模拟 TLS 服务端切换、坏令牌和证书、重启读回、旧租约回传、独立认证及跨来源请求拒绝。Edge 桌面和手机验证地址和端口表单、IPv6、证书上传、失败保留、重新载入及状态提示。首轮构建期间另一代理保存了修改，源文件核对未收口，收敛后重建并比对交付源码。飞牛实际验证需认证登录、错误令牌拒绝、原连接测试正常以及配置已持久化。用两组模拟服务端验证了实际切换，未切走生产连接。
+- 部署及 Git。镜像 ptmove-pull:0.3.1-pull.4 在 152 构建后经 SHA256 校验部署至飞牛，飞牛运行镜像 sha256:1cc6479428ae6ae06191370fc33f8873678e4da0a35ea6adc047cddc715d5c78，管理页仅监听飞牛环回 19447。152 中转 Hub 与 STARPT 本体继续运行。升级后 qB 版本和媒体通道探针通过，发布及自动任务计数比对一致。docs/DEPLOYMENT.json、docs/REMOTE_SCREENSHOTS.md 和 152 部署清单已记录。只核验独立飞牛 SSH 目标，未登录 81 本机，未发种、截图或上传图床。本轮未提交、推送或发布。
+
+## PTM-20261121-047 — 2026-11-21T19:34:05+08:00 — Codex root，撤回客户端管理页临时转发
+
+- 用户先要求从本机访问飞牛客户端设置页。初次连接到经主机密钥核对的独立飞牛目标，现有 SSH 配置拒绝 TCP 转发。为当前运维用户和 SSH 端口添加仅允许本地转发至 127.0.0.1:19447 的规则，验证语法、范围后重载。此时用户取消转发，立即停止本机辅助进程，并撤回飞牛的临时规则。
+- 撤回验证。本机 127.0.0.1:19447 已无监听，临时脚本和日志已清理。飞牛临时配置已移除，sshd -t 通过，重载后 ssh.service active，原有 allowtcpforwarding no 恢复。未连接 81 本机，无 Docker、发种或媒体操作。本轮未提交、推送或发布。
+
+## PTM-20261121-048 — 2026-11-21T19:45:13+08:00 — Codex root，飞牛媒体客户端局域网直连
+
+- 实现。nexus/proxy/pull 的 admin_server.go、admin_server_test.go、admin.html 和 compose.agent-admin.yaml 支持显式绑定指定私有 IPv4 和来源子网，默认仍为本机回环。飞牛部署为 192.168.31.238:19447，来源限于 192.168.31.0/24。保留独立密码、真实连接源、Host、Origin 和跨站请求校验。更新 docs/REMOTE_SCREENSHOTS.md、docs/DEPLOYMENT.json 和 152 部署记录。
+- 验证。152 上无外网 Docker 全量 Go 测试及 go vet 通过。飞牛的实际监听只在该局域网 IP，登录 HTTP 200，未登录 HTTP 401，网段外和错误 Host HTTP 403，HTTPS 领单测试成功。当前 Windows 在 192.168.3.x，直接请求未收到 HTTP 响应，尚未从另一台同网段物理设备验证。原管理密码和连接文件按字节核对一致。
+- 部署。152 构建 ptmove-pull:0.3.1-pull.5，按归档校验和部署至飞牛，运行镜像 sha256:6192c84a4f9e625058cd06b752d437ff0129bdeea4885190d2bfe79193e208c7。首次上线时部署脚本按镜像索引和挂载顺序的严格比较回滚，调整为核对运行镜像和挂载内容后重新部署通过。152 的 qB 版本查询继续通过。无 SSH 转发、无 81 本机操作，未实际发种、提交、推送或发布。
+
+## PTM-20261121-049 — 2026-11-21T20:04:21+08:00 — Codex root，交付飞牛客户端统一 Compose
+
+- 新增 nexus/proxy/compose.client.yaml。一份配置管理领单和媒体两个服务，默认沿用飞牛的两个已加载镜像、媒体目录、凭据文件和配置状态目录。管理页绑定飞牛局域网地址，媒体接口只绑定本机，视频目录只读。镜像按本地标签使用。
+- 152 上使用假令牌执行 Docker Compose config，验证默认配置以及回环地址和媒体目录覆盖值。仅验证配置解析，没有创建或启动容器。已知切换现有飞牛时旧服务占用相同端口。本轮未访问飞牛或 81，未部署、提交、推送或发布。
+
+## PTM-20261121-050 — 2026-11-21T20:46:21+08:00 — Codex root，客户端空配置启动及页面登录
+
+- 统一部署。修改 nexus/proxy/compose.client.yaml、main.go、media_token.go 及测试、pull/Dockerfile、pull/go.mod。统一 Compose 使用两容器及仅供本地应用的命名卷，新装无需提前填写领单地址、密码文件、证书或令牌。内部媒体令牌自动生成并只读共享给媒体容器。保留当前飞牛的默认管理地址和 qB 目录，可按主机调整。
+- 页面和连接。修改 pull 的 agent.go、admin_link.go、admin_server.go、admin.html，新增 admin_auth.go、agent_media_token.go 及回归测试。页面登录以有过期时间的 Cookie 维持会话；新装必须先改默认密码才允许访问连接设置，改密后旧会话撤销。旧安装可继续沿用已有密码和连接状态。空配置不会轮询服务端；地址、领单令牌、证书和可选 qB Token 在 Web 中设置，通过 HTTPS 校验后保存，配置随容器重建保留。证书自动申请此次未实现。更新 docs/REMOTE_SCREENSHOTS.md。
+- 验证。152 隔离 Docker 的领单和媒体 Go 全量测试、go vet、镜像构建均通过。编译期间纠正 Cookie 字段拼写。Edge 桌面及手机复现空配置时测试按钮错误可点击，修复后页面登录、未改密禁用配置、保存和退出流程通过。152 使用全新隔离 Compose、两个临时卷及本机模拟 HTTPS 服务验证首次改密、连接失败保留空配置、Web 保存、媒体角色实际接收并回传文件检查、可选 qB 通道及重建持久化。测试卷和容器已清理。媒体试验镜像在此前验证过的 FFmpeg/MediaInfo 基础镜像上替换二进制。
+- 构建及部署。构建 ptmove-pull:0.3.1-pull.6 与 ptmove-media-agent:0.3.1-websetup.1，仅用于 152 隔离验证。现有飞牛与 152 生产容器未切换，未访问 81，未发布、提交或推送代码。
+
+## PTM-20261121-051 — 2026-11-21T21:59:32+08:00 — Codex root，NovaHD 已发布种子编辑
+
+- 功能。任务记录提供「编辑已发布」。nexus/webui/src/views/PublishLogsView.vue 与 PublishedTorrentEditDialog.vue 显示现状、飞牛生成草稿、Pixhost 缩略图及前后差异，确认后才能保存，跨记录请求互相隔离。nexus/server 的 handler、bootstrap、migrationflow、repository、publish/publishededit 和 downloaderclient 按目标站绑定账号核对发布者及表单，保留 NFO 和其余字段，通过现有 HTTPS 领单按 qB 哈希与路径读取已完成的文件，只追加去重截图或明确指定的 MediaInfo。预览含限时确认凭据，已确认的提交先写入原文及差异，同一目标版本仅提交一次，回读后才报告已验证。docs/API_CONTRACT.md、PROJECT_STRUCTURE.md、docs/DEPLOYMENT.json 同步记录。
+- 检查。152 无外网 Docker 的 Go 全量测试、Vue 类型检查、新增界面 ESLint 与 Vite 生产构建通过，Vite 仍提示历史共享包体积。隔离容器健康且未鉴权返回 401。线上包的桌面与手机浏览器走通模拟生成、预览、确认保存和旧媒体请求隔离。初次隔离 Web 构建遇到 pnpm 工作区检测，改用镜像已有依赖直接运行。增量构建首次 Go 命令的 BusyBox 不支持花括号展开，改用完整路径后通过。
+- 实站。152 以 NovaHD 自有记录 #226481 核验归属、成功读取原有 7 张图和 MediaInfo，真实只读预览 HTTP 200，回读资料原样。初次两项媒体请求收到缺文件错误。核实三条成功记录的 qB 路径在媒体容器中均不可见，已加前置文件检查，#226481 线上复查返回明确 HTTP 409。作为对照，已知可读的 Harboring 文件通过同一领单通道回传 2715 字节 MediaInfo 与 5 张截图预览。实站的新增截图与保存仍待可读的自有发布对应文件；无图床上传或站点写入，发布日志 7、发布队列 0、自动任务 0、外站编辑提交 0。
+- 部署与 Git。152 首先健康运行 0.3.1-starpt.5，路径诊断及 Pixhost 实际域名兼容后更新为 ptmove-nexus:0.3.1-starpt.6，ID sha256:920770e082035bb439a3ccfad85c0e900b014a6dc7e3e182d77c4caa9cc3ac0c，18120 健康，保留 .4 回滚镜像。未重新发种、修改 qB 做种、访问 81 或升级飞牛。原主工作区改动保留，本次代码在独立工作区，未提交、推送或发布。
+- 本地核对。恢复独立工作区 30 个由预检临时改动的跟踪构建产物，移除 32 个同路径临时产物。构建产物目录无 Git 变更，最终镜像和 152 验证结果保持已记录状态。
+
+## PTM-20261121-052 — 2026-11-21T22:15:41+08:00 — Codex root，NovaHD #226481 实站编辑验证与封面核对
+
+- 诊断。152 经现有 HTTPS 领单检查飞牛媒体容器，`/keep/TEST` 可读，qB 原记录仍指向该目录下已不存在的目标文件。按 qB 同名同大小记录在 `/keep/PTNexus` 找到用户确认移放的副本，实时核对文件名、4,831,475,403 字节及编码、时长、分辨率等媒体参数。
+- 操作。飞牛回传新 MediaInfo 和 5 张低清候选。选出 3 张，确认 Pixhost 均返回 HTTP 200 PNG。STARPT 预览确认保留原简介和截图、更新 MediaInfo，再提交一次。保存返回 HTTP 200 verified，NovaHD 回读及独立详情页 HTML 检查确认新增 3 张截图和报告符合预览。审计记录 verified 一条，原发布日志、队列和自动任务计数维持 7/0/0。
+- 封面。NovaHD 页首封面与简介首张图片使用同一 Pixhost 地址，直接 GET 在有无 NovaHD Referer 时均返回 302，目标为 `/image/removed.png`。对照截图返回真实 HTTP 200 PNG。只核对原因，站上封面链接保留。152 私有暂存文件已移除，本机 D 盘 5 张低清候选因清理命令受限保留在本次暂存目录。
+- 影响。仅 #226481 既有发布资料发生变更，使用 152 线上既有镜像和飞牛领单。未重新发布、修改 qB 记录、访问 81、构建或部署镜像、提交或推送代码。仓库文件只追加本条变更记录。
+
+## PTM-20261121-053 — 2026-11-21T22:31:33+08:00 — Codex root，NovaHD #226481 封面直链替换
+
+- 原因与范围。Pixhost 展示页引用的 img3 原图仍可加载，NovaHD 保存的 img2 旧直链会跳转到占位图。经用户授权，通过 152 复用现有站点编辑表单解析、所有权检查与审计机制，仅替换 #226481 简介首张封面的图片主机。
+- 验证。先确认预览仅有一处 img2 到 img3 替换，9 张截图和 MediaInfo 保留。复查站点版本后执行一次 takeedit，原站 HTTP 302 后回读确认整份表单的其余字段一致。NovaHD 详情页 HTTP 200，页首和简介内封面都引用 img3，旧直链不再出现。按 NovaHD 来源请求新直链返回 HTTP 200 和有效 JPEG。审计 #2 verified，发布日志、发布队列、自动任务计数仍为 7/0/0。
+- 影响。152 上项目专用临时核验程序与构建目录已清理。未重新发种、修改 qB 或飞牛、访问 81、提交或推送代码、重建或部署服务。仓库只追加本记录。
+
+## PTM-20261121-054 — 2026-11-21T22:49:46+08:00 — Codex root 与 cover_backend、cover_ui、cover_feature_review，封面编辑及任务记录布局
+
+- 服务端。publishededit 的封面定位仅接受 NovaHD 头图与简介首图一致的发布记录。Pixhost 解析接受 HTTPS 展示页、图片直链或缩略图，限制域名与公网连接，重新验证图像类型及签名，失效旧直链可通过展示页找出可打开的原图。migrationflow 封面预览的签名同时绑定原始输入和解析结果，禁止混传截图或 MediaInfo，保存前重验证原图和站点版本，单次提交后校验头图及其余表单字段。
+- 界面。PublishedTorrentEditDialog.vue 增加「更换封面」，展示原图差异并要求确认，切换记录时隔离迟到响应。非 Pixhost 旧封面可更换，当前图仅在站上详情页查看。PublishLogsView.vue 将日志、编辑和查看、删除排为两行，窄屏将状态和操作区分行。docs/API_CONTRACT.md 补充请求与响应；docs/DEPLOYMENT.json 与 152 元数据同步。
+- 验证。152 无外网 Docker 的 Go 全量测试、Vue 类型检查、定向 ESLint 和 Vite 构建通过，两轮隔离容器鉴权均返回 401。首次构建移除未使用的导入后通过。桌面、平板和手机的浏览器模拟预览、确认保存、迟到响应及按钮边界通过。部署 .7 后视觉检查发现手机确认文案截断，CSS 更正后用 .8 复测通过。
+- 实站与部署。152 正在健康运行 ptmove-nexus:0.3.1-starpt.8，ID sha256:42029995b55eb387295df9357688e208a506802735d83a0c4c9e84302f5a7768，保留 .7 回滚。真实 #226481 展示页、失效 img2 直链均识别为当前 img3 原图，替换预览 HTTP 200 只读通过，站点原快照未变，发布日志/队列/自动任务/编辑尝试维持 7/0/0/2。保存以模拟浏览器与适配器测试验证，未做真实站点写入、重新发种、操作 81、提交、推送或发布。
+
+## PTM-20261121-055 — 2026-11-21T23:10:40+08:00 — Codex root，准备 STARPT v0.3.1-starpt.8 发行
+
+- 从 152 已验收的 .8 构建目录核对并导入服务端与前端生产源码、部署所用 Web UI 构建产物。纳入用于复现该镜像的此前服务端基线，保留客户端和其他未上线工作区改动。本次发行新增 `compose.starpt.yaml` 和版本安装说明。
+- 152 使用已验证 amd64 镜像以空数据目录、无配置文件及临时回环端口执行独立 Compose 启动和 HTTP 健康检查，测试服务已清理。现网仍运行镜像 sha256:42029995b55eb387295df9357688e208a506802735d83a0c4c9e84302f5a7768。152 导出完整归档的 SHA-256 已录入部署文档。
+- 记录时准备提交、标签及两站发行，未上传附件或提交发行表单。未重新发种、访问 81 或更新现网服务。后续在独立记录核验各远端与附件。

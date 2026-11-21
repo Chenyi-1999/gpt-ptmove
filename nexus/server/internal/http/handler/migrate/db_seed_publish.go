@@ -32,6 +32,29 @@ func (h *Handler) GetDBSeedInfo(c *gin.Context) {
 	c.JSON(status, result)
 }
 
+// PrepareSeedInfo 在转种准备时读取已缓存资料，并补全缺失的 MediaInfo。
+// 参数/返回：请求体包含 torrent_id、site_name 和可选 task_id；返回准备后的种子资料。
+// 失败场景：缺少参数或数据库读取失败时返回相应错误；MediaInfo 补全失败时保留资料并附带诊断信息。
+// 副作用：缓存命中且 MediaInfo 无效时可能读取下载器文件状态、请求飞牛媒体代理并更新 MediaInfo。
+func (h *Handler) PrepareSeedInfo(c *gin.Context) {
+	requestID := c.GetString("request_id")
+	payload, ok := bindMapPayload(c)
+	if !ok {
+		return
+	}
+	torrentID := strings.TrimSpace(handlerToString(payload["torrent_id"], ""))
+	siteName := strings.TrimSpace(handlerToString(payload["site_name"], ""))
+	taskID := strings.TrimSpace(handlerToString(payload["task_id"], ""))
+	logx.Infof(dbSeedInfoHandlerLogModule, "收到转种准备 请求ID=%s torrent_id=%s site_name=%s task_id=%s", requestID, torrentID, siteName, taskID)
+	result, status := h.service.PrepareSeedInfo(torrentID, siteName, taskID)
+	if status >= http.StatusBadRequest {
+		logx.Warnf(dbSeedInfoHandlerLogModule, "转种准备读取结束 请求ID=%s 状态码=%d", requestID, status)
+	} else {
+		logx.Infof(dbSeedInfoHandlerLogModule, "转种准备读取结束 请求ID=%s 状态码=%d", requestID, status)
+	}
+	c.JSON(status, result)
+}
+
 func (h *Handler) FetchAndStore(c *gin.Context) {
 	requestID := c.GetString("request_id")
 	payload, ok := bindMapPayload(c)
@@ -51,6 +74,18 @@ func (h *Handler) FetchAndStore(c *gin.Context) {
 	} else {
 		logx.Infof(fetchStoreHandlerLogModule, "请求结束 请求ID=%s source_site=%s search_term=%s 状态码=%d", requestID, sourceSite, searchTerm, status)
 	}
+	c.JSON(status, result)
+}
+
+// RefetchMaintenanceSeed 拉取选定源站的资料并返回当前维护记录。
+// 请求体无效时返回 400，业务层负责校验身份和保存范围。
+func (h *Handler) RefetchMaintenanceSeed(c *gin.Context) {
+	payload, ok := bindMapPayload(c)
+	if !ok {
+		return
+	}
+	result, status := h.service.RefetchMaintenanceSeed(payload)
+	logx.Infof(dbSeedInfoHandlerLogModule, "维护记录重新拉取结束 请求ID=%s 状态码=%d", c.GetString("request_id"), status)
 	c.JSON(status, result)
 }
 

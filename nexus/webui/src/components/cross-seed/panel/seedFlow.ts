@@ -122,6 +122,7 @@ type DbSeedInfoResponse = {
   task_id?: string
   success?: boolean
   message?: string
+  mediainfo_prepare_error?: string
   reverse_mappings?: ReverseMappings
   data?: DbSeedRecord
 }
@@ -936,14 +937,15 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       }
       const dbResponse = prefetchedDbSeedInfo
         ? ({ status: 200, data: prefetchedDbSeedInfo as DbSeedInfoResponse })
-        : await axios.get<DbSeedInfoResponse>('/api/migrate/get_db_seed_info', {
-            params: {
+        : await axios.post<DbSeedInfoResponse>(
+            '/api/migrate/prepare_seed_info',
+            {
               torrent_id: torrentId,
               site_name: englishSiteName,
-              task_id: tempTaskId, // 传递task_id给后端
+              task_id: tempTaskId,
             },
-            timeout: 600000, // 10分钟超时
-          })
+            { timeout: 600000 },
+          )
 
       if (prefetchedDbSeedInfo) {
         taskMonitorStore.markRunning({
@@ -1018,6 +1020,15 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         }
       } else if (dbResponse.data.success && dbResponse.data.data) {
         ElNotification.closeAll()
+
+        if (dbResponse.data.mediainfo_prepare_error) {
+          ElNotification.warning({
+            title: 'MediaInfo 自动补全失败',
+            message: `${dbResponse.data.mediainfo_prepare_error}。种子资料已载入，请检查后再继续。`,
+            duration: 0,
+            showClose: true,
+          })
+        }
 
         if (dbResponse.data.reverse_mappings) {
           reverseMappings.value = dbResponse.data.reverse_mappings

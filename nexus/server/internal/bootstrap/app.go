@@ -80,6 +80,9 @@ func NewApp() (*App, error) {
 	migrateService := migrationflow.NewMigrateService(migrateRepo, cfgManager)
 	migrateService.InitPublishQueue(queueRepo, statsRepo)
 	migrateService.InitPublishLogs(publishLogRepo)
+	if err := migrateService.InitPublishedEdit(store); err != nil {
+		logx.Warnf("启动", "初始化已发布详情编辑失败: %v", err)
+	}
 	profilesService, err := migrationflow.NewSiteProfileService(store, cfgManager, paths.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("初始化站点资料失败: %w", err)
@@ -312,13 +315,19 @@ func registerRoutes(
 
 		api.GET("/publish_logs", migrateHandler.PublishLogs)
 		api.DELETE("/publish_logs/:id", migrateHandler.DeletePublishLog)
+		api.GET("/publish_logs/:id/published_edit", migrateHandler.OpenPublishedEdit)
+		api.POST("/publish_logs/:id/published_edit/media", migrateHandler.GeneratePublishedEditMedia)
+		api.POST("/publish_logs/:id/published_edit/preview", migrateHandler.PreviewPublishedEdit)
+		api.POST("/publish_logs/:id/published_edit/save", migrateHandler.SavePublishedEdit)
 	}
 
 	migrateAPI := engine.Group("/api/migrate")
 	{
 		migrateAPI.GET("/get_db_seed_info", migrateHandler.GetDBSeedInfo)
+		migrateAPI.POST("/prepare_seed_info", migrateHandler.PrepareSeedInfo)
 		migrateAPI.POST("/download_torrent_only", migrateHandler.DownloadTorrentOnly)
 		migrateAPI.POST("/fetch_and_store", migrateHandler.FetchAndStore)
+		migrateAPI.POST("/refetch_maintenance_seed", migrateHandler.RefetchMaintenanceSeed)
 		migrateAPI.POST("/update_db_seed_info", migrateHandler.UpdateDBSeedInfo)
 		migrateAPI.POST("/update_screenshot_review_status", migrateHandler.UpdateScreenshotReviewStatus)
 		migrateAPI.POST("/publish", migrateHandler.Publish)

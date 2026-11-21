@@ -151,6 +151,7 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 			args = append(args, reviewArgs...)
 		}
 	}
+	filterInMemory := normalizedReviewStatus != "" || params.HideRestrictedTags || params.HideEpisodeTags
 	if excludedTarget := strings.TrimSpace(params.ExcludeTargetSites); excludedTarget != "" {
 		targetAliases, err := s.repo.ResolveSiteAliases(excludedTarget)
 		if err != nil {
@@ -218,13 +219,11 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 		Total int64 `gorm:"column:total"`
 	}
 	var count countRow
-	countQuery := fmt.Sprintf("SELECT COUNT(*) AS total %s %s", fromClause, whereClause)
-	if err := s.repo.DB().Raw(countQuery, args...).Scan(&count).Error; err != nil {
-		return nil, err
-	}
-
-	if normalizedReviewStatus != "" {
-		count.Total = 0
+	if !filterInMemory {
+		countQuery := fmt.Sprintf("SELECT COUNT(*) AS total %s %s", fromClause, whereClause)
+		if err := s.repo.DB().Raw(countQuery, args...).Scan(&count).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	isDeletedExpr := "CASE WHEN ct.hash IS NULL THEN 1 ELSE 0 END AS is_deleted"
@@ -253,7 +252,7 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 		`, strings.Join(missingChecks, ", "), isDeletedExpr, fromClause, whereClause)
 
 	dataArgs := args
-	if normalizedReviewStatus == "" {
+	if !filterInMemory {
 		dataQuery += "\n\t\t\tLIMIT ? OFFSET ?"
 		dataArgs = make([]any, 0, len(args)+2)
 		dataArgs = append(dataArgs, args...)
@@ -279,12 +278,16 @@ func (s *CrossSeedService) QueryData(params CrossSeedQueryParams) (map[string]an
 		item["missing_required_fields"] = missing
 	}
 
-	if normalizedReviewStatus != "" {
+	if filterInMemory {
 		filteredData := make([]map[string]any, 0, len(pageData))
 		for _, item := range pageData {
-			if matchesReviewStatus(item, normalizedReviewStatus) {
-				filteredData = append(filteredData, item)
+			if !matchesTagVisibility(item, params.HideRestrictedTags, params.HideEpisodeTags) {
+				continue
 			}
+			if normalizedReviewStatus != "" && !matchesReviewStatusWithTaggedReview(item, normalizedReviewStatus, params.IncludeTaggedReviewed, reverseMappings) {
+				continue
+			}
+			filteredData = append(filteredData, item)
 		}
 		count.Total = int64(len(filteredData))
 		pageData = paginateMaps(filteredData, offset, params.PageSize)

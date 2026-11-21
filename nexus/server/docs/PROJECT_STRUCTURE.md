@@ -434,6 +434,14 @@
 | `internal/service/publish/uploader/path.go` | 种子路径识别 |
 | `internal/service/publish/uploader/params_dump.go` | DEV 环境发布参数落盘（写入 `data/tmp/torrents`） |
 
+### `publish/publishededit`
+
+| 文件 | 作用 |
+|:---|:---|
+| `internal/service/publish/publishededit/` | 固定 NovaHD 来源，核对发布者，读取编辑表单并提交、回读截图和 MediaInfo |
+| `internal/service/migrationflow/published_edit*.go` | 任务记录入口、飞牛草稿、预览确认及提交结果编排 |
+| `internal/repository/published_edit_repository.go` | 记录实际提交的资料差异，持久限制同一目标版本重复提交 |
+
 ### `publish/guard`
 
 发布前预检查（例如：下载器做种数限制）。

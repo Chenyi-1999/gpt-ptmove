@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pt-nexus/server/internal/platform/logx"
+	"github.com/pt-nexus/server/internal/service/downloaderclient"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingrepair "github.com/pt-nexus/server/internal/service/processing/repair"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
@@ -82,7 +83,19 @@ func (s *MigrateService) FetchAndStore(payload map[string]any) (map[string]any, 
 			},
 			FetchRepairDeps: fetchRepairDeps,
 			TriggerMediainfoRepair: func(input processingrepair.TriggerMediainfoRepairInput) {
-				processingrepair.TriggerMediainfoRepairDuringFetch(input, fetchRepairDeps)
+				downloader, proxy, _ := downloaderclient.DecideProxy(rootConfig, input.DownloaderID)
+				if !proxy.Enabled || downloader.Type != "qbittorrent" {
+					processingrepair.TriggerMediainfoRepairDuringFetch(input, fetchRepairDeps)
+					return
+				}
+				hash, torrentID, siteName, err := processingpersist.ParseSeedID(input.SeedID)
+				if err == nil {
+					err = s.prepareSeedMediaInfo(input.TaskID, hash, torrentID, siteName, input.DownloaderID)
+				}
+				if err != nil {
+					logx.Warnf(fetchRepairLogModule, "MediaInfo 自动补全失败 seed_id=%s err=%v", input.SeedID, err)
+					s.emitLog(input.TaskID, "修复媒体信息", "MediaInfo 自动补全失败："+err.Error(), "warning")
+				}
 			},
 			RecomputeTags: func(hash, torrentID, siteName, savePath, torrentNameForPath, reason string) {
 				s.recomputeAndPersistTags(hash, torrentID, siteName, savePath, torrentNameForPath, reason)

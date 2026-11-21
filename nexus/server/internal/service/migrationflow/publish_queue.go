@@ -11,6 +11,7 @@ import (
 	"github.com/pt-nexus/server/internal/platform/logx"
 	"github.com/pt-nexus/server/internal/repository"
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 	publishguard "github.com/pt-nexus/server/internal/service/publish/guard"
@@ -394,9 +395,27 @@ func (s *MigrateService) EnqueuePublishQueueBatch(payload map[string]any) (map[s
 			processingpersist.DBSeedLookupInput{TorrentID: torrentID, SiteName: siteName},
 			s.repo,
 		)
+		if err == nil && !processingmedia.HasUsableMediaReport(processingshared.ToString(lookup.Normalized["mediainfo"], "")) {
+			// 只用同一 infohash 的活跃下载器定位文件，忽略批量请求中的路径。
+			err = s.prepareSeedMediaInfo(groupID, lookup.Hash, torrentID, lookup.SiteName, "")
+			if errors.Is(err, errPrepareMediaUnavailable) {
+				err = nil
+			} else if err == nil {
+				current, reloadErr := processingpersist.LookupSeedForMigration(
+					processingpersist.DBSeedLookupInput{TorrentID: torrentID, SiteName: lookup.SiteName}, s.repo,
+				)
+				if reloadErr != nil {
+					err = reloadErr
+				} else if current.SeedID != lookup.SeedID {
+					err = errors.New("补全 MediaInfo 期间资料已改变，请重新准备")
+				} else {
+					lookup = current
+				}
+			}
+		}
 		if err != nil {
 			skipped++
-			message := "数据库读取失败: " + err.Error()
+			message := "准备种子资料失败: " + err.Error()
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				message = "数据库中未找到种子信息"
 			}

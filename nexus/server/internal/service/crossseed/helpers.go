@@ -120,11 +120,34 @@ func hasRestrictedStandardTag(tags []string) bool {
 	return false
 }
 
+func matchesTagVisibility(item map[string]any, hideRestricted, hideEpisode bool) bool {
+	if !hideRestricted && !hideEpisode {
+		return true
+	}
+	for _, tag := range parseStringArray(item["tags"]) {
+		switch strings.TrimSpace(tag) {
+		case "禁转", "tag.禁转", "限转", "tag.限转":
+			if hideRestricted {
+				return false
+			}
+		case "分集", "tag.分集":
+			if hideEpisode {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func hasUnrecognizedValue(titleComponents []any) bool {
 	return strings.TrimSpace(extractUnrecognized(titleComponents)) != ""
 }
 
 func isRowPublishable(item map[string]any, reverseMappings map[string]any) bool {
+	return isRowPublishableWithTaggedReview(item, reverseMappings, false)
+}
+
+func isRowPublishableWithTaggedReview(item map[string]any, reverseMappings map[string]any, includeTagged bool) bool {
 	if boolFromAny(item["is_deleted"]) || !boolFromAny(item["is_reviewed"]) {
 		return false
 	}
@@ -141,10 +164,13 @@ func isRowPublishable(item map[string]any, reverseMappings map[string]any) bool 
 	}
 
 	tags := parseStringArray(item["tags"])
-	if hasRestrictedStandardTag(tags) {
+	if hasRestrictedStandardTag(tags) && !includeTagged {
 		return false
 	}
 	for _, tag := range tags {
+		if includeTagged && hasRestrictedStandardTag([]string{tag}) {
+			continue
+		}
 		if !isValidStandardValue(tag) || !isStandardValueMapped(reverseMappings, "tags", tag) {
 			return false
 		}
@@ -200,7 +226,7 @@ func paginateMaps(items []map[string]any, offset int, pageSize int) []map[string
 	return items[offset:end]
 }
 
-func matchesReviewStatus(item map[string]any, reviewStatus string) bool {
+func matchesReviewStatusWithTaggedReview(item map[string]any, reviewStatus string, includeTagged bool, reverseMappings map[string]any) bool {
 	publishable, ok := item["is_publishable"].(bool)
 	if !ok {
 		publishable = false
@@ -208,7 +234,7 @@ func matchesReviewStatus(item map[string]any, reviewStatus string) bool {
 
 	switch reviewStatus {
 	case "reviewed":
-		return publishable
+		return publishable || (includeTagged && isRowPublishableWithTaggedReview(item, reverseMappings, true))
 	case "unreviewed":
 		return !boolFromAny(item["is_deleted"]) && !publishable
 	case "error":

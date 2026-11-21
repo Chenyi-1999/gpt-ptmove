@@ -3,15 +3,18 @@ package crossseed
 import "github.com/pt-nexus/server/internal/repository"
 
 type CrossSeedQueryParams struct {
-	Page               int
-	PageSize           int
-	Search             string
-	PathFilters        []string
-	IsDeleted          string
-	ExcludeTargetSites string
-	ReviewStatus       string
-	IncludeUniquePaths bool
-	VideoOnly          bool
+	Page                  int
+	PageSize              int
+	Search                string
+	PathFilters           []string
+	IsDeleted             string
+	ExcludeTargetSites    string
+	ReviewStatus          string
+	IncludeUniquePaths    bool
+	VideoOnly             bool
+	HideRestrictedTags    bool
+	HideEpisodeTags       bool
+	IncludeTaggedReviewed bool
 }
 
 type CrossSeedService struct {
