@@ -320,7 +320,30 @@
     "mobile_confirmation_wrap_verified": true,
     "go_full_tests": true,
     "frontend_typecheck_lint_build": true,
-    "published": false,
+    "published": true,
+    "release": {
+      "tag": "v0.3.1-starpt.8",
+      "source_commit": "3df1b483cd7e69ed58c6a612f264b411e812daf5",
+      "github": {
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8",
+        "private": true,
+        "published_at": "2026-11-21T23:27:56+08:00",
+        "image_asset": "starpt-v0.3.1-starpt.8-linux-amd64.tar.gz",
+        "image_asset_bytes": 522128247,
+        "image_asset_sha256": "900019a17ada63d2160d83a1f716fcdf35c69f97d0815569a1ecf7df4c7f494a",
+        "checksum_asset": "starpt-v0.3.1-starpt.8-linux-amd64.tar.gz.sha256",
+        "compose_asset": "compose.starpt.yaml"
+      },
+      "gitee": {
+        "url": "https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8",
+        "release_id": 1344453,
+        "compose_asset": "compose.starpt.yaml",
+        "compose_asset_id": 3782964,
+        "compose_asset_sha256": "cfc417a0cf041063a206d1740ba51e0a033e857d1d85258bfda6424b31f649b7",
+        "image_asset": null,
+        "image_upload_result": "HTTP 400: Gitee repository attachment quota of 1 GB exceeded"
+      }
+    },
     "verified_at": "2026-11-21T22:49:46+08:00"
   }
 }

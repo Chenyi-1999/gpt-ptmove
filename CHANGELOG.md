@@ -425,3 +425,10 @@
 - 从 152 已验收的 .8 构建目录核对并导入服务端与前端生产源码、部署所用 Web UI 构建产物。纳入用于复现该镜像的此前服务端基线，保留客户端和其他未上线工作区改动。本次发行新增 `compose.starpt.yaml` 和版本安装说明。
 - 152 使用已验证 amd64 镜像以空数据目录、无配置文件及临时回环端口执行独立 Compose 启动和 HTTP 健康检查，测试服务已清理。现网仍运行镜像 sha256:42029995b55eb387295df9357688e208a506802735d83a0c4c9e84302f5a7768。152 导出完整归档的 SHA-256 已录入部署文档。
 - 记录时准备提交、标签及两站发行，未上传附件或提交发行表单。未重新发种、访问 81 或更新现网服务。后续在独立记录核验各远端与附件。
+
+## PTM-20261121-056 — 2026-11-21T23:28:40+08:00 — Codex root、gitee_publish、cover_release_image，STARPT v0.3.1-starpt.8 发行
+
+- 提交 3df1b483cd7e69ed58c6a612f264b411e812daf5 与标签 v0.3.1-starpt.8 已推送到 Gitee 和 GitHub，两处远端已核对标签解引用与发布提交一致。原始发行标签保留；本记录更新 `CHANGELOG.md`、`docs/DEPLOYMENT.json` 和 `docs/RELEASE-v0.3.1-starpt.8.md`。
+- GitHub 私有仓库发行已发布。API 确认完整 Linux AMD64 镜像、SHA-256 文件和 `compose.starpt.yaml` 均已上传，镜像 522,128,247 字节及摘要 900019a17ada63d2160d83a1f716fcdf35c69f97d0815569a1ecf7df4c7f494a 与 152 的导出一致。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8
+- Gitee 发行 ID 1344453 已发布。Compose 附件 ID 3782964，508 字节，从发行接口回下载后比对 SHA-256 cfc417a0cf041063a206d1740ba51e0a033e857d1d85258bfda6424b31f649b7 通过。已校验增量包可从 v0.3.1-starpt.1 精确复原 .8 OCI 镜像。Gitee API 对该 99,020,403 字节附件返回 HTTP 400 和仓库附件 1 GB 配额错误，附件列表只含 Compose，发行正文提供 GitHub 完整镜像入口。https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8
+- D 盘历史发布 ZIP 包含标签源码、完整镜像、Compose、恢复说明及校验清单。ZIP 内容 CRC、SHA-256、标签提交元数据通过，归档库索引已追加。152 上项目容器状态为 healthy，本次 152 操作为 Compose 验收、镜像归档和健康状态复核。未重新发种、写入站点或访问 81。

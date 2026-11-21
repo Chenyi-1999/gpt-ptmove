@@ -6,7 +6,11 @@
 
 ## 使用 Compose 部署
 
-把 `compose.starpt.yaml` 与下载的镜像文件放在同一目录。完整镜像可直接导入。若使用发行页的增量附件，先按附件说明还原镜像。
+GitHub 私有发行页提供完整 Linux AMD64 镜像、SHA-256 校验文件和 Compose。 [GitHub 发行页](https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8)
+
+Gitee 发行页提供 Compose 和 GitHub 镜像链接。Gitee 的仓库附件配额限制了镜像上传。 [Gitee 发行页](https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8)
+
+把 `compose.starpt.yaml` 与下载的镜像文件放在同一目录，然后执行下方命令。
 
 ```sh
 docker load -i starpt-v0.3.1-starpt.8-linux-amd64.tar.gz
