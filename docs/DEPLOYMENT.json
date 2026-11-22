@@ -447,6 +447,60 @@
     "go_full_tests": true,
     "ui_verified_assets_reused": true,
     "local_deployment_script_tests": 5,
-    "verified_at": "2026-11-22T08:25:20+08:00"
+    "verified_at": "2026-11-22T08:25:20+08:00",
+    "source_commit": "162ebf2a16ae476dc2c0bda27df981fa9c2fb515",
+    "git_tag": "v1.0.0",
+    "github": {
+      "private": true,
+      "tag": "v1.0.0",
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.0",
+      "publishedAt": "2026-11-22T00:40:26Z",
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "state": "uploaded",
+          "digest": "sha256:3d5f27dfac2459c2cb87f076ad521b1e2708981d7c98e8ec365061ee0810de4a"
+        },
+        {
+          "name": "starpt-v1.0.0-linux-amd64.tar.gz",
+          "size": 543336327,
+          "state": "uploaded",
+          "digest": "sha256:8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac"
+        },
+        {
+          "name": "starpt-v1.0.0-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "state": "uploaded",
+          "digest": "sha256:fc0f2de7facd7b589aa4d413ac6a047dc90abe10c7b3cfc0e86237e233e74ead"
+        }
+      ]
+    },
+    "gitee": {
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.0",
+      "release_id": 1351271,
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "id": 3785053,
+          "size": 498,
+          "sha256": "3d5f27dfac2459c2cb87f076ad521b1e2708981d7c98e8ec365061ee0810de4a"
+        },
+        {
+          "name": "starpt-v1.0.0-linux-amd64.tar.gz.sha256",
+          "id": 3785054,
+          "size": 99,
+          "sha256": "fc0f2de7facd7b589aa4d413ac6a047dc90abe10c7b3cfc0e86237e233e74ead"
+        }
+      ],
+      "image_asset": null,
+      "image_distribution": "Full image is attached to the same GitHub release due to Gitee repository attachment quota"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-22_084022__历史发布__STARPT-v1.0.0.zip",
+      "bytes": 562118288,
+      "sha256": "6d685f8763c8478155671ed6518ad142e83d62730a3661590c9d06c9699ddb3a"
+    },
+    "published": true
   }
 }

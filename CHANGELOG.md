@@ -461,3 +461,9 @@
 - 验证。Go 全量测试和版本路由回归在 152 通过，Python 发布保护测试 5 个通过。1.0.0 镜像沿用通过桌面与移动端验收的 Web 产物。独立 Compose 空数据目录验证启动、健康与版本，测试容器已清理。
 - 152 已部署 ptmove-nexus:1.0.0，镜像 sha256:1c166c1ec5ac61805c90f90217d159a157aa3b2f3090514b8b405f18475bdcac，回滚 ptmove-nexus:0.3.1-starpt.11。生产入口摘要匹配，健康与发布/自动化计数复核通过。完整镜像导出为 starpt-v1.0.0-linux-amd64.tar.gz，543336327 字节，摘要 8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac。
 - 准备提交和标签时，镜像传输与 GitHub/Gitee 发行仍在进行。Gitee 原有附件占用约 1.013 GB，完整镜像规划附于 GitHub 私有仓库。未重新发种或访问 81。
+
+## PTM-20261122-061 — 2026-11-22T08:40:54+08:00 — Codex root、release_gitee_100、release_image_archive_100，STARPT 1.0.0 双仓发行与归档
+
+- 源码、已验证的 84 个 Web 构建产物与 Compose 均包含在 162ebf2a16ae476dc2c0bda27df981fa9c2fb515。Gitee 和 GitHub 的 v1.0.0 标签解引用指向同一提交。GitHub 私有仓库发行已正式发布，三个附件状态及 SHA-256 索引均已核对。完整 Linux AMD64 镜像 543336327 字节，SHA-256 8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.0
+- Gitee 使用 canonical 仓库 star1999/starpt，发行 ID 1351271。Compose 与镜像校验文件回下载后逐字节匹配。仓库附件余量不足以镜像完整文件，发行正文链接同版本 GitHub 私有发行；保留所有旧附件。https://gitee.com/star1999/starpt/releases/tag/v1.0.0
+- D 盘历史发布 ZIP 包含标签源码、完整镜像、Compose、恢复说明、校验清单。SHA-256 6d685f8763c8478155671ed6518ad142e83d62730a3661590c9d06c9699ddb3a，以 OCI 摘要链、各成员哈希及 ZIP CRC 验证并更新 INDEX.jsonl。镜像复用 152 已验收 UI，独立 Compose 与线上版本接口通过。此发行记录另行提交，版本标签固定。未发种或访问 81。
