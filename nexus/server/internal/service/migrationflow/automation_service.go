@@ -410,7 +410,7 @@ func (s *AutomationService) CancelContext(ctx context.Context, id string) (map[s
 	return map[string]any{"success": true, "message": "任务已取消，已有下载保持原状"}, 200
 }
 
-// Retry 只允许恢复尚未上传的失败任务。
+// Retry 只恢复尚未上传的失败或查重待核对任务。
 func (s *AutomationService) Retry(id string) (map[string]any, int) {
 	return s.RetryContext(context.Background(), id)
 }
@@ -548,7 +548,9 @@ func (s *AutomationService) Tick(ctx context.Context) {
 		if !v.Enabled && !task.Explicit {
 			continue
 		}
-		if task.State != "reserved" && task.State != "downloading" && task.State != "preparing" && task.State != "ready" {
+		switch task.State {
+		case "reserved", "downloading", "preparing", repository.AutomationStateWaitingMedia, "ready":
+		default:
 			continue
 		}
 		token := automationID("lease")

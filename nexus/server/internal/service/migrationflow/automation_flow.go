@@ -14,11 +14,8 @@ import (
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
 	"github.com/pt-nexus/server/internal/service/downloaderclient"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
-	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
-	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
-	"gorm.io/gorm"
 )
 
 // authorizedTask 在每个新的外部动作前检查租约、模块开关和冻结站点声明。
@@ -50,8 +47,15 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 	if s.authorizedTask(task, snapshot) != nil {
 		return
 	}
+	if task.State == repository.AutomationStateWaitingMedia && s.now().UnixMilli() < task.MediaRetryAt {
+		return
+	}
 	d, err := s.downloader(task.DownloaderID)
 	if err != nil {
+		if task.State == "preparing" || task.State == repository.AutomationStateWaitingMedia {
+			s.waitForAutomationMedia(task, "等待下载器和飞牛客户端恢复连接")
+			return
+		}
 		s.failTask(task, "原生下载器不可用", false)
 		return
 	}
@@ -78,6 +82,14 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		candidate, err := s.scanner.Inspect(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
 		if err != nil {
 			s.failTask(task, "下载前重新检查失败", false)
+			return
+		}
+		switch automationTargetCheckState(candidate, task, snapshot.Settings) {
+		case repository.AutomationStateAlreadyExists:
+			_ = s.repo.SkipExistingBeforeDownload(task, s.now())
+			return
+		case repository.AutomationStateWaitingTarget:
+			_ = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"state": repository.AutomationStateWaitingTarget, "message": "下载前目标查重待核对，未添加种子"}, s.now())
 			return
 		}
 		candidate = policy.Evaluate(candidate, snapshot.Settings)
@@ -134,6 +146,7 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		}
 		task.State = "downloading"
 		task.TorrentPath = torrentPath
+		task.DownloadAttempted = true
 		if s.authorizedTask(task, snapshot) != nil {
 			return
 		}
@@ -184,7 +197,7 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		}
 		task.State = "preparing"
 	}
-	if task.State == "preparing" {
+	if task.State == "preparing" || task.State == repository.AutomationStateWaitingMedia {
 		if s.migrate == nil {
 			s.failTask(task, "原生迁移服务不可用", false)
 			return
@@ -192,51 +205,24 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		if s.authorizedTask(task, snapshot) != nil {
 			return
 		}
-		// 已生成待确认截图时不重复抓取；确认后的重试直接复用人工审核的原生资料。
-		stored, storedErr := s.migrate.repo.GetSeedParameter(task.SourceID, snapshot.Source.NativeName())
-		if storedErr != nil && !errors.Is(storedErr, gorm.ErrRecordNotFound) {
-			s.failTask(task, "原生资料读取失败，未重新抓取", false)
+		if err := s.prepareAutomationMedia(ctx, task, snapshot, d); err != nil {
+			if s.authorizedTask(task, snapshot) == nil {
+				if errors.Is(err, errAutomationMediaRestricted) {
+					s.failTask(task, err.Error(), false)
+				} else {
+					s.waitForAutomationMedia(task, err.Error())
+				}
+			}
 			return
-		}
-		reuseDraft := storedErr == nil && strings.ToLower(strings.TrimSpace(processingshared.ToString(stored["screenshot_review_status"], ""))) != processingshared.ScreenshotReviewStatusNone
-		if reuseDraft {
-			if _, err := s.migrate.automationSeedForPublish(task, snapshot); err != nil {
-				s.failTask(task, err.Error(), false)
-				return
-			}
-			// 缓存草稿绕过抓取的媒体修复；已确认截图的草稿可在这里补齐。
-			mediaErr := s.migrate.prepareSeedMediaInfo(task.ID, task.InfoHash, task.SourceID, processingshared.ToString(stored["site_name"], ""), task.DownloaderID)
-			if mediaErr != nil && !errors.Is(mediaErr, errPrepareMediaUnavailable) {
-				s.failTask(task, "MediaInfo 自动补全失败："+mediaErr.Error(), false)
-				return
-			}
-		} else {
-			result, status := s.migrate.FetchAndStore(map[string]any{"sourceSite": snapshot.Source.NativeName(), "searchTerm": task.SourceID, "torrentName": task.Title, "savePath": task.SavePath, "downloaderId": task.DownloaderID})
-			if status >= 400 || !processingshared.ToBool(result["success"]) {
-				s.failTask(task, "原生资料处理失败，请查看原生日志", false)
-				return
-			}
 		}
 		if s.authorizedTask(task, snapshot) != nil {
 			return
 		}
-		lookup, err := processingpersist.LookupSeedForMigration(processingpersist.DBSeedLookupInput{TorrentID: task.SourceID, SiteName: snapshot.Source.NativeName()}, s.migrate.repo)
-		if err != nil || !strings.EqualFold(lookup.Hash, task.InfoHash) {
-			s.failTask(task, "原生资料对应载荷不一致", false)
-			return
-		}
-		if s.cfg != nil && !processingmedia.HasUsableMediaReport(processingshared.ToString(lookup.Normalized["mediainfo"], "")) {
-			downloader, proxy, _ := downloaderclient.DecideProxy(s.cfg.Get(), task.DownloaderID)
-			if proxy.Enabled && downloader.Type == "qbittorrent" {
-				s.failTask(task, "MediaInfo 尚未补全，请核对飞牛媒体代理或在种子资料中补全后重试", false)
-				return
-			}
-		}
 		if _, err = s.migrate.automationSeedForPublish(task, snapshot); err != nil {
-			s.failTask(task, err.Error(), false)
+			s.waitForAutomationMedia(task, err.Error())
 			return
 		}
-		if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"state": "ready", "message": "资料已就绪，等待独立自动发布开关"}, s.now()); err != nil {
+		if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"state": "ready", "message": "资料已就绪，等待独立自动发布开关", "media_retry_at": 0}, s.now()); err != nil {
 			return
 		}
 		task.State = "ready"
@@ -253,6 +239,14 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 			s.failTask(task, "原生队列交接失败，未尝试上传："+err.Error(), false)
 		}
 	}
+}
+
+// waitForAutomationMedia 保留下载及配额，下一轮在退避期结束后仅检查媒体资料。
+func (s *AutomationService) waitForAutomationMedia(task repository.AutomationTask, message string) {
+	now := s.now()
+	_ = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{
+		"state": repository.AutomationStateWaitingMedia, "message": message, "media_retry_at": now.Add(automationMediaRetryDelay).UnixMilli(),
+	}, now)
 }
 
 // enqueueNative 从持久原生资料重建上下文，并在一个事务内关联唯一队列行。

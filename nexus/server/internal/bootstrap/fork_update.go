@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.3"
+const forkVersion = "1.0.4"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,15 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-22",
+				"changes": []string{
+					"NovaHD 查重只核对实际搜索结果和相符的发行或载荷",
+					"下载完成后通过既有客户端补齐截图和 MediaInfo",
+					"目标种子已存在时单独记录，不计入成功",
+				},
+			},
+			{
+				"version": "1.0.3",
 				"date":    "2026-11-22",
 				"changes": []string{
 					"修复织梦列表做种人数读取，并按体积降序跨页筛选符合规则的候选",

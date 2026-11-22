@@ -246,10 +246,16 @@ func TestAutomaticUploadBoundaryRechecksDisableWithoutResettingAttempt(t *testin
 	if err := a.repo.SaveSettings(string(raw), false, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	upload, _ := json.Marshal(map[string]any{"screenshots": screenshots})
+	upload, _ := json.Marshal(map[string]any{"screenshots": screenshots, "mediainfo": preparedReportFixture})
 	queue := repository.PublishQueueTask{ID: queueID, Trigger: "automation", UploadDataJSON: string(upload)}
 	if err := m.authorizeAutomationUpload(queue); err != nil {
 		t.Fatalf("valid attempt was blocked: %v", err)
+	}
+	stale := queue
+	staleUpload, _ := json.Marshal(map[string]any{"screenshots": screenshots, "mediainfo": "stale report"})
+	stale.UploadDataJSON = string(staleUpload)
+	if err := m.authorizeAutomationUpload(stale); err == nil || !strings.Contains(err.Error(), "MediaInfo") {
+		t.Fatalf("stale MediaInfo was allowed: %v", err)
 	}
 	path := filepath.Join(t.TempDir(), "changed.torrent")
 	if err := os.WriteFile(path, []byte("d4:infod6:lengthi1e4:name1:xee"), 0o600); err != nil {

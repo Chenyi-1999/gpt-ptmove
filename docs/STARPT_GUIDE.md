@@ -37,9 +37,11 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 ## 自动化行为与默认值
 
-自动化设置由 `server/internal/service/processing/automation/policy.go` 定义。首次配置的自动运行 (`enabled`)、自动发布 (`auto_publish`) 和月度计划 (`schedule_enabled`) 均为关闭。默认计划值为北京时间每月 1 日 02:00；每月上限 6 个任务、单项 1–10 GiB、总预算 60 GiB、最低做种数 3，优先官种及目标站缺少的作品/版本。配额和体积阈值是资源筛选预算，不是网络流量上限。
+自动化设置由 `server/internal/service/processing/automation/policy.go` 定义。首次配置的自动运行 (`enabled`)、自动发布 (`auto_publish`) 和月度计划 (`schedule_enabled`) 均为关闭。默认计划为北京时间每月 1 日 02:00，每月上限 6 个任务、单项 1–10 GiB、总预算 60 GiB、最低做种数 3。自动化只选官种，排除分集、禁转、已下载的种子，并要求目标站确认缺失。配额按完整资源体积预留。
 
 手动预览不会自动下载或发布。运行/入队必须由管理员明确启动或有权限的机器 API 请求触发。开启自动发布后，程序仍须证明源站限制状态和目标重复/做种状态；未知或无法验证时应拒绝。执行前必须选中 STARPT 中已配置的原生下载器及完整文件保存目录。
+
+每条资源在 qB 校验完整后独立准备发布资料。截图和 MediaInfo 缺失时由已配置的 HTTPS 领单客户端补全。客户端不可用时，任务进入「待补资料」并定时重试。NovaHD 查重使用真实搜索结果和可验证的版本或文件证据。确认「已存在」的任务单独记录，发布响应不明则保留「待核对」。
 
 目标站必须在站点声明中显式列出可信 Tracker 主机 `announce_hosts`。留空时只读候选预览仍可用，但自动化启用和下载执行因无法核验目标是否做种而失败。系统不会猜测或从站点 URL 自动推导 Tracker 主机。
 

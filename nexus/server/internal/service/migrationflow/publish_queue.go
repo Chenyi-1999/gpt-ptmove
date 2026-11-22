@@ -870,6 +870,13 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			return
 		}
 		if err := s.prepareAutomationQueue(taskRecord, ctx); err != nil {
+			var targetCheck *automationTargetCheckError
+			if errors.As(err, &targetCheck) {
+				if err := s.automation.repo.ResolveTargetBeforePublish(taskID, targetCheck.state, s.automation.now()); err != nil && !errors.Is(err, repository.ErrAutomationFence) {
+					logx.Errorf(publishQueueLogModule, "保存自动发布前查重结果失败 id=%d", taskID)
+				}
+				return
+			}
 			s.failAutomationBeforePublish(taskRecord, err.Error())
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
 			return
@@ -935,27 +942,21 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 		},
 	)
 	cost := time.Since(startedAt)
+	if taskRecord.Trigger == "automation" {
+		safe, err := s.automationPublishOutcome(taskRecord, result, status)
+		if err != nil {
+			logx.Errorf(publishQueueLogModule, "自动发布证据保存失败，保持尝试标记 id=%d", taskID)
+			return
+		}
+		s.appendPublishLog(payload, execTaskID, torrentID, safe, status, cost)
+		return
+	}
 	s.appendPublishLog(payload, execTaskID, torrentID, result, status, cost)
 
-	if taskRecord.Trigger == "automation" {
-		result = s.automationSafeResult(taskRecord, result)
-	}
 	encodedResult, _ := json.Marshal(result)
 	resultText := strings.TrimSpace(string(encodedResult))
 	logText := strings.TrimSpace(processingshared.ToString(result["logs"], processingshared.ToString(result["message"], "")))
 
-	if taskRecord.Trigger == "automation" {
-		if err := s.automationPublishOutcome(taskRecord, result, status, resultText); err != nil {
-			logx.Errorf(publishQueueLogModule, "自动发布证据保存失败，保持尝试标记 id=%d", taskID)
-			return
-		}
-		if processingshared.ToBool(result["success"]) && status < 400 && !processingshared.ToBool(result["is_existing_torrent"]) && processString(result["url"]) != "" {
-			_ = s.queueRepo.UpdateTaskAfterSuccess(taskID, resultText)
-		} else {
-			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, "自动发布结果待核对，禁止重试", resultText)
-		}
-		return
-	}
 	success := processingshared.ToBool(result["success"])
 	isPreCheck := processingshared.ToBool(result["pre_check"])
 	limitReached := processingshared.ToBool(result["limit_reached"])

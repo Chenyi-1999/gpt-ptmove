@@ -11,16 +11,18 @@ import (
 	"github.com/pt-nexus/server/internal/platform/logx"
 	"github.com/pt-nexus/server/internal/repository"
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingrepair "github.com/pt-nexus/server/internal/service/processing/repair"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
+	processingtagging "github.com/pt-nexus/server/internal/service/processing/tagging"
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
 )
 
 const automationUploadGuardKey = "_ptnexus_before_upload"
 
 // automationSeedForPublish 只读取当前原生记录，不接受队列或请求提供的审核状态。
-// 未确认、未知状态、载荷不符或缺图均拒绝；人工确认允许少于三张，但不能发布空截图。
+// 未确认、未知状态、载荷不符或缺媒体资料均拒绝；人工确认允许少于三张，但不能发布空截图。
 // 此检查不探测图片网络、不修改资料，也不创建上传尝试标记。
 func (s *MigrateService) automationSeedForPublish(task repository.AutomationTask, snapshot automationSnapshot) (map[string]any, error) {
 	if s == nil || s.repo == nil {
@@ -33,6 +35,9 @@ func (s *MigrateService) automationSeedForPublish(task repository.AutomationTask
 	if !strings.EqualFold(strings.TrimSpace(processingshared.ToString(row["hash"], "")), task.InfoHash) {
 		return nil, errors.New("当前原生资料载荷已改变，禁止自动发布")
 	}
+	if len(processingtagging.DetectRestrictedTags(processingpersist.ParseStringArray(row["tags"]))) > 0 {
+		return nil, errAutomationMediaRestricted
+	}
 	// 必须读取原始状态：通用标准化会把未知值降为 none，不能用于自动发布授权。
 	status := strings.ToLower(strings.TrimSpace(processingshared.ToString(row["screenshot_review_status"], "")))
 	if status != processingshared.ScreenshotReviewStatusNone && status != processingshared.ScreenshotReviewStatusConfirmed {
@@ -40,6 +45,9 @@ func (s *MigrateService) automationSeedForPublish(task repository.AutomationTask
 	}
 	if err := automationScreenshotPayload(processingshared.ToString(row["screenshots"], ""), status); err != nil {
 		return nil, err
+	}
+	if !processingmedia.HasUsableMediaReport(processingshared.ToString(row["mediainfo"], "")) {
+		return nil, errors.New("未确认有效的 MediaInfo 或 BDInfo，等待补全")
 	}
 	return row, nil
 }
@@ -159,6 +167,9 @@ func (s *MigrateService) authorizeAutomationUpload(queue repository.PublishQueue
 	screenshots := processingshared.ToString(row["screenshots"], "")
 	if processingshared.ToString(upload["screenshots"], "") != screenshots {
 		return errors.New("截图在上传授权后改变，禁止使用旧截图上传")
+	}
+	if processingshared.ToString(upload["mediainfo"], "") != processingshared.ToString(row["mediainfo"], "") {
+		return errors.New("MediaInfo 在上传授权后改变，禁止使用旧资料上传")
 	}
 	complete, _ := upload["complete_publish_params"].(map[string]any)
 	for _, section := range []map[string]any{upload, complete} {

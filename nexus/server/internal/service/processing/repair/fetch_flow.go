@@ -39,6 +39,7 @@ type FetchRepairDeps struct {
 	RefreshMediainfo func(payload map[string]any) (map[string]any, int)
 	CSPTToken        string
 	RootConfig       map[string]any
+	DeferMediaRepair bool
 }
 
 // ParallelFetchRepairInput 表示并发修复输入。
@@ -84,6 +85,7 @@ type screenshotsRepairResult struct {
 	Screens                   string
 	ScreenshotReviewStatus    string
 	ScreenshotPreviewRequired bool
+	Validated                 bool
 }
 
 type screenshotValidateJob struct {
@@ -350,12 +352,13 @@ func runScreenshotsRepairTask(input ParallelFetchRepairInput, deps FetchRepairDe
 		Screens:                   localReview.Screens,
 		ScreenshotReviewStatus:    processingshared.NormalizeScreenshotReviewStatus(reviewStatus),
 		ScreenshotPreviewRequired: previewRequired,
+		Validated:                 deps.DeferMediaRepair,
 	}
 }
 
 // mergeRepairedScreenshots 让已判定待审查的空结果清除失效截图；异常任务的零值仍保留原稿。
 func mergeRepairedScreenshots(original string, result screenshotsRepairResult) string {
-	if strings.TrimSpace(result.Screens) != "" || processingshared.NeedsScreenshotManualReview(result.ScreenshotReviewStatus) {
+	if result.Validated || strings.TrimSpace(result.Screens) != "" || processingshared.NeedsScreenshotManualReview(result.ScreenshotReviewStatus) {
 		return result.Screens
 	}
 	return original
@@ -595,6 +598,11 @@ func repairScreenshotsDuringFetch(
 		reviewData.Screens = ToBBCodeImages(validURLs)
 		logx.Infof(fetchRepairScreenshotLogModule, "截图校验通过 valid_count=%d", len(validURLs))
 		emitLog(deps, taskID, "修复截图", "截图校验通过", "success")
+		return reviewStatus, previewRequired
+	}
+	if deps.DeferMediaRepair {
+		// 保留原站可用的截图，将需要读取下载文件的操作交还给自动任务。
+		reviewData.Screens = ToBBCodeImages(validURLs)
 		return reviewStatus, previewRequired
 	}
 

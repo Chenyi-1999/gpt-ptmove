@@ -15,6 +15,7 @@ const (
 	PublishQueueStatusQueued    = "queued"
 	PublishQueueStatusRunning   = "running"
 	PublishQueueStatusSuccess   = "success"
+	PublishQueueStatusExists    = "exists"
 	PublishQueueStatusFailed    = "failed"
 	PublishQueueStatusCancelled = "cancelled"
 )
@@ -254,6 +255,7 @@ func (r *PublishQueueRepository) UpdateTaskAfterRequeue(id int64, nextRunAt time
 	nextText := nextRunAt.Format(PublishQueueTimeLayout)
 	return r.store.DB.Table("publish_queue_tasks").
 		Where("id = ?", id).
+		Where("status = ? OR COALESCE(publish_trigger, '') <> ?", PublishQueueStatusRunning, "automation").
 		Updates(map[string]any{
 			"status":      PublishQueueStatusQueued,
 			"next_run_at": nextText,
@@ -303,6 +305,7 @@ func (r *PublishQueueRepository) UpdateTaskAfterFailure(id int64, attemptCount i
 
 	return r.store.DB.Table("publish_queue_tasks").
 		Where("id = ?", id).
+		Where("status = ? OR COALESCE(publish_trigger, '') <> ?", PublishQueueStatusRunning, "automation").
 		Updates(updates).Error
 }
 

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "date": "2026-11-22",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.3",
-  "image_id": "sha256:a1663368f764df9e5475136ef8d5769efaa2c90acd710b67a699f1a18f8a06f8",
+  "image": "ptmove-nexus:1.0.4",
+  "image_id": "sha256:9562557d072df7f27562d2752cf7f317778b0c2b7582144c1d5aee1939395013",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "baa62d9c0e47f1537e441963153163c2c6b827901ab362d145419d6d74f9bd37",
+  "image_archive_sha256": "e59f5fb5bee852ce465ded12d0e9c418b5ad6ffea2804f97ad6b1ee3249f11a4",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -847,5 +847,56 @@
       "version_match_verified_by_pre_1_0_3_logic": false
     },
     "published_verified_at": "2026-11-22T21:23:57+08:00"
+  },
+  "release_v1_0_4": {
+    "image": "ptmove-nexus:1.0.4",
+    "image_id": "sha256:9562557d072df7f27562d2752cf7f317778b0c2b7582144c1d5aee1939395013",
+    "rollback_image": "ptmove-nexus:1.0.3",
+    "health": "healthy",
+    "production_index_sha256": "bb526ea3553f95eedb38a9d4bb6b4a923e4f9b939acbfc2ada3f62fe3bbcf3b1",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "automation_runs": 0,
+      "published_edit_attempts": 2
+    },
+    "archive_sha256": "e59f5fb5bee852ce465ded12d0e9c418b5ad6ffea2804f97ad6b1ee3249f11a4",
+    "archive_bytes": 673404753,
+    "docker_tar_identical_to_152": true,
+    "docker_tar_sha256": "ccf696f165e7af0e81f134ad48bb40a7aef11d157050d9874561bedd44b5bc94",
+    "docker_tar_bytes": 640886272,
+    "compose_sha256": "c13489b241906bfd15711255c8cbecf10964a86f416078d58c3128bb52cea144",
+    "version": "1.0.4",
+    "archive": "starpt-v1.0.4-linux-amd64.tar.gz",
+    "compose": "compose.starpt.yaml",
+    "oci_validation": {
+      "oci_blobs_verified": 53,
+      "referenced_descriptors": 53,
+      "config_digest": "sha256:b977b51ad193187acece11aff60e76fd94e27b5271413c75ad8d1287c383a0ff",
+      "docker_layers": 47
+    },
+    "compose_isolated_verified": true,
+    "go_full_tests_linux_docker": true,
+    "vue_typecheck_lint_build": true,
+    "verified_web_artifact_count": 41,
+    "native_deployment_smoke_tests": 5,
+    "read_only_check_without_saved_automation_settings": true,
+    "real_media_download_or_publish_test": false,
+    "verified_at": "2026-11-22T22:25:19+08:00",
+    "preview": {
+      "source_site": "zmpt",
+      "target_site": "novahd",
+      "min_size_gib": 6,
+      "max_size_gib": 7,
+      "min_seeders": 3,
+      "returned": 100,
+      "eligible": 20,
+      "target_existing": 12,
+      "target_unknown": 18,
+      "requested_download_history_skips": 2,
+      "duration_seconds": 518.8,
+      "settings_and_task_counts_unchanged": true
+    }
   }
 }

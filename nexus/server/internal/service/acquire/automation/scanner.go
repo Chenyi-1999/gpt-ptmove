@@ -237,6 +237,10 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 	if c.Title == "" {
 		c.Title = meta.Name
 	}
+	if isNovaHD(target) {
+		c.DuplicateKnown, c.Duplicate = s.novaHDDuplicate(ctx, source, target, targetCookie, doc, c)
+		return c, nil
+	}
 	search, err := Endpoint(target, target.Paths.Search, entry.id, c.Title, c.InfoHash)
 	if err != nil {
 		return c, err

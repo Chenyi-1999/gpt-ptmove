@@ -17,14 +17,14 @@ import (
 
 func automationReviewSeed(t *testing.T, db *gorm.DB, task repository.AutomationTask, status string, count int) string {
 	t.Helper()
-	if err := db.Exec(`CREATE TABLE IF NOT EXISTS seed_parameters (hash TEXT,torrent_id TEXT,site_name TEXT,nickname TEXT,name TEXT,screenshots TEXT,screenshot_review_status TEXT,updated_at TEXT)`).Error; err != nil {
+	if err := db.Exec(`CREATE TABLE IF NOT EXISTS seed_parameters (hash TEXT,torrent_id TEXT,site_name TEXT,nickname TEXT,name TEXT,title TEXT,screenshots TEXT,screenshot_review_status TEXT,mediainfo TEXT,mediainfo_status TEXT,tags TEXT,body TEXT,statement TEXT,bdinfo_error TEXT,updated_at TEXT,PRIMARY KEY(hash,torrent_id,site_name))`).Error; err != nil {
 		t.Fatal(err)
 	}
 	images := ""
 	for i := 0; i < count; i++ {
 		images += fmt.Sprintf("[img]https://images.example.com/%d.png[/img]\n", i)
 	}
-	if err := db.Table("seed_parameters").Create(map[string]any{"hash": task.InfoHash, "torrent_id": task.SourceID, "site_name": "zmpt", "nickname": "Source", "name": "movie", "screenshots": images, "screenshot_review_status": status, "updated_at": "2026-11-15 00:00:00"}).Error; err != nil {
+	if err := db.Table("seed_parameters").Create(map[string]any{"hash": task.InfoHash, "torrent_id": task.SourceID, "site_name": "zmpt", "nickname": "Source", "name": "movie", "screenshots": images, "screenshot_review_status": status, "mediainfo": preparedReportFixture, "mediainfo_status": "completed", "updated_at": "2026-11-15 00:00:00"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	return images
@@ -67,7 +67,7 @@ func TestAutomationScreenshotCanonicalGate(t *testing.T) {
 	}
 }
 
-// TestAutomationPendingPreparationResumesConfirmedWithoutRefetch 验证待审查时不入队、不重新截图，确认后通过原有重试恢复。
+// TestAutomationPendingPreparationResumesConfirmedWithoutRefetch 验证待审查时不入队、不重新截图，确认后自动恢复。
 func TestAutomationPendingPreparationResumesConfirmedWithoutRefetch(t *testing.T) {
 	a, m, db := automationNativeFixture(t)
 	task := automationDownloadTask(t, a, db)
@@ -77,18 +77,18 @@ func TestAutomationPendingPreparationResumesConfirmedWithoutRefetch(t *testing.T
 	}
 	fake := &automationFakeDownloader{status: downloaderclient.AutomationTorrentStatus{Found: true, Progress: 1, SavePath: task.SavePath}, complete: true}
 	a.downloaderHook = func(string) (automationDownloader, error) { return fake, nil }
+	now := a.now()
+	a.now = func() time.Time { return now }
 	a.Tick(context.Background())
 	row, _ := a.repo.Task(task.ID)
-	if row.State != "failed" || row.PublishAttempted || row.QueueID != nil || !strings.Contains(row.Message, "截图") {
+	if row.State != repository.AutomationStateWaitingMedia || row.PublishAttempted || row.QueueID != nil || !strings.Contains(row.Message, "截图") {
 		t.Fatalf("pending advanced: %+v", row)
 	}
 	result, status := m.UpdateScreenshotReviewStatus(map[string]any{"torrent_id": task.SourceID, "site_name": "Source", "screenshot_review_status": "confirmed"})
 	if status != 200 {
 		t.Fatalf("confirmation: %v", result)
 	}
-	if _, status := a.Retry(task.ID); status != 200 {
-		t.Fatalf("retry status=%d", status)
-	}
+	now = now.Add(automationMediaRetryDelay)
 	a.Tick(context.Background())
 	row, _ = a.repo.Task(task.ID)
 	seed, _ := m.repo.GetSeedParameter(task.SourceID, "Source")

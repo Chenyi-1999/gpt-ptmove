@@ -280,7 +280,7 @@ func hasPending(v any) bool {
 	case map[string]any:
 		if state, ok := x["state"].(string); ok {
 			switch state {
-			case "cancelled", "failed", "succeeded", "seeding":
+			case "cancelled", "failed", "succeeded", "seeding", "already_exists":
 			default:
 				return true
 			}

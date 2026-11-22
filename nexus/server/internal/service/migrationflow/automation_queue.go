@@ -24,7 +24,7 @@ func (s *MigrateService) automationQueueEnabled() bool {
 	return err == nil && v.Enabled && v.AutoPublish
 }
 
-// beginAutomationPublish 在上传授权事务内重读审核状态，只刷新截图字段并返回实际发送的同一份数据。
+// beginAutomationPublish 在上传授权事务内重读审核状态，刷新媒体资料并返回实际发送的同一份数据。
 // 审核、队列或尝试围栏失败则整体回滚；不访问网络，不刷新冻结的路由和其他发布字段。
 func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTask) (map[string]any, error) {
 	var upload map[string]any
@@ -45,6 +45,7 @@ func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTas
 		screenshots := processingshared.ToString(row["screenshots"], "")
 		upload["screenshots"] = screenshots
 		upload["screenshot_review_status"] = row["screenshot_review_status"]
+		upload["mediainfo"] = processingshared.ToString(row["mediainfo"], "")
 		if intro, ok := upload["intro"].(map[string]any); ok {
 			intro["screenshots"] = screenshots
 		}
@@ -67,6 +68,32 @@ func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTas
 		return nil
 	})
 	return upload, err
+}
+
+// automationTargetCheckState 提取唯一由目标查重引起的等待或重复结果。
+func automationTargetCheckState(candidate policy.Candidate, task repository.AutomationTask, settings policy.Settings) string {
+	if (candidate.DuplicateKnown && !candidate.Duplicate) || candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {
+		return ""
+	}
+	state := repository.AutomationStateWaitingTarget
+	if candidate.DuplicateKnown {
+		state = repository.AutomationStateAlreadyExists
+	}
+	// 仅评估其余规则；调用方绝不以此副本下载或发种。
+	candidate.DuplicateKnown, candidate.Duplicate = true, false
+	if !policy.Evaluate(candidate, settings).Eligible {
+		return ""
+	}
+	return state
+}
+
+type automationTargetCheckError struct{ state string }
+
+func (e *automationTargetCheckError) Error() string {
+	if e.state == repository.AutomationStateAlreadyExists {
+		return "发布前确认目标已有种子"
+	}
+	return "发布前无法确认目标站查重结果"
 }
 
 // prepareAutomationQueue 在任何上传标记前重新校验站点冻结、完整下载、限制和目标缺失。
@@ -139,14 +166,17 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if candidate.RestrictionsKnown && !candidate.Allowed {
 		return errors.New("源站标记禁转或限转，已停止发布")
 	}
+	// 本任务的完整下载已核实，源站因此显示已下载是预期状态。
+	candidate.PreviouslyDownloaded = false
+	if state := automationTargetCheckState(candidate, task, snapshot.Settings); state != "" {
+		return &automationTargetCheckError{state: state}
+	}
 	if err != nil {
 		return errors.New("发布前只读检查失败")
 	}
 	if !candidate.RestrictionsKnown {
 		return errors.New("无法确认源站转种权限，已停止发布")
 	}
-	// 本任务的完整下载已核实，源站因此显示已下载是预期状态。
-	candidate.PreviouslyDownloaded = false
 	candidate = policy.Evaluate(candidate, snapshot.Settings)
 	if !candidate.Eligible {
 		return errors.New("发布前候选已不符合规则：" + strings.Join(candidate.Reasons, "；"))
@@ -157,19 +187,33 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	return nil
 }
 
-// automationPublishOutcome 将任何上传尝试结果先写永久账本，绝不进入原生自动重试。
-func (s *MigrateService) automationPublishOutcome(queue repository.PublishQueueTask, result map[string]any, status int, text string) error {
+// automationPublishOutcome 持久化规范化的上传回执，供原生发布日志使用。不会自动重试上传。
+func (s *MigrateService) automationPublishOutcome(queue repository.PublishQueueTask, result map[string]any, status int) (map[string]any, error) {
 	if s.automation == nil {
-		return errors.New("自动化服务未初始化")
+		return nil, errors.New("自动化服务未初始化")
 	}
+	result = s.automationSafeResult(queue, result)
 	state := "needs_review"
 	url := processString(result["url"])
 	success, _ := result["success"].(bool)
 	existing, _ := result["is_existing_torrent"].(bool)
-	if success && status < 400 && !existing && url != "" {
+	switch {
+	case existing:
+		state = repository.AutomationStateAlreadyExists
+		result["message"] = "目标站返回已有对应种子"
+	case success && status >= 200 && status < 300 && url != "":
 		state = "published"
+		result["message"] = "已发布，等待核验目标做种"
+	default:
+		result["message"] = "发布结果待核对，禁止重复提交"
 	}
-	return s.automation.repo.PublishOutcome(queue.ID, state, url, text, s.automation.now())
+	result["success"] = state == "published"
+	result["logs"] = result["message"]
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return result, s.automation.repo.PublishOutcome(queue.ID, state, url, string(encoded), s.automation.now())
 }
 
 // automationSafeResult 只保存可公开的结构化发布证据，避免复制原生结果内的下载 passkey 或正文日志。

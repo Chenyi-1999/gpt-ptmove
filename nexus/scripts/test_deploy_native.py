@@ -12,7 +12,7 @@ class NativeUpgradeTests(unittest.TestCase):
     root = Path('/opt/gpt-ptmove-nexus')
 
     def setUp(self):
-        resolve_version = mock.patch.object(deploy, 'release_version', return_value='1.0.3')
+        resolve_version = mock.patch.object(deploy, 'release_version', return_value='1.0.4')
         resolve_version.start()
         self.addCleanup(resolve_version.stop)
 
@@ -56,7 +56,7 @@ class NativeUpgradeTests(unittest.TestCase):
             self.assertEqual(compose.call_args_list, [
                 mock.call(self.root, 'production', 'up', '-d', '--no-build'),
                 mock.call(self.root, 'production', 'up', '-d', '--no-build', image='sha256:previous-native')])
-            health.assert_has_calls([mock.call(18121, '1.0.3'), mock.call(18120, '1.0.3'), mock.call(18120, '0.3.0')])
+            health.assert_has_calls([mock.call(18121, '1.0.4'), mock.call(18120, '1.0.4'), mock.call(18120, '0.3.0')])
 
     def test_failed_canary_prevents_inspection_and_upgrade(self):
         with mock.patch.object(deploy, 'health', side_effect=RuntimeError('canary unhealthy')), \
@@ -79,7 +79,7 @@ class NativeUpgradeTests(unittest.TestCase):
                 self.assertEqual(environment['PTMOVE_ENV_FILE'], str(self.root / ('.env.canary' if kind == 'canary' else '.env.ptmove')))
                 self.assertEqual(environment['PTMOVE_PORT'], port)
                 self.assertEqual(environment['PTMOVE_BIND'], '0.0.0.0')
-                self.assertEqual(environment['PTMOVE_IMAGE'], 'ptmove-nexus:1.0.3')
+                self.assertEqual(environment['PTMOVE_IMAGE'], 'ptmove-nexus:1.0.4')
                 deploy.compose(self.root, kind, 'up', '-d', '--no-build', image='sha256:previous-native')
                 self.assertEqual(command.call_args.kwargs['env']['PTMOVE_IMAGE'], 'sha256:previous-native')
 

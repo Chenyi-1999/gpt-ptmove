@@ -2,6 +2,7 @@ package downloaderclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -82,7 +83,12 @@ type ProxyScreenshotPreviewResult struct {
 // 失败场景：代理不可达、HTTP 返回异常、代理返回 success=false、响应解析失败、BBCode 为空。
 // 副作用：会向盒子代理服务发起 HTTP 请求。
 func (d Downloader) FetchScreenshotsByProxy(remotePath, contentName string, selectedSubtitleSID *int) (string, error) {
-	resp, err := d.requestProxyScreenshots(remotePath, contentName, "", 0, nil, selectedSubtitleSID)
+	return d.FetchScreenshotsByProxyContext(context.Background(), remotePath, contentName, selectedSubtitleSID)
+}
+
+// FetchScreenshotsByProxyContext 允许自动任务在租约结束前取消截图领单。
+func (d Downloader) FetchScreenshotsByProxyContext(ctx context.Context, remotePath, contentName string, selectedSubtitleSID *int) (string, error) {
+	resp, err := d.requestProxyScreenshotsWithContext(ctx, remotePath, contentName, "", 0, nil, selectedSubtitleSID)
 	if err != nil {
 		return "", err
 	}
@@ -188,6 +194,18 @@ func (d Downloader) requestProxyScreenshots(
 	selectedTimes []float64,
 	selectedSubtitleSID *int,
 ) (proxyScreenshotResponse, error) {
+	return d.requestProxyScreenshotsWithContext(context.Background(), remotePath, contentName, mode, previewCount, selectedTimes, selectedSubtitleSID)
+}
+
+func (d Downloader) requestProxyScreenshotsWithContext(
+	ctx context.Context,
+	remotePath string,
+	contentName string,
+	mode string,
+	previewCount int,
+	selectedTimes []float64,
+	selectedSubtitleSID *int,
+) (proxyScreenshotResponse, error) {
 	trimmedPath := strings.TrimSpace(remotePath)
 	if trimmedPath == "" {
 		return proxyScreenshotResponse{}, &ProxyAPIError{StatusCode: 400, Message: "remote_path 不能为空"}
@@ -237,7 +255,7 @@ func (d Downloader) requestProxyScreenshots(
 	}
 
 	proxyURL := fmt.Sprintf("http://%s:%d/api/media/screenshot", proxyIP, proxyPort)
-	request, err := http.NewRequest(http.MethodPost, proxyURL, bytes.NewReader(payloadBytes))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return proxyScreenshotResponse{}, &ProxyAPIError{StatusCode: 500, Message: "创建请求失败: " + err.Error()}
 	}

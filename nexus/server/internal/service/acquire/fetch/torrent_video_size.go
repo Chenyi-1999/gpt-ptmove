@@ -38,54 +38,62 @@ func ExtractVideoSizeFromTorrentFile(torrentPath string) (int64, string, error) 
 	if err != nil {
 		return 0, "", fmt.Errorf("读取 torrent 文件失败: %w", err)
 	}
-	return extractVideoSizeFromTorrentBytes(content)
+	total, largestName, _, err := extractVideoSizeFromTorrentBytes(content)
+	return total, largestName, err
 }
 
-func extractVideoSizeFromTorrentBytes(content []byte) (int64, string, error) {
+// LargestVideoSizeFromTorrentBytes 返回种子中最大视频文件的精确字节数。
+// 元数据无效或没有视频文件时返回错误，不读取磁盘或访问 Tracker。
+func LargestVideoSizeFromTorrentBytes(content []byte) (int64, error) {
+	_, _, largestSize, err := extractVideoSizeFromTorrentBytes(content)
+	return largestSize, err
+}
+
+func extractVideoSizeFromTorrentBytes(content []byte) (int64, string, int64, error) {
 	if len(content) == 0 {
-		return 0, "", errors.New("torrent 内容为空")
+		return 0, "", 0, errors.New("torrent 内容为空")
 	}
 	p := &bdecodeParser{data: content}
 	if err := p.expect('d'); err != nil {
-		return 0, "", err
+		return 0, "", 0, err
 	}
 
 	var infoValue any
 	for p.idx < len(p.data) && p.data[p.idx] != 'e' {
 		keyBytes, err := p.parseBytes()
 		if err != nil {
-			return 0, "", err
+			return 0, "", 0, err
 		}
 		key := string(keyBytes)
 		if key == "info" {
 			value, err := p.parseValue()
 			if err != nil {
-				return 0, "", err
+				return 0, "", 0, err
 			}
 			infoValue = value
 			continue
 		}
 		if _, err := p.parseValue(); err != nil {
-			return 0, "", err
+			return 0, "", 0, err
 		}
 	}
 	if err := p.expect('e'); err != nil {
-		return 0, "", err
+		return 0, "", 0, err
 	}
 
 	if infoValue == nil {
-		return 0, "", errors.New("torrent 缺少 info 字段")
+		return 0, "", 0, errors.New("torrent 缺少 info 字段")
 	}
 	infoMap, ok := infoValue.(map[string]any)
 	if !ok {
-		return 0, "", errors.New("torrent info 结构异常")
+		return 0, "", 0, errors.New("torrent info 结构异常")
 	}
 
-	total, largestName, _ := extractVideoSizeFromInfo(infoMap)
+	total, largestName, largestSize := extractVideoSizeFromInfo(infoMap)
 	if total <= 0 {
-		return 0, "", errors.New("torrent 未包含视频文件")
+		return 0, "", 0, errors.New("torrent 未包含视频文件")
 	}
-	return total, largestName, nil
+	return total, largestName, largestSize, nil
 }
 
 func extractVideoSizeFromInfo(info map[string]any) (int64, string, int64) {

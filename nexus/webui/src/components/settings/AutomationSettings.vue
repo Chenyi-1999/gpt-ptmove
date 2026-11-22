@@ -101,7 +101,7 @@
         <ul>
           <li>源站只选官方种子，并按完整种子体积排序后匹配大小范围。</li>
           <li>禁转、限制转载、分集标签或已下载的资源会跳过。</li>
-          <li>目标站必须确认不存在对应种子；查重失败或结果未知时跳过。</li>
+          <li>下载和发布前核对目标站。已有对应种子会跳过，结果不明时等待核对。</li>
         </ul>
         <p>这些条件由服务端强制执行，不能在页面或旧版 API 字段中关闭。</p>
       </div>
@@ -113,7 +113,7 @@
         >
       </div>
       <el-alert
-        title="发布策略：是否自动发布仍由上方开关控制。固定筛选规则不因该开关或兼容字段改变；任一条件未知时服务端会跳过候选。"
+        title="自动发布开启后，每条种子在文件完整、资料齐备并再次通过查重后独立发布。目标站返回已存在时不计发布成功。"
         type="warning"
         :closable="false"
         show-icon
@@ -151,10 +151,10 @@
           ><template #default="s">{{ formatSize(s.row.size) }}</template></el-table-column
         ><el-table-column prop="seeders" label="做种" width="80" /><el-table-column
           label="资格"
-          width="100"
+          width="120"
           ><template #default="s"
-            ><el-tag :type="s.row.eligible ? 'success' : 'danger'">{{
-              s.row.eligible ? '可处理' : '跳过'
+            ><el-tag :type="candidateStatus(s.row).type">{{
+              candidateStatus(s.row).label
             }}</el-tag></template
           ></el-table-column
         ><el-table-column label="原因" min-width="200"
@@ -163,7 +163,14 @@
       ></el-card
     >
     <el-card shadow="never" class="panel"
-      ><template #header><strong>任务与运行记录</strong></template
+      ><template #header>
+        <div class="card-head">
+          <strong>任务与运行记录</strong>
+          <el-button size="small" :loading="refreshingRecords" @click="refreshRecords"
+            >刷新记录</el-button
+          >
+        </div>
+      </template
       ><el-tabs
         ><el-tab-pane label="下载任务"
           ><el-table :data="tasks" empty-text="暂无任务"
@@ -172,18 +179,34 @@
               label="源站"
               width="90"
             /><el-table-column prop="target" label="目标站" width="90" /><el-table-column
-              prop="state"
               label="状态"
-              width="110"
-            /><el-table-column prop="message" label="进度 / 信息" min-width="160" /><el-table-column
+              width="140"
+              ><template #default="s"
+                ><el-tag :type="taskStatus(s.row).type" effect="plain">{{
+                  taskStatus(s.row).label
+                }}</el-tag></template
+              ></el-table-column
+            ><el-table-column prop="message" label="进度 / 信息" min-width="160" /><el-table-column
               label="操作"
               width="230"
               ><template #default="s"
-                ><el-button link type="danger" @click="act(s.row, 'cancel')">取消</el-button
-                ><el-button link @click="act(s.row, 'retry')">重试</el-button
-                ><el-button link @click="reconcile(s.row)">对账链接</el-button
-                ><el-link v-if="s.row.result_url" :href="s.row.result_url" target="_blank"
-                  >上游</el-link
+                ><el-button
+                  v-if="canCancel(s.row)"
+                  link
+                  type="danger"
+                  @click="act(s.row, 'cancel')"
+                  >取消</el-button
+                ><el-button v-if="canRetry(s.row)" link @click="act(s.row, 'retry')">{{
+                  s.row.state === 'waiting_target' ? '重新核对' : '重试'
+                }}</el-button
+                ><el-button v-if="canReconcile(s.row)" link @click="reconcile(s.row)"
+                  >提交核对链接</el-button
+                ><el-link
+                  v-if="s.row.result_url"
+                  :href="s.row.result_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >目标详情</el-link
                 ></template
               ></el-table-column
             ></el-table
@@ -211,11 +234,70 @@ type Candidate = {
   official?: boolean
   episode?: boolean
   previously_downloaded?: boolean
+  duplicate_known?: boolean
+  duplicate?: boolean
   eligible: boolean
   reasons: string[]
 }
+type AutomationTask = {
+  id: string
+  state: string
+  publish_attempted?: boolean
+  result_url?: string
+}
+type StatusBadge = {
+  label: string
+  type: 'primary' | 'success' | 'warning' | 'info' | 'danger'
+}
 type Row = Record<string, unknown>
+const candidateStatus = (candidate: Candidate): StatusBadge => {
+  if (candidate.eligible) return { label: '可处理', type: 'success' }
+  if (candidate.duplicate_known && candidate.duplicate)
+    return { label: '目标已存在', type: 'info' }
+  if (candidate.reasons?.includes('目标查重未知'))
+    return { label: '查重待核对', type: 'warning' }
+  return { label: '跳过', type: 'info' }
+}
+const taskBadges: Record<string, StatusBadge> = {
+  reserved: { label: '待下载', type: 'info' },
+  downloading: { label: '下载中', type: 'primary' },
+  preparing: { label: '准备资料', type: 'primary' },
+  waiting_media: { label: '待补资料', type: 'warning' },
+  waiting_target: { label: '查重待核对', type: 'warning' },
+  ready: { label: '资料已齐', type: 'info' },
+  queued_publish: { label: '待发布', type: 'info' },
+  publishing: { label: '发布中', type: 'primary' },
+  published: { label: '已发布待做种', type: 'primary' },
+  seeding: { label: '做种校验中', type: 'primary' },
+  reconciling: { label: '正在核对', type: 'primary' },
+  succeeded: { label: '已发布并做种', type: 'success' },
+  already_exists: { label: '已存在', type: 'info' },
+  needs_review: { label: '结果待核对', type: 'warning' },
+  cancelled: { label: '已取消', type: 'info' },
+  failed: { label: '失败', type: 'danger' },
+}
+const taskStatus = (task: AutomationTask): StatusBadge =>
+  taskBadges[task.state] ?? { label: task.state || '未知', type: 'info' }
+const cancellableStates = new Set([
+  'reserved',
+  'downloading',
+  'preparing',
+  'waiting_media',
+  'waiting_target',
+  'ready',
+  'queued_publish',
+  'needs_review',
+  'failed',
+])
+const canCancel = (task: AutomationTask) =>
+  !task.publish_attempted && cancellableStates.has(task.state)
+const canRetry = (task: AutomationTask) =>
+  !task.publish_attempted && (task.state === 'waiting_target' || task.state === 'failed')
+const canReconcile = (task: AutomationTask) =>
+  task.publish_attempted === true &&
+  ['needs_review', 'published', 'seeding', 'reconciling'].includes(task.state)
 const loading = ref(false),
+  refreshingRecords = ref(false),
   saving = ref(false),
   previewing = ref(false),
   running = ref(false),
@@ -224,7 +306,7 @@ const loading = ref(false),
   downloaders = ref<{ id: string; name: string }[]>([]),
   candidates = ref<Candidate[]>([]),
   selected = ref<Candidate[]>([]),
-  tasks = ref<Row[]>([]),
+  tasks = ref<AutomationTask[]>([]),
   runs = ref<Row[]>([]),
   quota = ref<Record<string, unknown>>({})
 const form = reactive({
@@ -291,6 +373,26 @@ const load = async () => {
       : '加载设置失败'
   } finally {
     loading.value = false
+  }
+}
+const refreshRecords = async () => {
+  refreshingRecords.value = true
+  try {
+    const [t, r] = await Promise.all([
+      axios.get('/api/automation/tasks'),
+      axios.get('/api/automation/runs'),
+    ])
+    tasks.value = t.data.tasks || []
+    runs.value = r.data.runs || []
+    quota.value = t.data.quota || quota.value
+  } catch (e) {
+    ElMessage.error(
+      axios.isAxiosError(e)
+        ? e.response?.data?.message || e.response?.data?.error || e.message
+        : '刷新记录失败',
+    )
+  } finally {
+    refreshingRecords.value = false
   }
 }
 const payload = () => ({
@@ -362,11 +464,13 @@ const runRequest = async (ids?: string[]) => {
 }
 const run = () => runRequest()
 const enqueueSelected = () => runRequest(selected.value.map((x) => x.id))
-const act = async (task: Row, action: string) => {
+const act = async (task: AutomationTask, action: 'cancel' | 'retry') => {
   try {
     await axios.post(`/api/automation/tasks/${String(task.id ?? '')}/${action}`)
-    ElMessage.success(action === 'cancel' ? '已取消' : '已请求重试')
-    await load()
+    ElMessage.success(
+      action === 'cancel' ? '已取消' : task.state === 'waiting_target' ? '已请求核对' : '已请求重试',
+    )
+    await refreshRecords()
   } catch (e) {
     ElMessage.error(
       axios.isAxiosError(e)
@@ -375,7 +479,7 @@ const act = async (task: Row, action: string) => {
     )
   }
 }
-const reconcile = async (task: Row) => {
+const reconcile = async (task: AutomationTask) => {
   try {
     const result = await ElMessageBox.prompt('粘贴目标站详情页链接用于人工对账', '对账链接', {
       inputPattern: /^https:\/\//,
@@ -389,8 +493,8 @@ const reconcile = async (task: Row) => {
           : ''
     if (!value) return ElMessage.warning('请输入目标站详情页链接')
     await axios.post(`/api/automation/tasks/${String(task.id ?? '')}/reconcile`, { url: value })
-    ElMessage.success('对账完成')
-    await load()
+    ElMessage.success('已登记核对')
+    await refreshRecords()
   } catch (e) {
     if (e !== 'cancel')
       ElMessage.error(

@@ -2,6 +2,7 @@ package downloaderclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -55,6 +56,11 @@ type proxyMediaInfoResponse struct {
 // 失败场景：代理不可达、HTTP 返回异常、代理返回 success=false、响应解析失败。
 // 副作用：会向盒子代理服务发起 HTTP 请求。
 func (d Downloader) FetchMediaInfoByProxy(remotePath, contentName string) (string, bool, error) {
+	return d.FetchMediaInfoByProxyContext(context.Background(), remotePath, contentName)
+}
+
+// FetchMediaInfoByProxyContext 允许自动任务在租约结束前取消媒体领单。
+func (d Downloader) FetchMediaInfoByProxyContext(ctx context.Context, remotePath, contentName string) (string, bool, error) {
 	trimmedPath := strings.TrimSpace(remotePath)
 	if trimmedPath == "" {
 		return "", false, &ProxyAPIError{StatusCode: 400, Message: "remote_path 不能为空"}
@@ -88,7 +94,7 @@ func (d Downloader) FetchMediaInfoByProxy(remotePath, contentName string) (strin
 	}
 
 	proxyURL := fmt.Sprintf("http://%s:%d/api/media/mediainfo", proxyIP, proxyPort)
-	request, err := http.NewRequest(http.MethodPost, proxyURL, bytes.NewReader(payloadBytes))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, proxyURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return "", false, &ProxyAPIError{StatusCode: 500, Message: "创建请求失败: " + err.Error()}
 	}

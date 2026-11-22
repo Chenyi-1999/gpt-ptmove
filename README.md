@@ -14,7 +14,7 @@ STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可
 - 独立机器 API 密钥提供 `read`、`write`、`publish` 范围，可设到期时间并撤销；写命令使用幂等请求键。一般变更要求 `write`；启用发布、已有待执行任务或明确入队/发布时还要求 `publish`。管理员可下载 `/api/machine-openapi`，机器 API 文档为 `/api/v1/openapi.json`。
 - qB Bearer Token 接入仅假设目标 qB API 兼容 Bearer API 网关；本改版没有验证真实 qB 原生 Token 支持，也不保证用户提供的 Token 可直接使用。请按实际网关文档配置并在隔离环境验证。
 - API 管理提供密钥权限预设、有效／过期／撤销状态、同源只读连接测试和不含真实凭据的 AI 接入包，见 [API 管理与接入](docs/API_MANAGEMENT.md)。
-- 截图缺失时可使用 NAS 端 Docker 媒体代理，远程截帧并上传 Pixhost；支持 Linux amd64／arm64 构建。目录只读、独立认证，截图待确认时阻止自动发布，见 [远程补截图](docs/REMOTE_SCREENSHOTS.md)。
+- NAS 端 Docker 媒体代理支持 Linux amd64／arm64，可提取 MediaInfo 并截帧上传 Pixhost。自动任务补齐的有效资料可以直接进入发布队列，人工标记为待确认的截图仍需审核。 [远程补截图](docs/REMOTE_SCREENSHOTS.md)
 
 ## Docker 安装
 
@@ -44,7 +44,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-STARPT v1.0.3 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.3 发行说明](docs/RELEASE-v1.0.3.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
+STARPT v1.0.4 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.4 发行说明](docs/RELEASE-v1.0.4.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
 
 ## 初次配置
 

@@ -251,7 +251,9 @@ func (s *MigrateService) appendPublishLog(payload map[string]any, ctxTaskID stri
 		limitReached := processingshared.ToBool(result["limit_reached"])
 		if preCheck && limitReached {
 			logStatus = "pre_check_limit"
-		} else if statusCode == 200 && processingshared.ToBool(result["success"]) {
+		} else if trigger == "automation" && processingshared.ToBool(result["is_existing_torrent"]) {
+			logStatus = "exists"
+		} else if (statusCode == 200 || (trigger == "automation" && statusCode >= 200 && statusCode < 300)) && processingshared.ToBool(result["success"]) {
 			autoEdited := false
 			if processingshared.ToBool(result["auto_edit_executed"]) {
 				if autoEditResult, ok := result["auto_edit_result"].(map[string]any); ok && autoEditResult != nil {

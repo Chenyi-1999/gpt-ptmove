@@ -16,6 +16,15 @@ var (
 	ErrAutomationDuplicate = errors.New("该源种子已预留、已下载、已发布或结果待核对")
 )
 
+const (
+	// AutomationStateWaitingMedia 等待客户端下载器补全资料，由后台继续轮询。
+	AutomationStateWaitingMedia = "waiting_media"
+	// AutomationStateWaitingTarget 等待重新核对未知的目标站结果，尚未上传。
+	AutomationStateWaitingTarget = "waiting_target"
+	// AutomationStateAlreadyExists 表示已确认目标站有对应种子，不会再上传。
+	AutomationStateAlreadyExists = "already_exists"
+)
+
 // AutomationSettingsRecord 保存模块设置；凭据仍由原生站点和下载器配置管理。
 type AutomationSettingsRecord struct {
 	ID        uint   `gorm:"primaryKey"`
@@ -79,6 +88,7 @@ type AutomationTask struct {
 	LeaseToken        string `json:"-"`
 	LeaseUntil        int64  `json:"-"`
 	LastPolledAt      int64  `json:"-" gorm:"index"`
+	MediaRetryAt      int64  `json:"-"`
 	CreatedAt         int64  `json:"created_at"`
 	UpdatedAt         int64  `json:"updated_at"`
 }
@@ -118,7 +128,7 @@ func (r *AutomationRepository) SaveSettings(value string, disabled bool, now tim
 			if err := tx.Model(&AutomationRun{}).Where("status IN ?", []string{"queued", "scanning"}).Updates(map[string]any{"execute": false, "explicit": false}).Error; err != nil {
 				return err
 			}
-			return tx.Model(&AutomationTask{}).Where("state IN ?", []string{"reserved", "downloading", "preparing", "ready", "published", "seeding", "reconciling", "needs_review"}).Updates(map[string]any{"explicit": false}).Error
+			return tx.Model(&AutomationTask{}).Where("state IN ?", []string{"reserved", "downloading", "preparing", AutomationStateWaitingMedia, AutomationStateWaitingTarget, "ready", "published", "seeding", "reconciling", "needs_review"}).Updates(map[string]any{"explicit": false}).Error
 		}
 		return nil
 	})
@@ -134,8 +144,13 @@ func (r *AutomationRepository) FinishRun(id, status, message string, selected in
 
 // automationDownloadStates 包含已开始下载或已进入其后阶段的旧任务，兼容缺少下载标记的记录。
 var automationDownloadStates = []string{
-	"downloading", "preparing", "ready", "queued_publish", "publishing",
+	"downloading", "preparing", AutomationStateWaitingMedia, "ready", "queued_publish", "publishing",
 	"published", "seeding", "succeeded", "reconciling", "needs_review",
+}
+
+var automationRunnableStates = []string{
+	"reserved", "downloading", "preparing", AutomationStateWaitingMedia,
+	"ready", "published", "seeding", "reconciling",
 }
 
 // automationSourceIdentity 按同源标识或规范化信息哈希匹配载荷，不受目标站或月份影响。
@@ -179,8 +194,8 @@ func (r *AutomationRepository) Reserve(task *AutomationTask, maxCount int, maxBy
 		// 在当月配额行串行化写入后重读，命中时回滚本次配额扣减。
 		var duplicate AutomationTask
 		err := automationSourceIdentity(tx, task.Source, task.SourceID, task.InfoHash).
-			Where("(download_attempted = ? OR publish_attempted = ? OR state IN ? OR state = ? OR (source = ? AND target = ? AND month = ?))",
-				true, true, automationDownloadStates, "reserved", task.Source, task.Target, task.Month).
+			Where("(download_attempted = ? OR publish_attempted = ? OR state IN ? OR state IN ? OR (source = ? AND target = ? AND month = ?))",
+				true, true, automationDownloadStates, []string{"reserved", AutomationStateWaitingTarget}, task.Source, task.Target, task.Month).
 			Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").Take(&duplicate).Error
 		if err == nil {
 			return ErrAutomationDuplicate
@@ -225,7 +240,10 @@ func (r *AutomationRepository) Task(id string) (AutomationTask, error) {
 
 // Claim 通过状态和过期时间比较交换领取任务；过期工作者无法推进状态。
 func (r *AutomationRepository) Claim(id, token string, now time.Time) (AutomationTask, error) {
-	result := r.db.Model(&AutomationTask{}).Where("id = ? AND state IN ? AND lease_until <= ?", id, []string{"reserved", "downloading", "preparing", "ready", "published", "seeding", "reconciling"}, now.UnixMilli()).Updates(map[string]any{"lease_token": token, "lease_until": now.Add(15 * time.Minute).UnixMilli()})
+	result := r.db.Model(&AutomationTask{}).
+		Where("id = ? AND state IN ? AND lease_until <= ?", id, automationRunnableStates, now.UnixMilli()).
+		Where("(state <> ? OR media_retry_at IS NULL OR media_retry_at <= ?)", AutomationStateWaitingMedia, now.UnixMilli()).
+		Updates(map[string]any{"lease_token": token, "lease_until": now.Add(15 * time.Minute).UnixMilli()})
 	if result.Error != nil {
 		return AutomationTask{}, result.Error
 	}
@@ -253,6 +271,32 @@ func (r *AutomationRepository) Release(id, token string) error {
 	return r.db.Model(&AutomationTask{}).Where("id = ? AND lease_token = ?", id, token).Updates(map[string]any{"lease_token": "", "lease_until": 0}).Error
 }
 
+// SkipExistingBeforeDownload 结束尚未使用的下载预留，额度和任务状态一起更新。
+func (r *AutomationRepository) SkipExistingBeforeDownload(task AutomationTask, now time.Time) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		change := tx.Model(&AutomationTask{}).
+			Where("id = ? AND month = ? AND size = ? AND state = ? AND lease_token = ? AND lease_until > ? AND queue_id IS NULL AND download_attempted = ? AND publish_attempted = ?",
+				task.ID, task.Month, task.Size, "reserved", task.LeaseToken, now.UnixMilli(), false, false).
+			Updates(map[string]any{
+				"state": AutomationStateAlreadyExists, "message": "目标站已有对应种子，已跳过下载",
+				"lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli(),
+			})
+		if change.Error != nil {
+			return change.Error
+		}
+		if change.RowsAffected != 1 {
+			return ErrAutomationFence
+		}
+		return refundAutomationQuota(tx, task.Month, task.Size)
+	})
+}
+
+// refundAutomationQuota 只退还调用方已确认未使用的下载预留。
+func refundAutomationQuota(tx *gorm.DB, month string, size int64) error {
+	return tx.Model(&AutomationQuota{}).Where("month = ? AND count > 0 AND bytes >= ?", month, size).
+		Updates(map[string]any{"count": gorm.Expr("count - 1"), "bytes": gorm.Expr("bytes - ?", size)}).Error
+}
+
 // Cancel 取消尚未开始上传的任务；仅完全未触碰的任务退还预留。
 func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
@@ -262,6 +306,9 @@ func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 		}
 		if row.PublishAttempted || row.State == "succeeded" {
 			return errors.New("发布已尝试，必须先核对结果")
+		}
+		if row.State == AutomationStateAlreadyExists {
+			return ErrAutomationFence
 		}
 		if row.State == "cancelled" {
 			return nil
@@ -274,25 +321,31 @@ func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 			return ErrAutomationFence
 		}
 		if row.QueueID != nil {
-			if err := tx.Model(&PublishQueueTask{}).Where("id = ? AND status = ?", *row.QueueID, PublishQueueStatusQueued).Updates(map[string]any{"status": PublishQueueStatusCancelled}).Error; err != nil {
+			nowText := now.Format(PublishQueueTimeLayout)
+			if err := tx.Model(&PublishQueueTask{}).
+				Where("id = ? AND status IN ?", *row.QueueID, []string{PublishQueueStatusQueued, PublishQueueStatusRunning}).
+				Updates(map[string]any{
+					"status": PublishQueueStatusCancelled, "next_run_at": nil,
+					"finished_at": nowText, "updated_at": nowText,
+				}).Error; err != nil {
 				return err
 			}
 		}
 		if !row.DownloadAttempted && row.QueueID == nil {
-			return tx.Model(&AutomationQuota{}).Where("month = ? AND count > 0 AND bytes >= ?", row.Month, row.Size).Updates(map[string]any{"count": gorm.Expr("count - 1"), "bytes": gorm.Expr("bytes - ?", row.Size)}).Error
+			return refundAutomationQuota(tx, row.Month, row.Size)
 		}
 		return nil
 	})
 }
 
-// Retry 仅恢复未尝试上传的失败任务，沿用原来的配额与下载副作用标记。
+// Retry 仅恢复未尝试上传的失败或查重待核对任务，沿用原来的预留与下载标记。
 func (r *AutomationRepository) Retry(id string, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var task AutomationTask
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&task, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if task.State != "failed" || task.PublishAttempted {
+		if (task.State != "failed" && task.State != AutomationStateWaitingTarget) || task.PublishAttempted {
 			return ErrAutomationFence
 		}
 		next := "reserved"
@@ -309,7 +362,7 @@ func (r *AutomationRepository) Retry(id string, now time.Time) error {
 			}
 			next = "queued_publish"
 		}
-		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND publish_attempted = ?", id, "failed", false).Updates(map[string]any{"state": next, "explicit": true, "message": "用户重试，沿用原有预留", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
+		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND publish_attempted = ?", id, task.State, false).Updates(map[string]any{"state": next, "explicit": true, "message": "用户重试，沿用原有预留", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -392,14 +445,78 @@ func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time
 	})
 }
 
-// PublishOutcome 先保存永久结果，再允许原生队列完成或清理。未知结果不允许重试。
+// PublishOutcome 将已尝试上传的结果与原生队列一起完成，重复或未知结果不计成功。
 func (r *AutomationRepository) PublishOutcome(queueID int64, state, url, result string, now time.Time) error {
-	return r.db.Model(&AutomationTask{}).Where("queue_id = ? AND publish_attempted = ?", queueID, true).Updates(map[string]any{"state": state, "result_url": url, "result_json": result, "message": "发布结果已持久化；只有校验目标种子后才能完成", "updated_at": now.UnixMilli()}).Error
+	switch state {
+	case "published":
+		return r.finishPublishQueue(queueID, true, state, PublishQueueStatusSuccess, "已发布，等待核验目标做种", url, result, now)
+	case AutomationStateAlreadyExists:
+		return r.finishPublishQueue(queueID, true, state, PublishQueueStatusExists, "目标站返回已有对应种子", url, result, now)
+	case "needs_review":
+		return r.finishPublishQueue(queueID, true, state, PublishQueueStatusFailed, "发布结果待核对，禁止重复提交", url, result, now)
+	default:
+		return ErrAutomationFence
+	}
+}
+
+// ResolveTargetBeforePublish 记录上传前的查重结论。未知任务仅可恢复原队列重新查重。
+func (r *AutomationRepository) ResolveTargetBeforePublish(queueID int64, state string, now time.Time) error {
+	switch state {
+	case AutomationStateAlreadyExists:
+		return r.finishPublishQueue(queueID, false, state, PublishQueueStatusExists, "发布前确认目标站已有对应种子", "", "", now)
+	case AutomationStateWaitingTarget:
+		return r.finishPublishQueue(queueID, false, state, PublishQueueStatusFailed, "发布前无法确认目标站查重结果", "", "", now)
+	default:
+		return ErrAutomationFence
+	}
+}
+
+// finishPublishQueue 使用任务状态、尝试标记及运行中的自动队列共同围栏保存结果。
+func (r *AutomationRepository) finishPublishQueue(queueID int64, attempted bool, state, queueState, message, url, result string, now time.Time) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		expected := "queued_publish"
+		if attempted {
+			expected = "publishing"
+		}
+		task := tx.Model(&AutomationTask{}).
+			Where("queue_id = ? AND state = ? AND publish_attempted = ?", queueID, expected, attempted).
+			Updates(map[string]any{"state": state, "result_url": url, "result_json": result, "message": message, "updated_at": now.UnixMilli()})
+		if task.Error != nil {
+			return task.Error
+		}
+		if task.RowsAffected != 1 {
+			return ErrAutomationFence
+		}
+		nowText := now.Format(PublishQueueTimeLayout)
+		updates := map[string]any{
+			"status": queueState, "last_error": "", "last_result": result,
+			"next_run_at": nil, "finished_at": nowText, "updated_at": nowText,
+		}
+		if queueState == PublishQueueStatusFailed {
+			updates["last_error"] = message
+			if attempted {
+				updates["attempt_count"] = gorm.Expr("attempt_count + 1")
+			}
+		}
+		queue := tx.Model(&PublishQueueTask{}).
+			Where("id = ? AND publish_trigger = ? AND status = ?", queueID, "automation", PublishQueueStatusRunning).
+			Updates(updates)
+		if queue.Error != nil {
+			return queue.Error
+		}
+		if queue.RowsAffected != 1 {
+			return ErrAutomationFence
+		}
+		return nil
+	})
 }
 
 // RecoverPublishing 将进程中断遗留的上传状态隔离，绝不重新进入上传路径。
 func (r *AutomationRepository) RecoverPublishing(now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := recoverExistingAutomationResults(tx, now); err != nil {
+			return err
+		}
 		if err := tx.Model(&AutomationTask{}).Where("state = ?", "publishing").Updates(map[string]any{"state": "needs_review", "message": "发布进程中断，需提供目标详情地址核对", "updated_at": now.UnixMilli()}).Error; err != nil {
 			return err
 		}
@@ -413,6 +530,54 @@ func (r *AutomationRepository) RecoverPublishing(now time.Time) error {
 		}
 		return tx.Model(&PublishQueueTask{}).Where("publish_trigger = ? AND status = ?", "automation", PublishQueueStatusRunning).Updates(map[string]any{"status": PublishQueueStatusFailed, "last_error": "缺少自动化关联，已隔离"}).Error
 	})
+}
+
+// recoverExistingAutomationResults 修正旧版将明确重复回执记为待核对或核对成功的历史任务。
+func recoverExistingAutomationResults(tx *gorm.DB, now time.Time) error {
+	var rows []struct {
+		ID, State, ResultJSON, QueueResult string
+		QueueID                            *int64
+	}
+	states := []string{"needs_review", "reconciling", "seeding", "succeeded"}
+	const duplicateKey = "%is_existing_torrent%"
+	if err := tx.Table("automation_tasks").
+		Select("automation_tasks.id, automation_tasks.state, automation_tasks.queue_id, COALESCE(automation_tasks.result_json, '') AS result_json, COALESCE(publish_queue_tasks.last_result, '') AS queue_result").
+		Joins("LEFT JOIN publish_queue_tasks ON publish_queue_tasks.id = automation_tasks.queue_id AND publish_queue_tasks.publish_trigger = ?", "automation").
+		Where("automation_tasks.state IN ? AND automation_tasks.publish_attempted = ? AND (automation_tasks.result_json LIKE ? OR publish_queue_tasks.last_result LIKE ?)", states, true, duplicateKey, duplicateKey).
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if !isAutomationExistingResult(row.ResultJSON) && !isAutomationExistingResult(row.QueueResult) {
+			continue
+		}
+		change := tx.Model(&AutomationTask{}).
+			Where("id = ? AND state = ? AND publish_attempted = ? AND COALESCE(result_json, '') = ?", row.ID, row.State, true, row.ResultJSON).
+			Updates(map[string]any{
+				"state": AutomationStateAlreadyExists, "message": "目标站返回已有对应种子",
+				"lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli(),
+			})
+		if change.Error != nil {
+			return change.Error
+		}
+		if change.RowsAffected == 1 && row.QueueID != nil {
+			nowText := now.Format(PublishQueueTimeLayout)
+			if err := tx.Model(&PublishQueueTask{}).
+				Where("id = ? AND publish_trigger = ?", *row.QueueID, "automation").
+				Updates(map[string]any{"status": PublishQueueStatusExists, "last_error": "", "next_run_at": nil, "finished_at": nowText, "updated_at": nowText}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// isAutomationExistingResult 接受结构化的站点重复回执，忽略文本及非布尔值。
+func isAutomationExistingResult(raw string) bool {
+	var result struct {
+		Existing bool `json:"is_existing_torrent"`
+	}
+	return json.Unmarshal([]byte(raw), &result) == nil && result.Existing
 }
 
 // Reconcile 保存已验证的目标做种证据，不触发上传也不释放预留。
@@ -453,7 +618,7 @@ func (r *AutomationRepository) FailBeforePublish(queueID int64, message string, 
 
 // RequestReconcile 仅登记目标详情和显式核对授权；不访问站点、下载器或文件。
 func (r *AutomationRepository) RequestReconcile(id, url string, now time.Time) error {
-	result := r.db.Model(&AutomationTask{}).Where("id = ? AND state IN ?", id, []string{"needs_review", "published", "seeding", "reconciling"}).Updates(map[string]any{"state": "reconciling", "result_url": url, "explicit": true, "message": "已登记目标核对，等待后台仅修复做种", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
+	result := r.db.Model(&AutomationTask{}).Where("id = ? AND publish_attempted = ? AND state IN ?", id, true, []string{"needs_review", "published", "seeding", "reconciling"}).Updates(map[string]any{"state": "reconciling", "result_url": url, "explicit": true, "message": "已登记目标核对，等待后台仅修复做种", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -513,7 +678,7 @@ func (r *AutomationRepository) PendingRuns() ([]AutomationRun, error) {
 // WorkTasks 只读取可推进任务，避免终态历史挤出待执行任务。
 func (r *AutomationRepository) WorkTasks() ([]AutomationTask, error) {
 	rows := []AutomationTask{}
-	err := r.db.Where("state IN ?", []string{"reserved", "downloading", "preparing", "ready", "published", "seeding", "reconciling"}).Order("last_polled_at ASC").Order("created_at ASC").Order("id ASC").Limit(50).Find(&rows).Error
+	err := r.db.Where("state IN ?", automationRunnableStates).Order("last_polled_at ASC").Order("created_at ASC").Order("id ASC").Limit(50).Find(&rows).Error
 	return rows, err
 }
 

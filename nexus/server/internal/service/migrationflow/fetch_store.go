@@ -24,6 +24,11 @@ const (
 // 失败场景：源站点校验失败、下载种子失败、解析失败、写库失败等会返回错误状态码与 message。
 // 副作用：会发起网络请求、写入临时 torrent 文件、写入/覆盖 seed_parameters，并可能触发 MediaInfo/BDInfo 的异步修复。
 func (s *MigrateService) FetchAndStore(payload map[string]any) (map[string]any, int) {
+	return s.fetchAndStore(payload, nil)
+}
+
+// fetchAndStore 使用内部仓储覆盖时只提取原站资料，自动任务随后按冻结载荷补齐媒体。
+func (s *MigrateService) fetchAndStore(payload map[string]any, automationRepo *automationMediaDraftRepo) (map[string]any, int) {
 	sourceSite := strings.TrimSpace(processingshared.ToString(payload["sourceSite"], ""))
 	searchTerm := strings.TrimSpace(processingshared.ToString(payload["searchTerm"], ""))
 	torrentName := strings.TrimSpace(processingshared.ToString(payload["torrentName"], ""))
@@ -64,6 +69,11 @@ func (s *MigrateService) FetchAndStore(payload map[string]any) (map[string]any, 
 		CSPTToken:        s.csptToken(),
 		RootConfig:       rootConfig,
 	}
+	var fetchRepo processingpersist.FetchAndStoreEntryRepo = s.repo
+	if automationRepo != nil {
+		fetchRepo = automationRepo
+		fetchRepairDeps.DeferMediaRepair = true
+	}
 
 	entryResult, statusCode, isAcquireError, runErr := processingpersist.ExecuteFetchAndStoreEntry(
 		processingpersist.FetchAndStoreEntryInput{
@@ -76,13 +86,16 @@ func (s *MigrateService) FetchAndStore(payload map[string]any) (map[string]any, 
 			ScreenshotReviewMode: screenshotReviewMode,
 		},
 		processingpersist.FetchAndStoreEntryDeps{
-			Repo:            s.repo,
+			Repo:            fetchRepo,
 			ExtractorEngine: s.extractorEngine,
 			EmitLog: func(step, message, status string) {
 				s.emitLog(taskID, step, message, status)
 			},
 			FetchRepairDeps: fetchRepairDeps,
 			TriggerMediainfoRepair: func(input processingrepair.TriggerMediainfoRepairInput) {
+				if automationRepo != nil {
+					return
+				}
 				downloader, proxy, _ := downloaderclient.DecideProxy(rootConfig, input.DownloaderID)
 				if !proxy.Enabled || downloader.Type != "qbittorrent" {
 					processingrepair.TriggerMediainfoRepairDuringFetch(input, fetchRepairDeps)
@@ -98,6 +111,9 @@ func (s *MigrateService) FetchAndStore(payload map[string]any) (map[string]any, 
 				}
 			},
 			RecomputeTags: func(hash, torrentID, siteName, savePath, torrentNameForPath, reason string) {
+				if automationRepo != nil {
+					return
+				}
 				s.recomputeAndPersistTags(hash, torrentID, siteName, savePath, torrentNameForPath, reason)
 			},
 			FetchRepairModule: fetchRepairLogModule,
