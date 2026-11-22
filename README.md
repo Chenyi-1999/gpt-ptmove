@@ -8,7 +8,7 @@ STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可
 
 - 提供 Go 后端、Vue 管理界面和手动转种流程。
 - 自动化运行、定时计划和自动发布默认关闭，分别由设置页中的开关控制。首次配置时先检查站点映射、凭据、下载器和路径，再由管理员明确启用。
-- 默认计划为北京时间每月 1 日 02:00；每月最多 6 项，每项 1–10 GiB，月度资源预算 60 GiB。筛选优先官种，并优先目标站缺少的作品/版本。
+- 默认计划为北京时间每月 1 日 02:00，每月最多 6 项，每项 1–10 GiB，月度资源预算 60 GiB。自动化只选官种，并要求目标站确认没有对应种子。
 - 站点 JSON 是公开元数据声明，不包含 Cookie、RSS 或 API 密钥。导入时做严格格式校验；`announce_hosts` 必须明确填写，系统不会根据站点域名猜测 Tracker 域名。
 - 声明导入不等于站点已经可用。站点需映射到 STARPT 已实现的发布适配器，并验证该映射和真实页面行为；未知限制、查重结果或目标做种状态必须按未通过处理。
 - 独立机器 API 密钥提供 `read`、`write`、`publish` 范围，可设到期时间并撤销；写命令使用幂等请求键。一般变更要求 `write`；启用发布、已有待执行任务或明确入队/发布时还要求 `publish`。管理员可下载 `/api/machine-openapi`，机器 API 文档为 `/api/v1/openapi.json`。
@@ -44,7 +44,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-STARPT v1.0.2 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.2 发行说明](docs/RELEASE-v1.0.2.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
+STARPT v1.0.3 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.3 发行说明](docs/RELEASE-v1.0.3.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
 
 ## 初次配置
 

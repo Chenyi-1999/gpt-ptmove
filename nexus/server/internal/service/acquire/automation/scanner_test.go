@@ -106,7 +106,7 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 			var rows strings.Builder
 			switch q.Get("page") {
 			case "0":
-				rows.WriteString(zmptTestRow("1", "Pinned-ZmWeb", `<div>官方</div>`))
+				rows.WriteString(zmptTestRowWithSeeders("1", "Pinned-ZmWeb", `<div>官方</div>`, "9"))
 				rows.WriteString(zmptTestRow("2", "Restricted", official+zmptTestTag("禁转")))
 				rows.WriteString(zmptTestRow("3", "Single Episode", official+zmptTestTag("分集")))
 				rows.WriteString(zmptTestRow("4", "Previously downloaded and removed from client", official+zmptTestBar("inactivity 100%")))
@@ -114,8 +114,8 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 					rows.WriteString(zmptTestRow(fmt.Sprint(n), "Previous download", official+zmptTestBar("seeding 100%")))
 				}
 			case "1":
-				rows.WriteString(zmptTestRow("500", "New smaller release", official+`<img title="审核通过" style="color: green">`))
-				rows.WriteString(zmptTestRow("501", "New larger release", official))
+				rows.WriteString(zmptTestRowWithSeeders("500", "New smaller release", official+`<img title="审核通过" style="color: green">`, "8"))
+				rows.WriteString(zmptTestRowWithSeeders("501", "New larger release", official, "13"))
 				rows.WriteString(zmptTestRow("502", "Out of Exact Bounds", official))
 				rows.WriteString(zmptTestRow("503", "Already on Target", official))
 			}
@@ -134,7 +134,7 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 54 || !rows[0].Eligible || rows[0].ID != "501" || !rows[1].Eligible || rows[1].ID != "500" {
+	if len(rows) != 54 || !rows[0].Eligible || rows[0].ID != "501" || rows[0].Seeders != 13 || !rows[1].Eligible || rows[1].ID != "500" || rows[1].Seeders != 8 {
 		t.Fatalf("expected both eligible rows in size order after the skipped first page, got %d rows, first %#v", len(rows), rows[:min(2, len(rows))])
 	}
 	byID := map[string]policy.Candidate{}
@@ -155,6 +155,7 @@ func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
 	var progress = "inactivity 0%"
 	var matchID = "500"
 	var detailsTitle = "Synthetic ZmPT Release-ZmWeb"
+	var listingSeeders = "17"
 	var seenSearch string
 	torrentReads, targetReads := 0, 0
 	s := NewScanner()
@@ -171,7 +172,7 @@ func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
 			if req.URL.Query().Get("tag_id") != "3" {
 				t.Fatal("live verification failed to restrict to official results")
 			}
-			body = `<table class="torrents">` + zmptTestRow(matchID, detailsTitle, zmptTestTag("官方")+zmptTestBar(progress)) + `</table>`
+			body = `<table class="torrents">` + zmptTestRowWithSeeders(matchID, detailsTitle, zmptTestTag("官方")+zmptTestBar(progress), listingSeeders) + `</table>`
 		case req.URL.Path == "/download.php":
 			torrentReads++
 			body = zmptTestTorrent(policy.GiB)
@@ -182,12 +183,12 @@ func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
 	})
 	ctx := context.Background()
 	c, err := s.Inspect(ctx, source, target, "source-cookie-fixture", "target-cookie-fixture", "500")
-	if err != nil || !c.Official || !c.PreviouslyDownloaded || len(c.Torrent) != 0 || seenSearch != detailsTitle || torrentReads != 0 || targetReads != 0 {
+	if err != nil || !c.Official || !c.PreviouslyDownloaded || c.Seeders != 17 || len(c.Torrent) != 0 || seenSearch != detailsTitle || torrentReads != 0 || targetReads != 0 {
 		t.Fatalf("new download did not yield to previous account activity: %+v, %v (%d,%d), search=%q", c, err, torrentReads, targetReads, seenSearch)
 	}
 	progress = "leeching 35.50%"
 	c, err = s.InspectForPublish(ctx, source, target, "source-cookie-fixture", "target-cookie-fixture", "500")
-	if err != nil || !c.PreviouslyDownloaded || len(c.Torrent) == 0 || !c.DuplicateKnown || c.Duplicate || torrentReads != 1 || targetReads != 1 {
+	if err != nil || !c.PreviouslyDownloaded || c.Seeders != 17 || len(c.Torrent) == 0 || !c.DuplicateKnown || c.Duplicate || torrentReads != 1 || targetReads != 1 {
 		t.Fatalf("own download could not refresh full publish evidence: %+v, %v (%d,%d)", c, err, torrentReads, targetReads)
 	}
 	matchID = "501"
@@ -233,7 +234,86 @@ func zmptTestBar(title string) string {
 }
 
 func zmptTestRow(id, title, badges string) string {
-	return `<tr><td class="rowfollow"><table class="torrentname"><tr><td class="embedded"><a href="details.php?id=` + id + `&amp;hit=1"><b>` + title + `</b></a>` + badges + `</td></tr></table></td><td>999</td></tr>`
+	return zmptTestRowWithSeeders(id, title, badges, "8")
+}
+
+func zmptTestRowWithSeeders(id, title, badges, seeders string) string {
+	return zmptTestRowStart(id, title, badges) + `<td><a href="details.php?id=` + id + `&amp;hit=1#seeders">` + seeders + `</a></td></tr>`
+}
+
+func zmptTestRowNoSeeders(id, title, badges string) string {
+	return zmptTestRowStart(id, title, badges) + `</tr>`
+}
+
+func zmptTestRowStart(id, title, badges string) string {
+	return `<tr><td class="rowfollow"><table class="torrentname"><tr><td class="embedded"><a href="details.php?id=` + id + `&amp;hit=1"><b>` + title + `</b></a>` + badges + `</td></tr></table></td>`
+}
+
+func TestZmptListingSeedersUseMatchingSeedersAnchor(t *testing.T) {
+	source := testProfile("https://zmpt.cc")
+	tests := []struct {
+		name  string
+		row   string
+		want  int
+		known bool
+	}{
+		{name: "matching row", row: `<table class="torrents">` + zmptTestRowWithSeeders("1", "one", "", "13") + `</table>`, want: 13, known: true},
+		{name: "zero is a known count", row: `<table class="torrents">` + zmptTestRowWithSeeders("1", "one", "", "0") + `</table>`, want: 0, known: true},
+		{name: "grouped count", row: `<table class="torrents">` + zmptTestRowWithSeeders("1", "one", "", "1,234") + `</table>`, want: 1234, known: true},
+		{name: "peer links and other torrent ignored", row: `<table class="torrents"><tr><td><a href="details.php?id=2#seeders">99</a></td><td><table class="torrentname"><tr><td class="embedded"><a href="details.php?id=1"><b>one</b></a></td></tr></table><a href="details.php?id=1&amp;hit=1#seeders">7</a><a href="details.php?id=1#leechers">22</a><a href="details.php?id=1#completed">250</a></td></tr></table>`, want: 7, known: true},
+		{name: "invalid count falls back", row: `<table class="torrents">` + zmptTestRowWithSeeders("1", "one", "", "unknown") + `</table>`, known: false},
+		{name: "malformed grouping falls back", row: `<table class="torrents">` + zmptTestRowWithSeeders("1", "one", "", "12,,4") + `</table>`, known: false},
+		{name: "conflicting counts fall back", row: `<table class="torrents"><tr><td><table class="torrentname"><tr><td class="embedded"><a href="details.php?id=1"><b>one</b></a></td></tr></table><a href="details.php?id=1#seeders">7</a><a href="details.php?id=1&amp;hit=1#seeders">8</a></td></tr></table>`, known: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			doc, err := html.Parse(strings.NewReader(test.row))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range zmptListingEntries(doc, source) {
+				if entry.id == "1" {
+					seeders, known := entry.seeders, entry.seedersKnown
+					if seeders != test.want || known != test.known {
+						t.Fatalf("seeders = %d, known %v, want %d, %v", seeders, known, test.want, test.known)
+					}
+					return
+				}
+			}
+			t.Fatal("matching listing row was not parsed")
+		})
+	}
+}
+
+func TestZmptInspectFallsBackToDetailSeedersWhenListingCountIsMissing(t *testing.T) {
+	source := testProfile("https://zmpt.cc")
+	target := testProfile("https://target.example.com")
+	var requests []string
+	s := NewScanner()
+	s.Client.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.Host+req.URL.Path)
+		var body string
+		switch {
+		case req.URL.Host == "target.example.com":
+			body = `<p>没有找到相关种子</p>`
+		case req.URL.Path == "/details.php":
+			body = zmptTestDetail("1", "Fallback-ZmWeb")
+		case req.URL.Path == "/torrents.php":
+			body = `<table class="torrents">` + zmptTestRowNoSeeders("1", "Fallback-ZmWeb", zmptTestTag("官方")) + `</table>`
+		case req.URL.Path == "/download.php":
+			body = zmptTestTorrent(policy.GiB)
+		default:
+			t.Fatalf("unexpected URL %s", req.URL)
+		}
+		return zmptTestResponse(body), nil
+	})
+	candidate, err := s.Inspect(context.Background(), source, target, "source-cookie-fixture", "target-cookie-fixture", "1")
+	if err != nil || candidate.Seeders != 8 || len(candidate.Torrent) == 0 || !candidate.DuplicateKnown || candidate.Duplicate {
+		t.Fatalf("detail peer count was not used as the missing-list fallback: %+v, %v", candidate, err)
+	}
+	if len(requests) != 4 {
+		t.Fatalf("unexpected requests: %v", requests)
+	}
 }
 
 func zmptTestDetail(id, title string) string {

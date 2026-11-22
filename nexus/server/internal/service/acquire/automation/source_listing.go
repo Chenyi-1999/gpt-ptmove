@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -15,10 +16,14 @@ import (
 
 const zmptListingPageLimit = 8
 
+var zmptPeerCount = regexp.MustCompile(`^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)$`)
+
 type sourceListingEntry struct {
-	id    string
-	title string
-	flags sourcePolicyEvidence
+	id           string
+	title        string
+	flags        sourcePolicyEvidence
+	seeders      int
+	seedersKnown bool
 }
 
 // zmptListing 确认织梦实站及已验证的列表路径，其他站点继续使用声明的列表或 RSS。
@@ -121,11 +126,49 @@ func zmptListingEntries(doc *html.Node, source Profile) []sourceListingEntry {
 			if labels := Select(link, "b"); len(labels) > 0 {
 				title = strings.TrimSpace(text(labels[0]))
 			}
-			entries = append(entries, sourceListingEntry{id: id, title: title, flags: listingSourceEvidence(row, source)})
+			seeders, seedersKnown := zmptListingSeeders(row, source, id)
+			entries = append(entries, sourceListingEntry{
+				id:           id,
+				title:        title,
+				flags:        listingSourceEvidence(row, source),
+				seeders:      seeders,
+				seedersKnown: seedersKnown,
+			})
 			break
 		}
 	}
 	return entries
+}
+
+// zmptListingSeeders 提取当前种子行中指向同一详情 ID 的做种人数链接。
+// 只接受 #seeders 锚点和纯数字文本，0 也是有效值，歧义数据留给详情页回退。
+func zmptListingSeeders(row *html.Node, source Profile, id string) (int, bool) {
+	seeders := 0
+	known := false
+	for _, link := range Select(row, `a[href*="#seeders"]`) {
+		u, err := url.Parse(attr(link, "href"))
+		if err != nil || !strings.EqualFold(u.Fragment, "seeders") {
+			continue
+		}
+		u.Fragment = ""
+		linkID, err := SourceRestrictionID(source, u.String())
+		if err != nil || linkID != id {
+			continue
+		}
+		value := strings.TrimSpace(text(link))
+		if !zmptPeerCount.MatchString(value) {
+			continue
+		}
+		count, err := strconv.Atoi(strings.ReplaceAll(value, ",", ""))
+		if err != nil {
+			continue
+		}
+		if known && count != seeders {
+			return 0, false
+		}
+		seeders, known = count, true
+	}
+	return seeders, known
 }
 
 // genericSourceEntries 兼容非织梦源站的订阅和自定义列表，只保留种子标识。

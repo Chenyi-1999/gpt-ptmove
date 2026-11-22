@@ -82,7 +82,7 @@ Frontend agent owns `ptmove/static/*` only. Root owns worker/adapters, packaging
 
 This section describes the native Go service and its authenticated `/api/v1` machine API. It supersedes the legacy policy descriptions above for native STARPT automation.
 
-- Source candidates must be official releases. For ZmPT, query the official tag (`tag_id=3`) within the configured size bounds and request descending torrent-size order (`sort=5&type=desc`); the adapter must still verify each returned result and apply the rule's exact size and seeder/leech thresholds.
+- Source candidates must be official releases. For ZmPT, query the official tag (`tag_id=3`) within the configured size bounds and request descending torrent-size order (`sort=5&type=desc`). The adapter starts at the first page of that filtered result and advances within the scan limit. It prefers the seeder count from the matching ZmPT listing row and uses the detail page when that count is unavailable. The adapter still verifies each returned result and applies the exact size and seeder/leech thresholds.
 - Never select restricted/no-cross-seed releases, episode-tagged releases, or items already downloaded by this account. A failed or unknown restriction, episode, or download-history check fails closed.
 - The target site must affirmatively confirm that the corresponding torrent is absent. Existing torrents, search errors, and unknown duplicate status are all skipped.
 - `prefer_official` and `target_absent_priority` remain readable and writable for old clients. They are deprecated, returned for compatibility, and have no effect on the hard filters above.

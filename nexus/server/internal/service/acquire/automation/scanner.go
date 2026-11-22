@@ -86,7 +86,11 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 			seen[entry.id] = true
 			if zmpt && (!entry.flags.official || entry.flags.restricted || entry.flags.episode || entry.flags.downloaded) {
 				if listedSkips < 50 {
-					c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: -1, Leechers: -1}
+					seeders := -1
+					if entry.seedersKnown {
+						seeders = entry.seeders
+					}
+					c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: seeders, Leechers: -1}
 					applySourceEvidence(&c, entry.flags)
 					rows = append(rows, policy.Evaluate(c, settings))
 					listedSkips++
@@ -146,6 +150,10 @@ func (s *Scanner) InspectForPublish(ctx context.Context, source, target Profile,
 
 func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie string, entry sourceListingEntry, recheckListing, ownDownload bool) (policy.Candidate, error) {
 	c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: -1, Leechers: -1}
+	if entry.seedersKnown {
+		c.Seeders = entry.seeders
+	}
+	listedEntry := entry
 	doc, detail, err := s.sourceDetail(ctx, source, sourceCookie, entry.id)
 	c.DetailURL = detail
 	if err != nil {
@@ -176,6 +184,7 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 			return c, rowErr
 		}
 		applySourceEvidence(&c, row.flags)
+		listedEntry = row
 	}
 	seedSelector := source.Selectors.Seeders
 	if seedSelector == "" {
@@ -196,6 +205,9 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 	nativeSeeders, nativeLeechers := PeerCounts(doc)
 	if source.Selectors.Seeders == "" && nativeSeeders >= 0 {
 		c.Seeders = nativeSeeders
+	}
+	if zmpt && listedEntry.seedersKnown {
+		c.Seeders = listedEntry.seeders
 	}
 	if source.Selectors.Leechers == "" && nativeLeechers >= 0 {
 		c.Leechers = nativeLeechers

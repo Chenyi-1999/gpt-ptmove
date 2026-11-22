@@ -505,3 +505,10 @@
 - v1.0.2 的代码、41 个经验证的 Web 文件和 Compose 已推送到 Gitee 与 GitHub。标签解引用均指向 4c24afe913b4afd003d397753c8f919404642d29。GitHub 私有发行的三个附件已发布并核对大小与 SHA-256。完整镜像 600401955 字节，SHA-256 0d325567f2cd4fd725bc58093b99b6b6f9d4e2f637ef9f489c16e7fc3f735edc。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.2
 - Gitee 发行为 1352048，Compose 和 SHA-256 文件已上传并回下载核对。完整镜像超过 Gitee 单附件上限，仓库历史附件约 1.01 GB。发行页链接同版本 GitHub 私有发行中的完整镜像，保留历史附件。https://gitee.com/star1999/starpt/releases/tag/v1.0.2
 - D 盘 ZIP 包含同一标签源码、可独立装载的完整 Linux AMD64 镜像、Compose、恢复说明和校验清单。ZIP SHA-256 950c84b00af0a9429fa2f077d39aa83819eb2edda1053a2b00f875c17d74a804，验证了 OCI 摘要、ZIP 成员哈希及 Compose 与标签源码的字节一致，档案已索引。未重新发种或访问 81。版本标签固定，发行记录另提交并推送。
+
+## PTM-20261122-068 — 2026-11-22T21:13:36+08:00 — Codex root、zmpt_seeder_fix、seeder_release_metadata、zmpt_fix_review，织梦做种人数与分页校验
+
+- `acquire/automation` 从同一种子 ID 的列表行及 `#seeders` 链接读取做种人数。保留确认为零的值，缺失或格式异常时读取详情。预览及执行前复查统一使用该规则。体积上下限和降序从匹配区间第一页开始，沿用分页和详情检查上限。`docs/API_CONTRACT.md` 记录该行为。同步版本接口、`VERSION`、Dockerfile、两份 Compose、README 和 v1.0.3 发行说明。
+- 回归测试覆盖做种与下载、完成计数的区分、千位分组、零值、错误行、详情回退及第二页。先修正格式校验后，152 Go 定向与全量测试、部署脚本 5 项检查、独立 Compose 以及线上 1.0.3 健康通过。生产镜像 `ptmove-nexus:1.0.3`，回滚镜像 `ptmove-nexus:1.0.2`。复用已验证的 Web 文件。
+- 152 读取织梦经筛选的第 1、2 页，各返回 100 条且无重复 ID。实站 6–7 GiB、至少 3 人做种预览返回 100 条。50 条已核验体积的结果均满足做种人数。NovaHD 查重判定 37 条已存在、13 条未知，最终 0 条可选。两条指定样本均识别为已下载而跳过。设置、任务、配额和发种记录计数保持一致。未实际下载资源、发种、操作 81。
+- `docs/DEPLOYMENT.json` 记录部署、回滚和预览证据。发布用完整 Docker 归档解压后与 152 的 Docker 导出逐字节一致。归档 653264101 字节，SHA-256 为 `baa62d9c0e47f1537e441963153163c2c6b827901ab362d145419d6d74f9bd37`。记录时双仓发布与历史 ZIP 待完成。
