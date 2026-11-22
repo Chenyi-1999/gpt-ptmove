@@ -4,8 +4,8 @@
 
 1. NAS 支持 Docker。Linux NAS 可用此仓库的 `compose.nas.yaml`（host 网络）；其他平台需调整网络连接。
 2. 已有 qBittorrent 4.1+ 或 5.x，开启 Web UI API，知道其地址、版本与下载保存路径。qB 5.2+ 可以提供原生 API Token；否则使用用户名/密码。
-3. 在 NAS 部署并配置 PTNexus，添加织梦、NovaHD 和该 qB 下载器。使用官方镜像/项目说明；它是独立依赖，不包含在 PTMove 自有镜像里。
-4. PTNexus 读取媒体的容器路径必须与 qB API 返回的保存路径一致，或使用 PTNexus 自身支持的路径映射。挂载对应 NAS 目录并验证截图和 MediaInfo 功能。
+3. 在 NAS 部署并配置 STARPT 客户端，添加织梦、NovaHD 和该 qB 下载器。使用官方镜像/项目说明；它是独立依赖，不包含在 PTMove 自有镜像里。
+4. 客户端读取媒体的容器路径必须与 qB API 返回的保存路径一致，或使用 客户端支持的路径映射。挂载对应 NAS 目录并验证截图和 MediaInfo 功能。
 
 ## 连接 152
 
@@ -38,17 +38,17 @@ docker compose -f compose.nas.yaml up -d --build
 
 镜像可以在 NAS 从源码构建；152 生成的现成镜像为 linux/amd64，ARM NAS 应在本机构建匹配架构。不要给执行端容器 Docker socket、宿主机 root 或 privileged 权限。
 
-控制台连接页填写两站 Cookie、RSS（可选）、qB URL/API Token 或账号/保存路径、PTNexus URL/账号、PTNexus 中该 qB 的下载器 ID。Token 优先于用户名/密码。秘密字段留空保持原值，需要清除时使用清除操作。控制台不会回显已保存 Cookie/密码/Token。执行端在 NAS 本地运行时优先填 NAS 内网的 qB 地址，避免依赖外部反向代理。
+控制台连接页填写两站 Cookie、RSS（可选）、qB URL/API Token 或账号/保存路径、STARPT URL/账号、STARPT 中该 qB 的下载器 ID。Token 优先于用户名/密码。秘密字段留空保持原值，需要清除时使用清除操作。控制台不会回显已保存 Cookie/密码/Token。执行端在 NAS 本地运行时优先填 NAS 内网的 qB 地址，避免依赖外部反向代理。
 
 ## 首次验证顺序
 
 1. 控制台看到 NAS 在线；月度计划保持关闭。
 2. 手动扫描，检查候选的分类、体积、人数、官种、查重和限制标签。解析不到的字段不会猜测。
 3. 选择一个允许转载的小资源入队，在 qB 核对实际下载和文件清单。
-4. 检查 PTNexus 元数据/截图，再确认 NovaHD 发布链接、目标 qB 种子和 Tracker 工作状态。
+4. 检查媒体信息/截图，再确认 NovaHD 发布链接、目标 qB 种子和 Tracker 工作状态。
 5. 单种通过后测试批量，再启用月度计划。
 
-源站页面、API、RSS、Cookie 和 PTNexus 实际版本可能影响联调。没有账号或连通条件时，不应把模拟测试标为真实发种成功。
+源站页面、API、RSS、Cookie 和 客户端实际版本可能影响联调。没有账号或连通条件时，不应把模拟测试标为真实发种成功。
 
 ## 故障恢复
 

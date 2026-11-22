@@ -36,7 +36,7 @@
   <el-dialog
     v-model="showScreenshotPreviewDialog"
     title="选择截图候选"
-    width="1200px"
+    width="min(1200px, calc(100vw - 28px))"
     class="screenshot-preview-dialog"
     destroy-on-close
     @closed="resetScreenshotPreviewState"

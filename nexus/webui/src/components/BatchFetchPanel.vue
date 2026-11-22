@@ -276,7 +276,7 @@
           </el-alert>
 
           <div class="priority-section">
-            <p style="color: #606266; font-size: 14px; margin-bottom: 10px; font-weight: 600">
+            <p style="color: var(--star-ink); font-size: 14px; margin-bottom: 10px; font-weight: 600">
               源站点优先级顺序：
             </p>
             <div class="priority-list" v-loading="priorityLoading">
@@ -358,7 +358,7 @@
 
             <!-- BDInfo 处理状态 -->
             <div v-if="progress.bdinfo_stats" class="bdinfo-stats">
-              <h4 style="margin: 15px 0 10px 0; font-size: 14px; color: #606266;">BDInfo 处理状态</h4>
+              <h4 style="margin: 15px 0 10px 0; font-size: 14px; color: var(--star-ink);">BDInfo 处理状态</h4>
               <el-descriptions :column="3" border size="small">
                 <el-descriptions-item label="处理中">
                   <el-tag type="warning" size="small">{{ progress.bdinfo_stats.processing }}</el-tag>
@@ -1263,8 +1263,8 @@ watch(nameSearch, () => {
   display: flex;
   align-items: center;
   padding: 10px 15px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ebeef5;
+  background-color: var(--star-surface);
+  border-bottom: 1px solid var(--star-border);
   flex-shrink: 0;
 }
 
@@ -1286,7 +1286,7 @@ watch(nameSearch, () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1299,7 +1299,7 @@ watch(nameSearch, () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1309,7 +1309,7 @@ watch(nameSearch, () => {
 .filter-card {
   width: 600px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -1323,6 +1323,7 @@ watch(nameSearch, () => {
 :deep(.filter-card .el-card__body) {
   padding: 0;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1341,7 +1342,7 @@ watch(nameSearch, () => {
 .path-tree-container {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 5px;
   margin-bottom: 20px;
@@ -1350,7 +1351,7 @@ watch(nameSearch, () => {
 .batch-fetch-card {
   padding: 10px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -1358,6 +1359,7 @@ watch(nameSearch, () => {
 :deep(.batch-fetch-card .el-card__body) {
   padding: 20px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1365,6 +1367,7 @@ watch(nameSearch, () => {
 
 .batch-fetch-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1384,22 +1387,22 @@ watch(nameSearch, () => {
 .config-section {
   margin-bottom: 20px;
   padding: 15px;
-  background-color: #f8f9fa;
+  background-color: var(--star-surface-muted);
   border-radius: 8px;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--star-accent);
 }
 
 .config-section h3 {
   margin: 0 0 5px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--star-ink);
 }
 
 .priority-settings-card {
   width: 700px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   padding: 0 10px 10px;
@@ -1407,6 +1410,7 @@ watch(nameSearch, () => {
 
 :deep(.priority-settings-card .el-card__body) {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1414,6 +1418,7 @@ watch(nameSearch, () => {
 
 .priority-settings-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1432,29 +1437,29 @@ watch(nameSearch, () => {
 .priority-list {
   min-height: 80px;
   padding: 15px;
-  border: 2px dashed #dcdfe6;
+  border: 2px dashed var(--star-border);
   border-radius: 6px;
-  background-color: #f5f7fa;
+  background-color: var(--star-surface-muted);
   transition: all 0.3s;
 }
 
 .priority-list:hover {
-  border-color: #409eff;
-  background-color: #ecf5ff;
+  border-color: var(--star-accent);
+  background-color: var(--star-accent-soft);
 }
 
 .available-sites {
   min-height: 60px;
   padding: 15px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 6px;
-  background-color: #fafafa;
+  background-color: var(--star-surface-muted);
 }
 
 .progress-card {
   width: 90vw;
   max-width: 1000px;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   padding: 0 10px 10px;
@@ -1462,6 +1467,7 @@ watch(nameSearch, () => {
 
 :deep(.progress-card .el-card__body) {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1469,6 +1475,7 @@ watch(nameSearch, () => {
 
 .progress-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1514,6 +1521,13 @@ watch(nameSearch, () => {
     flex-wrap: wrap;
     justify-content: flex-start;
     gap: 8px;
+  }
+
+  .priority-settings-footer :deep(.el-button + .el-button),
+  .batch-fetch-footer :deep(.el-button + .el-button),
+  .progress-footer :deep(.el-button + .el-button),
+  .filter-card-footer :deep(.el-button + .el-button) {
+    margin-left: 0;
   }
 
   .progress-header-controls {

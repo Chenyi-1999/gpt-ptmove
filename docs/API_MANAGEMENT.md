@@ -1,6 +1,6 @@
 # API 管理与 AI 接入
 
-原生 PTNexus 改版从 0.3.1 起在 **设置 → API 管理**（`/settings/api`）集中管理 AI 和脚本使用的接口。旧 `/settings/ai` 地址继续可用。根目录 Python 0.2 的接口与当前 Go 服务不同；当前接入以本页和在线 OpenAPI 为准。
+STARPT 从 0.3.1 起在 **设置 → API 管理**（`/settings/api`）集中管理 AI 和脚本使用的接口。旧 `/settings/ai` 地址继续可用。根目录 Python 0.2 的接口与当前 Go 服务不同；当前接入以本页和在线 OpenAPI 为准。
 
 ## 首次接入
 

@@ -10,6 +10,7 @@ import { getDesktopBridge } from './desktop/bridge'
 // 引入 Element Plus
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 // 引入公共毛玻璃样式
@@ -21,9 +22,6 @@ import './assets/styles/typography.scss'
 // 引入移动端响应式覆盖
 import './assets/styles/mobile-responsive.scss'
 import './assets/styles/status-toast.scss'
-
-// 如果需要，可以引入 ECharts
-import * as echarts from 'echarts'
 
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -404,7 +402,6 @@ const app = createApp(App)
 app.use(createPinia())
 
 // 将 echarts 挂载到全局，方便组件中使用
-app.config.globalProperties.$echarts = echarts
 
 app.use(router)
 

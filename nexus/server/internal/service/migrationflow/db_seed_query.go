@@ -20,7 +20,7 @@ func (s *MigrateService) GetDBSeedInfo(torrentID, siteName, taskID string) (map[
 // PrepareSeedInfo 在单种转种准备时刷新缺失的 MediaInfo，再返回当前数据库资料。
 // 参数/返回：输入种子编号、站点及日志任务编号；返回标准化资料和 HTTP 状态码。
 // 失败场景：查询参数无效或数据库不可读时返回错误；媒体补全失败时保留资料并返回 mediainfo_prepare_error。
-// 副作用：仅当缓存资料 MediaInfo 不完整时请求配置的飞牛媒体代理并回写报告。
+// 副作用：缓存报告缺失时尝试简介引用，再回退到已配置的飞牛媒体代理，写回有效报告。
 func (s *MigrateService) PrepareSeedInfo(torrentID, siteName, taskID string) (map[string]any, int) {
 	return s.getDBSeedInfoWithPreparation(s.repo, torrentID, siteName, taskID, true)
 }

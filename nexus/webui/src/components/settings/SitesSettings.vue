@@ -1,14 +1,25 @@
 <template>
   <div class="cookie-view-container">
-    <!-- 1. 顶部固定区域 -->
-    <div class="top-actions cookie-actions glass-pagination">
-      <el-form :model="cookieCloudForm" inline class="cookie-cloud-form">
-        <el-form-item label="CookieCloud">
+    <header class="sites-settings-heading">
+      <h2 class="settings-section-title">站点管理</h2>
+      <el-input
+        v-model="searchQuery"
+        placeholder="搜索站点昵称、标识或官组"
+        aria-label="搜索站点"
+        clearable
+        :prefix-icon="Search"
+        class="search-input"
+      />
+    </header>
+
+    <section class="cookie-controls star-surface" aria-labelledby="cookie-cloud-title">
+      <h3 id="cookie-cloud-title">CookieCloud</h3>
+      <el-form :model="cookieCloudForm" label-position="top" class="cookie-cloud-form">
+        <el-form-item label="同步地址">
           <el-input
             v-model="cookieCloudForm.url"
             placeholder="http://127.0.0.1:8088"
             clearable
-            style="width: 200px"
           ></el-input>
         </el-form-item>
         <el-form-item label="KEY">
@@ -16,7 +27,6 @@
             v-model="cookieCloudForm.key"
             placeholder="KEY (UUID)"
             clearable
-            style="width: 100px"
           ></el-input>
         </el-form-item>
         <el-form-item label="端对端密码">
@@ -26,21 +36,18 @@
             show-password
             placeholder="端对端加密密码"
             clearable
-            style="width: 125px"
           ></el-input>
         </el-form-item>
-        <el-form-item>
-          <!-- [修改] 合并后的按钮 -->
+        <el-form-item class="cookie-cloud-actions">
           <el-button
             type="primary"
-            size="large"
             @click="handleSaveAndSync"
             :loading="isCookieActionLoading"
           >
             <el-icon>
               <Refresh />
             </el-icon>
-            <span>同步Cookie</span>
+            <span>同步 Cookie</span>
           </el-button>
           <el-link
             href="https://gitee.com/star1999/gpt-ptmove/tree/master/nexus/extension"
@@ -53,24 +60,12 @@
           </el-link>
         </el-form-item>
       </el-form>
+    </section>
 
-      <div class="right-action-group">
-        <el-input
-          v-model="searchQuery"
-          placeholder="搜索站点昵称/标识/官组"
-          clearable
-          :prefix-icon="Search"
-          class="search-input"
-        />
-      </div>
-    </div>
-
-    <!-- 2. 中间可滚动内容区域 -->
     <div class="settings-view" v-loading="isSitesLoading">
       <el-table
         :data="paginatedSites"
         class="settings-table glass-table"
-        height="100%"
         :row-class-name="getRowClassName"
         @sort-change="handleSortChange"
         :default-sort="defaultSort"
@@ -233,8 +228,7 @@
       </el-table>
     </div>
 
-    <!-- 3. 底部固定区域 -->
-    <div class="settings-footer glass-pagination">
+    <div class="settings-footer star-surface">
       <el-radio-group v-model="siteFilter" @change="handleFilterChange">
         <el-radio-button label="existing_supported">已有支持站点</el-radio-button>
         <el-radio-button label="supported">所有支持站点</el-radio-button>
@@ -258,9 +252,9 @@
       title="编辑站点"
       width="700px"
       :close-on-click-modal="false"
-      class="site-edit-dialog"
+      class="settings-dialog site-edit-dialog"
     >
-      <el-form :model="siteForm" ref="siteFormRef" label-width="140px" label-position="left">
+      <el-form :model="siteForm" ref="siteFormRef" label-position="top">
         <el-form-item label="站点标识" prop="site" required>
           <el-input v-model="siteForm.site" placeholder="例如：pt" disabled></el-input>
           <div class="form-tip">站点标识不可修改。</div>
@@ -298,15 +292,13 @@
           <el-input v-model="siteForm.passkey" placeholder="站点的Passkey"></el-input>
           <div
             v-if="siteForm.site === 'hddolby'"
-            class="form-tip"
-            style="color: #409eff; font-weight: bold"
+            class="form-tip form-choice-heading"
           >
             杜比的passkey为种子详情页复制种子链接时downhash=后的部分
           </div>
           <div
             v-else-if="siteForm.site === 'rousi'"
-            class="form-tip"
-            style="color: #409eff; font-weight: bold"
+            class="form-tip form-choice-heading"
           >
             获取肉丝passkey-
             <el-button
@@ -350,7 +342,7 @@
             :max="1000"
             style="width: 100%"
           />
-          <div class="form-tip" style="color: #409eff; font-size: 12px">默认 5 MB/s</div>
+          <div class="form-tip" style="color: var(--star-accent)">默认 5 MB/s</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -886,196 +878,146 @@ const handleDelete = (site: SiteConfig) => {
 </script>
 
 <style scoped>
-/* 样式部分保持不变 */
 .cookie-view-container {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 40px);
-  overflow: hidden;
+  display: grid;
+  min-width: 0;
+  gap: 14px;
 }
 
-.top-actions,
-.settings-footer {
-  flex-shrink: 0;
-}
-
-.top-actions {
+.sites-settings-heading,
+.settings-footer,
+.pagination-container {
   display: flex;
+  min-width: 0;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.settings-view {
-  flex-grow: 1;
-  min-height: 0;
-  overflow: hidden;
-  background-color: transparent;
+.sites-settings-heading .search-input {
+  width: min(100%, 290px);
 }
 
-.settings-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
+.cookie-controls {
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+}
+
+.cookie-controls h3 {
+  margin: 0 0 12px;
+  color: var(--star-ink);
+  font-size: 1rem;
 }
 
 .cookie-cloud-form {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  flex: 1;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
 }
 
 .cookie-cloud-form .el-form-item {
+  min-width: 0;
   margin-bottom: 0;
 }
 
-.browser-extension-link {
-  margin-left: 8px;
-  white-space: nowrap;
+.cookie-cloud-actions {
+  grid-column: 1 / -1;
 }
 
-.right-action-group {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  margin-left: auto;
+.cookie-cloud-actions :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
-.search-input {
-  width: 280px;
+.settings-view {
+  min-width: 0;
+  border: 1px solid var(--star-border);
+  border-radius: 12px;
 }
 
 .settings-table {
   width: 100%;
+  border-radius: inherit;
 }
 
-.pagination-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.settings-footer {
+  padding: 10px 12px;
+  border-radius: 12px;
 }
 
-.page-size-text {
-  font-size: 14px;
-  color: var(--el-text-color-regular);
+.settings-footer :deep(.el-radio-group),
+.pagination-container :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-footer :deep(.el-radio-button__inner) {
+  border: 1px solid var(--star-border);
+  border-radius: 6px;
+}
+
+.page-size-text,
+.form-tip {
+  color: var(--star-muted);
+  font-size: 0.8125rem;
 }
 
 .form-tip {
-  color: #909399;
-  font-size: 12px;
-  line-height: 1.5;
   margin-top: 4px;
+  line-height: 1.5;
+}
+
+.form-choice-heading {
+  color: var(--star-accent);
+  font-weight: 650;
 }
 
 .settings-table :deep(tr.row-config-incomplete > td.el-table__cell) {
-  background-color: #ffecec;
+  background-color: var(--star-danger-soft);
 }
 
 .settings-table :deep(tr.row-config-incomplete:hover > td.el-table__cell) {
-  background-color: #ffd6d6;
+  background-color: color-mix(in srgb, var(--star-danger) 17%, var(--star-surface));
 }
 
 .role-tag {
   display: inline-block;
-  padding: 0px 3px;
-  border-radius: 2px;
-  font-size: 11px;
-  font-weight: 500;
+  padding: 2px 5px;
+  border: 1px solid var(--star-border);
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  font-weight: 600;
 }
 
 .role-source {
-  background-color: #ecf5ff;
-  color: #409eff;
-  border: 1px solid #b3d8ff;
+  background-color: var(--star-accent-soft);
+  color: var(--star-accent);
 }
 
 .role-target {
-  background-color: #f0f9ff;
-  color: #67c23a;
-  border: 1px solid #b3e0ff;
+  background-color: var(--star-success-soft);
+  color: var(--star-success);
 }
 
 .role-both {
-  background-color: #fdf6ec;
-  color: #e6a23c;
-  border: 1px solid #f5dab1;
+  background-color: var(--star-warning-soft);
+  color: var(--star-warning);
 }
 
-.site-edit-dialog :deep(.el-overlay-dialog) {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
-
-.site-edit-dialog :deep(.el-dialog) {
-  margin: 0;
-}
-
-@media (max-width: 768px) {
-  .cookie-view-container {
-    height: 100%;
-    min-height: 0;
-  }
-
-  .top-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .cookie-cloud-form {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .cookie-cloud-form .el-form-item {
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .cookie-cloud-form :deep(.el-input),
-  .cookie-cloud-form :deep(.el-input__wrapper) {
-    width: 100% !important;
-  }
-
-  .right-action-group {
+@media (max-width: 600px) {
+  .sites-settings-heading .search-input {
     width: 100%;
   }
 
-  .search-input {
-    width: 100%;
+  .cookie-controls {
+    padding-inline: 12px;
   }
 
-  .settings-view {
-    overflow: auto;
-  }
-
-  .settings-table {
-    min-width: 1080px;
-  }
-
-  .settings-footer {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 10px 12px;
-  }
-
-  .pagination-container {
-    overflow-x: auto;
-    justify-content: space-between;
-  }
-
-  .site-edit-dialog :deep(.el-dialog) {
-    width: calc(100vw - 16px) !important;
-    max-width: calc(100vw - 16px) !important;
+  .settings-table :deep(.el-table-fixed-column--right) {
+    position: static !important;
   }
 }
 </style>

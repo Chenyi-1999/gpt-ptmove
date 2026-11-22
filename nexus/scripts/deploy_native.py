@@ -17,6 +17,10 @@ def command(args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 
+def release_version(root):
+    return (root / "VERSION").read_text(encoding="utf-8").strip()
+
+
 def compose(root, kind, *args, image=None):
     if kind not in {"canary", "production"}:
         raise ValueError("Unknown native deployment kind")
@@ -29,7 +33,7 @@ def compose(root, kind, *args, image=None):
         "PTMOVE_DATA_DIR": str(root / ("canary-data" if kind == "canary" else "data")),
         "PTMOVE_BIND": "0.0.0.0",
         "PTMOVE_PORT": "18121" if kind == "canary" else "18120",
-        "PTMOVE_IMAGE": image or "ptmove-nexus:" + (root / "VERSION").read_text().strip(),
+        "PTMOVE_IMAGE": image or "ptmove-nexus:" + release_version(root),
     })
     command(["docker", "compose", "--project-name", project, "--env-file", env_file,
              "-f", "compose.ptmove.yaml", *args], cwd=root, env=environment)
@@ -61,13 +65,13 @@ def prepare(root, kind):
         if not password:
             raise SystemExit("Existing administrator password unavailable; no credentials changed")
         command(["docker", "run", "--rm", "--network=none", "--memory=128m", "--cpus=0.25", "-i",
-                 "-v", f"{data}:/app/data", "ptmove-nexus:" + (root / "VERSION").read_text().strip(), "--initialize-admin"],
+                 "-v", f"{data}:/app/data", "ptmove-nexus:" + release_version(root), "--initialize-admin"],
                 input=json.dumps({"username": "admin", "password": password}), text=True)
     compose(root, kind, "config", "--quiet")
     print(f"Prepared {kind}: independent runtime data; existing administrator password preserved")
 
 
-def health(port, version="0.3.1"):
+def health(port, version):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for _ in range(20):
         try:
@@ -83,7 +87,8 @@ def health(port, version="0.3.1"):
 
 def upgrade(root):
     """Upgrade only the existing native project, retaining its data and rollback image."""
-    health(18121)
+    version = release_version(root)
+    health(18121, version)
     current = json.loads(subprocess.check_output(["docker", "inspect", "ptmove-nexus-ptmove-nexus-1"]))[0]
     labels = current["Config"].get("Labels", {})
     if labels.get("com.docker.compose.project") != "ptmove-nexus" or labels.get("com.docker.compose.service") != "ptmove-nexus":
@@ -96,7 +101,7 @@ def upgrade(root):
     prepare(root, "production")
     try:
         compose(root, "production", "up", "-d", "--no-build")
-        health(18120)
+        health(18120, version)
     except Exception:
         compose(root, "production", "up", "-d", "--no-build", image=previous_image)
         health(18120, previous_version)
@@ -106,7 +111,8 @@ def upgrade(root):
 
 def cutover(root):
     # Canary readiness is necessary; actual API/browser acceptance is performed separately.
-    health(18121)
+    version = release_version(root)
+    health(18121, version)
     old = json.loads(subprocess.check_output(["docker", "inspect", "gpt-ptmove-controller-1"]))[0]
     labels = old["Config"].get("Labels", {})
     if labels.get("com.docker.compose.project") != "gpt-ptmove" or labels.get("com.docker.compose.service") != "controller":
@@ -115,7 +121,7 @@ def cutover(root):
     command(["docker", "stop", old["Id"]], stdout=subprocess.DEVNULL)
     try:
         compose(root, "production", "up", "-d", "--no-build")
-        health(18120)
+        health(18120, version)
     except Exception:
         compose(root, "production", "stop")
         command(["docker", "start", old["Id"]], stdout=subprocess.DEVNULL)
@@ -137,7 +143,7 @@ def main():
     elif args.action == "start-canary":
         prepare(root, "canary")
         compose(root, "canary", "up", "-d", "--no-build")
-        print(json.dumps(health(18121), ensure_ascii=False))
+        print(json.dumps(health(18121, release_version(root)), ensure_ascii=False))
     elif args.action == "stop-canary":
         compose(root, "canary", "down")
     elif args.action == "cutover":

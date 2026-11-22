@@ -432,3 +432,32 @@
 - GitHub 私有仓库发行已发布。API 确认完整 Linux AMD64 镜像、SHA-256 文件和 `compose.starpt.yaml` 均已上传，镜像 522,128,247 字节及摘要 900019a17ada63d2160d83a1f716fcdf35c69f97d0815569a1ecf7df4c7f494a 与 152 的导出一致。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8
 - Gitee 发行 ID 1344453 已发布。Compose 附件 ID 3782964，508 字节，从发行接口回下载后比对 SHA-256 cfc417a0cf041063a206d1740ba51e0a033e857d1d85258bfda6424b31f649b7 通过。已校验增量包可从 v0.3.1-starpt.1 精确复原 .8 OCI 镜像。Gitee API 对该 99,020,403 字节附件返回 HTTP 400 和仓库附件 1 GB 配额错误，附件列表只含 Compose，发行正文提供 GitHub 完整镜像入口。https://gitee.com/star1999/gpt-ptmove/releases/tag/v0.3.1-starpt.8
 - D 盘历史发布 ZIP 包含标签源码、完整镜像、Compose、恢复说明及校验清单。ZIP 内容 CRC、SHA-256、标签提交元数据通过，归档库索引已追加。152 上项目容器状态为 healthy，本次 152 操作为 Compose 验收、镜像归档和健康状态复核。未重新发种、写入站点或访问 81。
+
+## PTM-20261121-057 — 2026-11-21T23:55:15+08:00 — Codex root、mediainfo_flow、mediainfo_quote_parser、mediainfo_review、remove_upstream_refs，简介 MediaInfo 提取及来源文案整理
+
+- MediaInfo。acquire/extract/description_quote.go 与现有抓取逻辑支持真实简介、带反斜杠的样例和 HTML 引用，校验容器及音视频结构，歧义引用回退。processing/persist 处理新抓取与维护刷新，migrationflow/prepare_mediainfo.go 处理缓存及飞牛回退；repository 更新校验此前的媒体、状态及简介。准备日志提示引用命中。
+- 文案。README、docs、nexus/readme.md、站点配置、Web 导出名、更新文案、API 标题和健康接口清理可见上游引用。历史日志、兼容字段及既有用途限制保留。
+- 验证。152 的独立无外网 Docker 运行样本、缓存优先、并发回填、HTML 引用、错误和歧义回退测试，Go 全量测试、前端类型、定向 ESLint 与 Vite 均通过。隔离 HTTP 准备接口 4/4，通过用户样本回填与原正文保留。隔离测试的 curl 和 fixture 时间字段问题已修正。生产健康和 Web 入口与构建一致，发布日志/队列/自动任务/编辑尝试计数为 7/0/0/2。线上镜像 ptmove-nexus:0.3.1-starpt.9，ID sha256:9c55641ccfaf4d344041bac7cc6e9c994ef607a316c8f3b9ec4042b7c1e953fa，回滚 ptmove-nexus:0.3.1-starpt.8。
+- 本轮涉及 152 的项目容器和隔离验证，未重新发种、操作 81、提交、推送或发行新标签。飞牛回退通过模拟调用测试，样例命中简介无须真实访问飞牛。
+
+## PTM-20261122-058 — 2026-11-22T00:04:52+08:00 — Codex root、starpt_ui_inventory、starpt_dashboard_ui、starpt_sites_ui，STARPT 工作台与站点统计可视化
+
+- Web。App.vue、glass-morphism.scss、star-shell.scss 更新导航及语义色板。HomeView.vue 使用现有流量接口汇总已启用下载器近 24 小时或昨日的数据，提供分时柱状图、可展开明细、下载器状态和原入口。SitesView.vue 使用站点和官组接口呈现各站体积、种子数和前五对比，保留排序表格、筛选和扫描。容量按 IEC 单位显示，官组切换时隔离迟到数据。
+- 验证。152 的离线 Docker 前端类型检查、定向 ESLint 和 Vite 构建通过。基于候选静态包用隔离浏览器样例验证 1440px 与 390px，两页渲染、图表数据、范围切换、小时明细、统计刷新、导航、空态和错误态通过，未出现页面异常或整页横向溢出。根据首轮截图调整移动卡片高度与容量单位后复测通过。
+- 部署。现网镜像 ptmove-nexus:0.3.1-starpt.10，ID sha256:1c42d38cd28bf5e8cea6e201c7e621b3dcf2b2bfdeb97758d22f0476ccc81b5e。健康检查、入口静态文件 SHA-256 和发布/队列/自动化/编辑计数复核通过。回滚镜像 ptmove-nexus:0.3.1-starpt.9。本地 Web 构建产物和 docs/DEPLOYMENT.json 已同步。
+- 本轮仅操作工作区与 152 项目环境，未重新发种、访问 81、提交、推送或创建新 Git 发行。
+
+## PTM-20261122-059 — 2026-11-22T00:27:48+08:00 — Codex root、settings_layout、operations_theme、aux_theme、theme_review，STARPT 全站主题与设置滚动
+
+- 设置。SettingsView.vue 与六个设置组件统一布局。分类导航在窄屏换行，设置工作区承担纵向滚动，下载器卡片、长表单和列表可达，弹窗正文滚动及操作页脚分开。旧实时流量开关的显示随独立页面移除。
+- 主题。App.vue、index.html、main.ts 与共享样式使用深海军蓝、紫蓝强调色和暗色组件变量。登录、插件、种子列表、批量获取、维护、任务日志、预览、更新和弹窗同步颜色、边框及状态。
+- 流量入口。router/index.ts 把 /info 跳转到工作台，App.vue 与 HomeView.vue 去除独立入口，删除 InfoView.vue。工作台按原流量 API 展示图表。
+- 验证。设置和全局类型检查、28 个目标文件的 ESLint、152 离线 Vite 构建通过。首轮发现的站点表单重复 class、两处残留浅色及临时 pnpm 工作区文件均已处理。最终构建使用隔离浏览器遍历主要页面和六个设置页，并验证 1440/1024/390/320 像素下载器页面、多卡片滚动和十行路径映射弹窗的底部按钮。旧 /info 跳转及工作台流量图通过。
+- 152 部署 ptmove-nexus:0.3.1-starpt.11，ID sha256:78b13e80be7089f5e8306fb211a4d308ca7c588af0a5280f020e1c586cf73eb9，回滚 ptmove-nexus:0.3.1-starpt.10。线上健康、静态入口摘要及发布计数通过。同步 docs/DEPLOYMENT.json 和 Web 静态产物。未重新发种、访问 81、提交、推送或创建 Git 发行。
+
+## PTM-20261122-060 — 2026-11-22T08:25:20+08:00 — Codex root、release_version、release_runtime_audit，STARPT 1.0.0 版本与镜像
+
+- 发布范围包含简介 MediaInfo 自动提取、工作台图表、全站深色主题及设置滚动修复。nexus/VERSION、服务端版本接口、Dockerfile、两份 Compose 更新到 1.0.0。部署脚本按版本文件验证健康返回，保留旧实例回滚逻辑。当前发行文档使用 Gitee 仓库的 canonical 地址。
+- 验证。Go 全量测试和版本路由回归在 152 通过，Python 发布保护测试 5 个通过。1.0.0 镜像沿用通过桌面与移动端验收的 Web 产物。独立 Compose 空数据目录验证启动、健康与版本，测试容器已清理。
+- 152 已部署 ptmove-nexus:1.0.0，镜像 sha256:1c166c1ec5ac61805c90f90217d159a157aa3b2f3090514b8b405f18475bdcac，回滚 ptmove-nexus:0.3.1-starpt.11。生产入口摘要匹配，健康与发布/自动化计数复核通过。完整镜像导出为 starpt-v1.0.0-linux-amd64.tar.gz，543336327 字节，摘要 8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac。
+- 准备提交和标签时，镜像传输与 GitHub/Gitee 发行仍在进行。Gitee 原有附件占用约 1.013 GB，完整镜像规划附于 GitHub 私有仓库。未重新发种或访问 81。

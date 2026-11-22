@@ -1,6 +1,0 @@
-{
-  "repository": "https://github.com/sqing33/PTNexus",
-  "branch": "go",
-  "commit": "53eee1fed09121867f956c798c158c13a475d51f",
-  "import": "source only; upstream BDInfo/platform binaries and wiki excluded; release dependencies fetched separately"
-}

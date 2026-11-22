@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -20,8 +21,17 @@ const preparedReportFixture = "General\nFormat : Matroska\nDuration : 90 min\n\n
 
 // TestPrepareSeedMediaInfo 覆盖完整和受限跳过、精确代理请求、失败保护以及并发编辑。
 func TestPrepareSeedMediaInfo(t *testing.T) {
+	sample, err := os.ReadFile("../acquire/extract/testdata/mediainfo-quote-without-general.bbcode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote := strings.TrimSpace(strings.ReplaceAll(string(sample), "\r\n", "\n"))
+	quotedBody := strings.TrimSuffix(strings.TrimPrefix(quote, "[quote]"), "[/quote]")
+	quotedReport := "General\n" + strings.TrimSpace(strings.ReplaceAll(quotedBody, "\\\n", "\n"))
 	cases := []struct {
 		name, current, tags, status string
+		body, statement             string
+		expectedQuote               bool
 		mediaResponse               string
 		writeDuringRequest          string
 		failProxy                   bool
@@ -32,11 +42,15 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 	}{
 		{name: "缺失", mediaResponse: preparedReportFixture, expectedCalls: 1},
 		{name: "非空占位", current: "  等待获取  ", mediaResponse: preparedReportFixture, expectedCalls: 1},
-		{name: "报告已有", current: preparedReportFixture},
+		{name: "报告已有", current: preparedReportFixture, body: quote},
+		{name: "从简介识别且不访问下载器", body: quote, disableProxy: true, expectedQuote: true},
+		{name: "从声明区识别且不访问下载器", current: "等待获取", statement: quote, expectedQuote: true},
+		{name: "不完整的引用回退代理", body: "[quote]Format : Matroska[/quote]", mediaResponse: preparedReportFixture, expectedCalls: 1},
+		{name: "有歧义的引用回退代理", body: quote + "\n" + strings.ReplaceAll(quote, "E-AC-3", "AAC"), mediaResponse: preparedReportFixture, expectedCalls: 1},
 		{name: "已有BDInfo", current: "DISC INFO:\nDisc Size: 10 GB\n\nPLAYLIST REPORT:\nVIDEO:\nHEVC"},
-		{name: "禁转", tags: `["tag.禁转"]`},
+		{name: "禁转", body: quote, tags: `["tag.禁转"]`},
 		{name: "旧分集标签", tags: "分集"},
-		{name: "BDInfo处理中", status: "processing_bdinfo", expectedError: "已有媒体分析"},
+		{name: "BDInfo处理中", body: quote, status: "processing_bdinfo", expectedError: "已有媒体分析"},
 		{name: "没有远程代理", disableProxy: true, expectedError: "远程媒体代理"},
 		{name: "未下载完整", partialDownload: true, expectedError: "未找到已完整下载"},
 		{name: "代理失败", current: "  等待获取  ", failProxy: true, expectedError: "提取失败", expectedCalls: 1},
@@ -46,7 +60,7 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, service, db := automationNativeFixture(t)
-			const schema = `CREATE TABLE seed_parameters (hash TEXT,torrent_id TEXT,site_name TEXT,title TEXT,tags TEXT,mediainfo TEXT,mediainfo_status TEXT,bdinfo_error TEXT,updated_at TEXT,screenshots TEXT,PRIMARY KEY(hash,torrent_id,site_name))`
+			const schema = `CREATE TABLE seed_parameters (hash TEXT,torrent_id TEXT,site_name TEXT,title TEXT,tags TEXT,body TEXT,statement TEXT,mediainfo TEXT,mediainfo_status TEXT,bdinfo_error TEXT,updated_at TEXT,screenshots TEXT,PRIMARY KEY(hash,torrent_id,site_name))`
 			if err := db.Exec(schema).Error; err != nil {
 				t.Fatal(err)
 			}
@@ -58,8 +72,8 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 				hash, "陈旧名称", "/stale", "qb-fixture", "2026-11-21").Error; err != nil {
 				t.Fatal(err)
 			}
-			if err := db.Exec(`INSERT INTO seed_parameters (hash,torrent_id,site_name,title,tags,mediainfo,mediainfo_status,bdinfo_error,screenshots) VALUES (?,?,?,?,?,?,?,?,?)`,
-				hash, "45", "zmpt", "Harboring", tc.tags, tc.current, tc.status, "旧诊断", "截图原文").Error; err != nil {
+			if err := db.Exec(`INSERT INTO seed_parameters (hash,torrent_id,site_name,title,tags,body,statement,mediainfo,mediainfo_status,bdinfo_error,screenshots) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+				hash, "45", "zmpt", "Harboring", tc.tags, tc.body, tc.statement, tc.current, tc.status, "旧诊断", "截图原文").Error; err != nil {
 				t.Fatal(err)
 			}
 			if err := db.Exec(`INSERT INTO seed_parameters (hash,torrent_id,site_name,mediainfo) VALUES (?,?,?,?)`,
@@ -138,7 +152,7 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			if tc.disableProxy && !errors.Is(err, errPrepareMediaUnavailable) {
+			if tc.disableProxy && !tc.expectedQuote && !errors.Is(err, errPrepareMediaUnavailable) {
 				t.Fatalf("missing unavailable marker: %v", err)
 			}
 			if calls := mediaCalls.Load(); calls != tc.expectedCalls {
@@ -152,6 +166,9 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 				t.Fatalf("qB calls=%d, want %d", calls, expectedQBCalls)
 			}
 			expectedReport, expectedStatus := tc.current, tc.status
+			if tc.expectedQuote {
+				expectedReport, expectedStatus = quotedReport, "completed"
+			}
 			if tc.expectedCalls == 1 && tc.expectedError == "" {
 				expectedReport, expectedStatus = tc.mediaResponse, "completed"
 			}
@@ -159,15 +176,15 @@ func TestPrepareSeedMediaInfo(t *testing.T) {
 				expectedReport = tc.writeDuringRequest
 			}
 			got, err := service.repo.GetSeedParameterByKey(hash, "45", "zmpt")
-			if err != nil || got["mediainfo"] != expectedReport || got["mediainfo_status"] != expectedStatus || got["screenshots"] != "截图原文" {
+			if err != nil || got["mediainfo"] != expectedReport || got["mediainfo_status"] != expectedStatus || got["screenshots"] != "截图原文" || got["body"] != tc.body || got["statement"] != tc.statement {
 				t.Fatalf("prepared draft mismatch: %v err=%v", got, err)
 			}
 			other, err := service.repo.GetSeedParameterByKey(hash, "45", "other")
 			if err != nil || other["mediainfo"] != "不相关草稿" {
 				t.Fatalf("unrelated seed modified: %v err=%v", other, err)
 			}
-			if tc.expectedCalls == 1 && tc.expectedError == "" {
-				if err := service.prepareSeedMediaInfo("", hash, "45", "zmpt", ""); err != nil || mediaCalls.Load() != 1 || qbCalls.Load() != 2 {
+			if tc.expectedQuote || (tc.expectedCalls == 1 && tc.expectedError == "") {
+				if err := service.prepareSeedMediaInfo("", hash, "45", "zmpt", ""); err != nil || mediaCalls.Load() != tc.expectedCalls || qbCalls.Load() != expectedQBCalls {
 					t.Fatalf("second preparation must reuse saved report: err=%v media=%d qb=%d", err, mediaCalls.Load(), qbCalls.Load())
 				}
 			}

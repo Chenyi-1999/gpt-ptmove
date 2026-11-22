@@ -39,8 +39,8 @@ func (h *LogsHandler) Export(c *gin.Context) {
 	}
 
 	ts := time.Now().Format("20060102-150405")
-	asciiFileName := fmt.Sprintf("ptnexus-go-log-24h-%s.txt", ts)
-	utf8FileName := fmt.Sprintf("ptnexus-go-日志-24h-%s.txt", ts)
+	asciiFileName := fmt.Sprintf("starpt-log-24h-%s.txt", ts)
+	utf8FileName := fmt.Sprintf("starpt-日志-24h-%s.txt", ts)
 
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	// 同时提供 ASCII filename 和 UTF-8 filename*，避免不同浏览器对中文文件名产生乱码。

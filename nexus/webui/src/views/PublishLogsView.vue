@@ -653,8 +653,8 @@ watch(
 
 .record-panel {
   border: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color-overlay);
-  border-radius: 14px;
+  background: var(--star-surface);
+  border-radius: var(--star-radius);
   min-width: 0;
   min-height: 90px;
 }
@@ -677,12 +677,19 @@ watch(
 }
 
 .record-header {
-  color: var(--el-text-color-secondary);
+  border-radius: var(--star-radius) var(--star-radius) 0 0;
+  background: var(--star-surface-muted);
+  color: var(--star-muted);
   font-size: 13px;
 }
 
 .record {
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--star-border);
+}
+
+.record:hover,
+.record:focus-within {
+  background: var(--star-surface-muted);
 }
 
 .record-title,
@@ -725,20 +732,20 @@ watch(
 }
 
 .status[data-tone='success'] {
-  color: var(--el-color-success-dark-2);
+  color: var(--star-success);
 }
 .status[data-tone='failed'] {
-  color: var(--el-color-danger-dark-2);
+  color: var(--star-danger);
 }
 .status[data-tone='running'] {
-  color: var(--el-color-primary-dark-2);
+  color: var(--star-accent);
 }
 
 .record-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--el-color-primary-dark-2);
+  color: var(--star-accent);
   white-space: nowrap;
   font-size: 13px;
   text-decoration: none;

@@ -5,7 +5,7 @@
 
 ## 1. 项目概览
 
-`server` 是 PT Nexus 的 Go 后端实现，采用分层结构：
+`server` 是 STARPT 的 Go 后端实现，采用分层结构：
 
 - HTTP 层：`internal/http/handler` + `internal/http/middleware`
 - 业务层：`internal/service`
@@ -520,9 +520,9 @@
 
 ---
 
-## 附录：PTMove Nexus fork（2026-10-27）
+## 附录：STARPT 服务说明
 
-本目录结构文档原本描述 PTNexus 上游服务。当前 PTMove Nexus 改版以 PTNexus Go + Vue 源码为基础，固定上游版本见 `nexus/UPSTREAM.json`（commit `53eee1fed09121867f956c798c158c13a475d51f`）。保留原有手动转种和设置 UI；fork 新增自动化、声明式站点档案和机器 API。根目录 Python 0.2 是历史实现，不能与本服务的数据目录、配置或部署混用。改版部署入口为 `nexus/Dockerfile.ptmove` 和 `nexus/compose.ptmove.yaml`，后者挂载当前目录 `data/` 至 `/app/data`，对外端口默认 18120、容器端口 5275。详见仓库根目录 [`docs/PTNEXUS_FORK.md`](../../../docs/PTNEXUS_FORK.md)。
+本目录结构文档描述 STARPT Go 服务。保留手动转种和设置界面，并支持自动化、站点档案和机器 API。根目录 Python 0.2 是历史实现，不能与本服务的数据目录、配置或部署混用。Docker 部署入口为 `nexus/Dockerfile.ptmove` 和 `nexus/compose.ptmove.yaml`，后者挂载当前目录 `data/` 至 `/app/data`，默认对外端口 18120，容器端口 5275。详见仓库根目录 [`docs/STARPT_GUIDE.md`](../../../docs/STARPT_GUIDE.md)。
 
 ### A. 新增模块位置
 
@@ -547,16 +547,16 @@
 - 管理员档案、自动化及机器 key 管理路由挂载在管理员 JWT 保护的 `/api` 路由组中。机器 key 管理 OpenAPI 为 `GET /api/machine-openapi`。
 - AI/机器客户端使用 `/api/v1` 的独立 Bearer key；不回退接受浏览器 JWT、Cookie 或 NAS 内部 token。OpenAPI 为 `GET /api/v1/openapi.json`。
 - 机器 key 有 `read`、`write`、`publish` 范围，必须设置到期时间且可立即撤销。写请求提供幂等键；开启自动化/发布或存在待执行任务的规则变更，以及会执行入队/发布的操作，需满足 `write` 与 `publish` 条件。
-- 档案 JSON 只声明公开页面配置；Cookie 与 RSS 单独录入，不从 JSON 导入。Cookie 保持 PTNexus 原生兼容存储；RSS 和幂等回复加密，依赖 `data/machine-registry.key` 恢复。
+- 档案 JSON 只声明公开页面配置；Cookie 与 RSS 单独录入，不从 JSON 导入。Cookie 保持 STARPT 原生兼容存储；RSS 和幂等回复加密，依赖 `data/machine-registry.key` 恢复。
 
 ### C. 自动化默认边界
 
 - 自动运行、自动发布、定时计划默认均关闭。初始值为每月 1 日 02:00（Asia/Shanghai）、最多 6 项、1–10 GiB、月度资源预算 60 GiB，并偏好官种和目标缺失项。
 - 手工只读预览不执行下载或发布。限制状态、重复状态或目标 Tracker 状态不确定时，执行必须拒绝/隔离，不应盲目重试上传。
 - 目标 profile 必须显式定义 `announce_hosts`；不能从 `base_url` 猜测。留空会阻止自动化启用/执行所需的做种验证。
-- JSON 声明只适配受限通用 NexusPHP 解析路径。发布仍依赖 PTNexus 已有原生站点 publisher 和准确映射；导入成功仅表示声明通过校验，不代表站点已联调。
-- qB Bearer Token 目前只假设 API 兼容网关接受该方式；本 fork 未验证用户 Token 对 qB 原生 Web API 的实际可用性。
+- JSON 声明只适配受限通用 NexusPHP 解析路径。发布仍依赖 STARPT 已有原生站点 publisher 和准确映射；导入成功仅表示声明通过校验，不代表站点已联调。
+- qB Bearer Token 目前只假设 API 兼容网关接受该方式；真实 qB 原生 Web API 的可用性需按接入环境验证。
 
 ### D. 部署、更新和状态说明
 
-`Dockerfile.ptmove` 是 fork 专用构建入口，构建 Vue 资源和 Go server，不使用原版在线 updater 覆盖安装。本 fork 的更新需使用本仓库 Docker 发布物。当前 `152.136.236.238:18120` 尚未部署本 Go + Vue fork，SSH 和网页连接均超时；不得将旧 Python 服务视为本版已部署。提交、标签、Gitee Release 尚未完成。部署或升级前应为该实例单独备份 Compose、`.env.ptmove`、完整 `data/` 与对应镜像；回滚应恢复同一版本组的数据和加密密钥。
+`Dockerfile.ptmove` 构建 Vue 资源和 Go 服务，更新使用 STARPT 发行的 Docker 镜像和 Compose。安装方法见 [v1.0.0 发行说明](../../../docs/RELEASE-v1.0.0.md)，152 的当前运行信息见 [部署记录](../../../docs/DEPLOYMENT.json)。部署或升级前应为该实例单独备份 Compose、`.env.ptmove`、完整 `data/` 与对应镜像；回滚应恢复同一版本组的数据和加密密钥。

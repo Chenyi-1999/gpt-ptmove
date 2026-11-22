@@ -6,6 +6,7 @@ import (
 	"time"
 
 	parser "github.com/pt-nexus/server/internal/service/acquire/extract"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingrepair "github.com/pt-nexus/server/internal/service/processing/repair"
 )
 
@@ -19,6 +20,7 @@ type FetchRepairFinalizeInput struct {
 	RootConfig           map[string]any
 	ReviewData           parser.ReviewExtractedData
 	DetailHTML           string
+	QuotedMediaInfo      string
 
 	Draft          *SeedDraft
 	MetaName       string
@@ -50,6 +52,26 @@ func RunFetchRepairAndFinalize(input FetchRepairFinalizeInput, deps FetchRepairF
 		return FetchRepairFinalizeResult{}, errors.New("seed draft is nil")
 	}
 
+	quotedReport := ""
+	if !processingmedia.HasUsableMediaReport(input.ReviewData.Mediainfo) {
+		quotedReport = input.QuotedMediaInfo
+		if quotedReport == "" {
+			quotedReport = processingmedia.QuotedMediaInfo(parser.TorrentDescriptionBBCode(input.DetailHTML))
+		}
+		if quotedReport != "" {
+			input.ReviewData.Mediainfo = quotedReport
+			inferred := parser.InferStandardizedValues(input.ReviewData.Title, quotedReport, input.ReviewData.Body)
+			for key, field := range map[string]*string{
+				"video_codec": &input.ReviewData.VideoCodec,
+				"audio_codec": &input.ReviewData.AudioCodec,
+				"resolution":  &input.ReviewData.Resolution,
+			} {
+				if (*field == "" || strings.HasSuffix(*field, ".other")) && inferred[key] != "" {
+					*field = inferred[key]
+				}
+			}
+		}
+	}
 	input.Draft.ApplyReviewExtract(input.ReviewData, input.DetailHTML)
 	restrictionPrecheck := DetectFetchRestrictionPrecheck(
 		input.Draft,
@@ -116,6 +138,9 @@ func RunFetchRepairAndFinalize(input FetchRepairFinalizeInput, deps FetchRepairF
 		return FetchRepairFinalizeResult{}, err
 	}
 
+	if quotedReport != "" && finalizeResult.MediainfoValid && input.Draft.Mediainfo == quotedReport && deps.FetchRepairDeps.EmitLog != nil {
+		deps.FetchRepairDeps.EmitLog(input.TaskID, "补全 MediaInfo", "MediaInfo 从简介提取", "success")
+	}
 	return FetchRepairFinalizeResult{
 		RepairResult:          repairResult,
 		FinalizeResult:        finalizeResult,

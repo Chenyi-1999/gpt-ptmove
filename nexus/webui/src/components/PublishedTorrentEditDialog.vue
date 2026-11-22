@@ -817,6 +817,7 @@ watch(
 
 <style scoped>
 .edit-content {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -868,8 +869,9 @@ watch(
   gap: 10px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--star-border);
+  border-radius: 10px;
+  background: var(--star-surface-muted);
 }
 
 .cover-card h3 {
@@ -902,8 +904,9 @@ watch(
 
 .target-link-row {
   padding: 10px 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--star-border);
+  border-radius: 10px;
+  background: var(--star-surface-muted);
   color: var(--el-text-color-secondary);
 }
 
@@ -911,6 +914,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  color: var(--star-accent);
 }
 
 .edit-section,
@@ -940,8 +944,9 @@ watch(
 .preview-card {
   min-width: 0;
   padding: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--star-border);
+  border-radius: 10px;
+  background: var(--star-surface-muted);
 }
 
 .screenshot-gallery {
@@ -1024,6 +1029,7 @@ watch(
 }
 
 @media (max-width: 640px) {
+  .target-link-row,
   .section-heading,
   .edit-actions {
     align-items: flex-start;
@@ -1032,6 +1038,10 @@ watch(
 
   .cover-preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mediainfo-controls {
+    flex-wrap: wrap;
   }
 
   .edit-mode-switch :deep(.el-radio-button__inner) {

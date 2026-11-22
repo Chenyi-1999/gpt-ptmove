@@ -64,8 +64,8 @@ defineEmits<{
 <style scoped>
 .desktop-window-controls {
   --desktop-window-control-width: 46px;
-  --desktop-window-control-hover-bg: rgba(25, 35, 52, 0.08);
-  --desktop-window-control-icon: #243347;
+  --desktop-window-control-hover-bg: var(--star-surface-muted);
+  --desktop-window-control-icon: var(--star-muted);
   --desktop-window-control-close-hover: #d13438;
   --wails-draggable: no-drag;
   display: flex;

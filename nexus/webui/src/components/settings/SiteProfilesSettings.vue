@@ -1,7 +1,7 @@
 <template>
-  <main class="settings-page" v-loading="loading">
+  <section class="settings-page" v-loading="loading">
     <header>
-      <h1>站点配置档案</h1>
+      <h2 class="settings-section-title">站点配置档案</h2>
       <p>JSON 仅包含公开站点元数据（最大 64 KiB）；Cookie 与 RSS 凭据单独存储。</p>
     </header>
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" /><el-alert
@@ -29,7 +29,7 @@
           label="ID"
         /><el-table-column prop="engine" label="引擎" /><el-table-column prop="roles" label="用途"
           ><template #default="s">{{ s.row.roles?.join(' / ') }}</template></el-table-column
-        ><el-table-column label="状态"
+        ><el-table-column label="状态" min-width="180"
           ><template #default="s"
             ><el-tag type="info">{{ s.row.health || 'declared / unverified' }}</el-tag
             ><el-tag v-if="s.row.builtin" class="ml">内置</el-tag></template
@@ -46,7 +46,8 @@
     <el-dialog
       v-model="editorOpen"
       :title="editing ? '检查配置' : '导入配置'"
-      width="min(760px, 94vw)"
+      width="760px"
+      class="settings-dialog"
       @closed="clearEditor"
       ><div class="editor-actions">
         <el-upload
@@ -66,7 +67,7 @@
       /><el-checkbox v-if="editing" v-model="updateExisting">明确更新现有配置</el-checkbox>
       <p class="note">
         engine 目前使用已知引擎映射，如 nexusphp /
-        ptnexus_site；配置声明尚未验证站点可用性，也不会创建通用新协议。
+        站点映射字段；配置声明尚未验证站点可用性，也不会创建通用新协议。
       </p>
       <div v-if="previewProfile" class="preview">
         <strong>预览：{{ previewProfile.name }}</strong
@@ -90,7 +91,8 @@
     <el-dialog
       v-model="credentialsOpen"
       title="站点凭据"
-      width="min(560px, 94vw)"
+      width="560px"
+      class="settings-dialog"
       @closed="clearCredentials"
       ><p>{{ credentialName }} · {{ configuredStatus }}</p>
       <el-input
@@ -116,7 +118,7 @@
         ></template
       ></el-dialog
     >
-  </main>
+  </section>
 </template>
 <script setup lang="ts">
 import axios from 'axios'
@@ -367,31 +369,32 @@ onMounted(load)
 </script>
 <style scoped>
 .settings-page {
-  padding: 20px;
-  overflow: auto;
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 16px;
-}
-h1 {
-  font-size: 22px;
-  margin: 0 0 6px;
+  gap: 14px;
 }
 p {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
-  margin: 0;
+  font-size: 0.8125rem;
+  margin: 4px 0 0;
+  line-height: 1.55;
 }
 .head,
 .editor-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .head > div {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+.head > div .el-button {
+  margin-left: 0;
 }
 .ml {
   margin-left: 6px;
@@ -413,8 +416,9 @@ p {
   background: var(--el-fill-color-light);
 }
 @media (max-width: 600px) {
-  .settings-page {
-    padding: 12px;
+  .settings-page :deep(.el-card__body),
+  .settings-page :deep(.el-card__header) {
+    padding-inline: 12px;
   }
   .head {
     align-items: flex-start;

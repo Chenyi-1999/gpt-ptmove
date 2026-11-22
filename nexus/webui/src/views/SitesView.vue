@@ -1,5 +1,128 @@
 <template>
   <div class="sites-view-container">
+    <section class="sites-overview" aria-labelledby="sites-overview-title">
+      <header class="sites-overview__heading">
+        <div>
+
+          <h1 id="sites-overview-title">站点与存储</h1>
+
+        </div>
+        <el-button
+          class="sites-overview__refresh"
+          :loading="siteStatsLoading || groupStatsLoading"
+          :icon="Refresh"
+          @click="refreshStats"
+        >
+          刷新统计
+        </el-button>
+      </header>
+
+      <div class="sites-overview__metrics" aria-label="做种汇总">
+        <article class="sites-overview__metric">
+          <span class="sites-overview__metric-icon sites-overview__metric-icon--violet"><Connection aria-hidden="true" /></span>
+          <div>
+            <p>已收录站点</p>
+            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(siteStatsData.length) : '—' }}</strong>
+          </div>
+        </article>
+        <article class="sites-overview__metric">
+          <span class="sites-overview__metric-icon sites-overview__metric-icon--blue"><Files aria-hidden="true" /></span>
+          <div>
+            <p>各站种子数</p>
+            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(totalTorrents) : '—' }}</strong>
+          </div>
+        </article>
+        <article class="sites-overview__metric">
+          <span class="sites-overview__metric-icon sites-overview__metric-icon--mint"><Coin aria-hidden="true" /></span>
+          <div>
+            <p>各站做种体积</p>
+            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatBytes(totalSiteBytes) : '—' }}</strong>
+          </div>
+          <span class="sites-overview__metric-note">按站点分别计入</span>
+        </article>
+        <article class="sites-overview__metric">
+          <span class="sites-overview__metric-icon sites-overview__metric-icon--amber"><Medal aria-hidden="true" /></span>
+          <div>
+            <p>官组记录</p>
+            <strong>{{ groupStatsData.length || (!groupStatsLoading && !groupStatsError) ? formatCount(groupStatsData.length) : '—' }}</strong>
+          </div>
+          <span class="sites-overview__metric-note">{{ selectedSite || '全部站点' }}</span>
+        </article>
+      </div>
+
+      <div class="sites-overview__charts">
+        <article class="sites-overview__chart-card" aria-labelledby="site-storage-title">
+          <div class="sites-overview__chart-heading">
+            <div>
+
+              <h2 id="site-storage-title">站点空间分布</h2>
+            </div>
+            <span class="sites-overview__chart-unit">总大小 · 前 5</span>
+          </div>
+          <div v-if="siteStatsError" class="sites-overview__chart-state" role="status">
+            <span>{{ siteStatsError }}</span>
+            <button type="button" class="sites-overview__retry" @click="fetchSiteStats">重试</button>
+          </div>
+          <div v-if="siteStatsLoading && !siteStatsData.length" class="sites-overview__chart-state" role="status">
+            正在读取站点统计…
+          </div>
+          <div v-else-if="!siteStorageRanking.length && !siteStatsError" class="sites-overview__chart-state" role="status">
+            暂无站点统计数据
+          </div>
+          <div v-else-if="siteStorageRanking.length" class="sites-overview__bars">
+            <div v-for="(site, index) in siteStorageRanking" :key="site.site_name" class="sites-overview__bar-row">
+              <div class="sites-overview__bar-label">
+                <span :title="site.site_name">{{ site.site_name }}</span>
+                <strong>{{ formatBytes(site.total_size) }}</strong>
+              </div>
+              <div class="sites-overview__track" role="img" :aria-label="`${site.site_name}，${formatBytes(site.total_size)}`">
+                <span
+                  class="sites-overview__bar"
+                  :class="`sites-overview__bar--${index % 2 ? 'blue' : 'violet'}`"
+                  :style="{ width: `${siteStoragePercent(site.total_size)}%` }"
+                />
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="sites-overview__chart-card" aria-labelledby="group-count-title">
+          <div class="sites-overview__chart-heading">
+            <div>
+
+              <h2 id="group-count-title">官组分布</h2>
+            </div>
+            <span class="sites-overview__chart-unit">种子数量 · 前 5</span>
+          </div>
+          <div v-if="groupStatsError" class="sites-overview__chart-state" role="status">
+            <span>{{ groupStatsError }}</span>
+            <button type="button" class="sites-overview__retry" @click="fetchGroupStats">重试</button>
+          </div>
+          <div v-if="groupStatsLoading && !groupStatsData.length" class="sites-overview__chart-state" role="status">
+            正在读取官组统计…
+          </div>
+          <div v-else-if="!groupCountRanking.length && !groupStatsError" class="sites-overview__chart-state" role="status">
+            暂无可展示的官组数据
+          </div>
+          <div v-else-if="groupCountRanking.length" class="sites-overview__bars">
+            <div v-for="(group, index) in groupCountRanking" :key="`${group.site_name}-${group.group_suffix}`" class="sites-overview__bar-row">
+              <div class="sites-overview__bar-label">
+                <span :title="`${group.group_suffix} · ${group.site_name}`">{{ group.group_suffix }}<small>{{ group.site_name }}</small></span>
+                <strong>{{ formatCount(group.torrent_count) }}</strong>
+              </div>
+              <div class="sites-overview__track" role="img" :aria-label="`${group.group_suffix}，${group.site_name}，${formatCount(group.torrent_count)} 个种子`">
+                <span
+                  class="sites-overview__bar"
+                  :class="`sites-overview__bar--${index % 2 ? 'blue' : 'violet'}`"
+                  :style="{ width: `${groupCountPercent(group.torrent_count)}%` }"
+                />
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <div class="layout-wrapper">
       <!-- 第一个象限：做种站点统计 -->
       <div class="quadrant glass-card glass-rounded">
@@ -228,7 +351,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Coin, Connection, Files, Medal, Refresh, Search } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { useContentFiltersStore } from '@/stores/contentFilters'
 import { ElMessage } from '@/utils/uiNotify'
@@ -304,6 +427,25 @@ const groupStatsLoading = ref(true)
 const siteStatsData = ref<SiteStat[]>([])
 const groupStatsData = ref<GroupStat[]>([])
 const selectedSite = ref('')
+const siteStatsError = ref('')
+const groupStatsError = ref('')
+
+const totalTorrents = computed(() =>
+  siteStatsData.value.reduce((sum, site) => sum + Math.max(0, Number(site.torrent_count) || 0), 0),
+)
+const totalSiteBytes = computed(() =>
+  siteStatsData.value.reduce((sum, site) => sum + Math.max(0, Number(site.total_size) || 0), 0),
+)
+const siteStorageRanking = computed(() =>
+  [...siteStatsData.value]
+    .sort((left, right) => right.total_size - left.total_size)
+    .slice(0, 5),
+)
+const groupCountRanking = computed(() =>
+  [...groupStatsData.value]
+    .sort((left, right) => right.torrent_count - left.torrent_count)
+    .slice(0, 5),
+)
 
 // 本地扫描相关
 const scanning = ref(false)
@@ -359,47 +501,70 @@ const filteredSyncedTorrents = computed(() => {
 })
 
 const formatBytes = (bytes: number, decimals = 2): string => {
-  if (!+bytes) return '0 Bytes'
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
   const k = 1024
   const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+  const i = Math.min(sizes.length - 1, Math.max(0, Math.floor(Math.log(bytes) / Math.log(k))))
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
+}
+
+const formatCount = (value: number): string =>
+  new Intl.NumberFormat('zh-CN').format(Math.max(0, Number(value) || 0))
+
+const siteStoragePercent = (bytes: number): number => {
+  const largest = siteStorageRanking.value[0]?.total_size || 0
+  return largest > 0 ? Math.max(2, (Math.max(0, bytes) / largest) * 100) : 0
+}
+
+const groupCountPercent = (count: number): number => {
+  const largest = groupCountRanking.value[0]?.torrent_count || 0
+  return largest > 0 ? Math.max(2, (Math.max(0, count) / largest) * 100) : 0
 }
 
 // 获取站点统计数据
 const fetchSiteStats = async () => {
   siteStatsLoading.value = true
+  siteStatsError.value = ''
   try {
     const response = await axios.get('/api/site_stats')
     const data = response.data
     siteStatsData.value = Array.isArray(data) ? data : []
   } catch (error) {
     console.error('获取站点统计数据失败:', error)
-    siteStatsData.value = []
+    siteStatsError.value = siteStatsData.value.length ? '更新失败，显示上次读取的数据' : '站点统计加载失败'
   } finally {
     siteStatsLoading.value = false
   }
 }
 
 // 获取官组统计数据
+let groupStatsRequest = 0
 const fetchGroupStats = async () => {
+  const request = ++groupStatsRequest
   groupStatsLoading.value = true
+  groupStatsError.value = ''
   try {
     const url = selectedSite.value ? `/api/group_stats?site=${encodeURIComponent(selectedSite.value)}` : '/api/group_stats'
     const response = await axios.get(url)
     const data = response.data
-    groupStatsData.value = Array.isArray(data) ? data : []
+    if (request === groupStatsRequest) groupStatsData.value = Array.isArray(data) ? data : []
   } catch (error) {
+    if (request !== groupStatsRequest) return
     console.error('获取官组统计数据失败:', error)
-    groupStatsData.value = []
+    groupStatsError.value = groupStatsData.value.length ? '更新失败，显示上次读取的数据' : '官组统计加载失败'
   } finally {
-    groupStatsLoading.value = false
+    if (request === groupStatsRequest) groupStatsLoading.value = false
   }
 }
 
 const handleSiteChange = () => {
+  groupStatsData.value = []
   fetchGroupStats()
+}
+
+const refreshStats = async () => {
+  await Promise.all([fetchSiteStats(), fetchGroupStats()])
 }
 
 // 获取下载器路径列表
@@ -757,6 +922,456 @@ onMounted(() => {
   .loading-container,
   .empty-state-container {
     min-height: 180px;
+  }
+}
+
+/* Data dashboard surfaces follow STARPT's navy and violet visual system. */
+.sites-view-container {
+  min-height: 100%;
+  padding: clamp(16px, 2.4vw, 30px);
+  gap: 24px;
+  color: var(--star-data-ink, #f4f3fb);
+}
+
+.sites-overview {
+  width: min(100%, 1480px);
+  margin-inline: auto;
+}
+
+.sites-overview__heading,
+.sites-overview__chart-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.sites-overview__heading {
+  margin-bottom: 20px;
+}
+
+
+.sites-overview__heading h1 {
+  margin: 0;
+  color: var(--star-data-ink, #f4f3fb);
+  font-size: clamp(1.35rem, 2.3vw, 1.8rem);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+}
+
+
+.sites-overview__refresh {
+  min-height: 40px;
+  border-color: var(--star-data-border, #293553);
+  border-radius: 12px;
+  color: var(--star-data-ink, #f4f3fb);
+  background: var(--star-data-panel, #12182b);
+}
+
+.sites-overview__refresh:hover,
+.sites-overview__refresh:focus-visible {
+  border-color: var(--star-data-accent, #b8a4ff);
+  color: var(--star-data-ink, #f4f3fb);
+  background: var(--star-data-panel-raised, #17203a);
+}
+
+.sites-overview__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.sites-overview__metric,
+.sites-overview__chart-card {
+  border: 1px solid var(--star-data-border, #293553);
+  border-radius: var(--star-data-radius, 16px);
+  background: linear-gradient(145deg, rgb(23 32 58 / 93%), rgb(16 21 39 / 97%));
+  box-shadow: 0 14px 40px rgb(0 0 0 / 12%);
+}
+
+.sites-overview__metric {
+  box-sizing: border-box;
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  align-items: center;
+  gap: 13px;
+  padding: 17px;
+}
+
+.sites-overview__metric-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgb(184 164 255 / 15%);
+  border-radius: 13px;
+  font-size: 19px;
+}
+
+.sites-overview__metric-icon--violet {
+  color: var(--star-data-accent, #b8a4ff);
+  background: rgb(159 112 255 / 13%);
+}
+
+.sites-overview__metric-icon--blue {
+  color: var(--star-data-blue, #72a7ff);
+  background: rgb(90 151 255 / 12%);
+}
+
+.sites-overview__metric-icon--mint {
+  color: var(--star-data-success, #7ce2b7);
+  background: rgb(75 203 157 / 12%);
+}
+
+.sites-overview__metric-icon--amber {
+  color: #f3c47d;
+  background: rgb(226 165 70 / 12%);
+}
+
+.sites-overview__metric > div {
+  min-width: 0;
+}
+
+.sites-overview__metric p {
+  margin: 0;
+  color: var(--star-data-muted, #a8b3cf);
+  font-size: 0.8rem;
+}
+
+.sites-overview__metric strong {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--star-data-ink, #f4f3fb);
+  font-size: clamp(1.08rem, 2vw, 1.55rem);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sites-overview__metric-note {
+  margin-inline-start: auto;
+  color: var(--star-data-muted, #a8b3cf);
+  font-size: 0.7rem;
+  text-align: end;
+}
+
+.sites-overview__charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sites-overview__chart-card {
+  min-width: 0;
+  padding: 19px 21px 21px;
+}
+
+.sites-overview__chart-heading {
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+
+.sites-overview__chart-heading h2 {
+  margin: 0;
+  color: var(--star-data-ink, #f4f3fb);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.sites-overview__chart-unit {
+  color: var(--star-data-muted, #a8b3cf);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.sites-overview__bars {
+  display: grid;
+  gap: 13px;
+}
+
+.sites-overview__bar-row {
+  min-width: 0;
+}
+
+.sites-overview__bar-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  color: #dfe5f5;
+  font-size: 0.78rem;
+}
+
+.sites-overview__bar-label > span {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sites-overview__bar-label small {
+  overflow: hidden;
+  color: var(--star-data-muted, #a8b3cf);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+}
+
+.sites-overview__bar-label strong {
+  flex: none;
+  color: var(--star-data-ink, #f4f3fb);
+  font-size: 0.75rem;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.sites-overview__track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(148 166 204 / 13%);
+}
+
+.sites-overview__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  transition: width 360ms ease;
+}
+
+.sites-overview__bar--violet {
+  background: linear-gradient(90deg, #8d64f5, #c4a9ff);
+  box-shadow: 0 0 14px rgb(163 115 255 / 29%);
+}
+
+.sites-overview__bar--blue {
+  background: linear-gradient(90deg, #547fef, #82b4ff);
+  box-shadow: 0 0 14px rgb(103 154 255 / 25%);
+}
+
+.sites-overview__chart-state {
+  display: flex;
+  min-height: 143px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--star-data-muted, #a8b3cf);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.sites-overview__retry {
+  padding: 4px 8px;
+  border: 1px solid var(--star-data-border, #293553);
+  border-radius: 8px;
+  color: var(--star-data-accent, #b8a4ff);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sites-overview__retry:hover,
+.sites-overview__retry:focus-visible {
+  border-color: var(--star-data-accent, #b8a4ff);
+  outline: none;
+}
+
+.layout-wrapper {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  grid-template-rows: minmax(300px, 0.8fr) minmax(380px, 1.2fr);
+  gap: 16px;
+}
+
+.quadrant {
+  border-color: var(--star-data-border, #293553) !important;
+  border-radius: var(--star-data-radius, 16px) !important;
+  background: var(--star-data-panel, #12182b) !important;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 12%) !important;
+}
+
+.quadrant-title {
+  color: var(--star-data-ink, #f4f3fb);
+}
+
+.scan-description {
+  color: var(--star-data-muted, #a8b3cf);
+}
+
+.stat-item,
+.scan-summary,
+.scan-results {
+  border: 1px solid var(--star-data-border, #293553);
+  border-radius: 12px;
+  background: var(--star-data-panel-raised, #17203a);
+}
+
+.scan-summary,
+.scan-results {
+  color: var(--star-data-ink, #f4f3fb);
+}
+
+.stat-value {
+  color: var(--star-data-ink, #f4f3fb);
+}
+
+.stat-label {
+  color: var(--star-data-muted, #a8b3cf);
+}
+
+:deep(.glass-table.el-table),
+:deep(.stats-table.el-table),
+:deep(.glass-transition.el-table) {
+  --el-table-bg-color: var(--star-data-panel, #12182b);
+  --el-table-tr-bg-color: var(--star-data-panel, #12182b);
+  --el-table-header-bg-color: var(--star-data-panel-raised, #17203a);
+  --el-table-row-hover-bg-color: rgb(184 164 255 / 9%);
+  --el-table-border-color: var(--star-data-border, #293553);
+  --el-table-text-color: #e3e9f7;
+  --el-table-header-text-color: #c4cde3;
+  background-color: var(--star-data-panel, #12182b) !important;
+}
+
+:deep(.el-table th.el-table__cell),
+:deep(.el-table tr),
+:deep(.el-table td.el-table__cell) {
+  background-color: var(--star-data-panel, #12182b);
+  border-color: var(--star-data-border, #293553);
+}
+
+:deep(.el-table__inner-wrapper::before),
+:deep(.el-table--border::after),
+:deep(.el-table--border::before) {
+  background-color: var(--star-data-border, #293553);
+}
+
+:deep(.el-table__empty-text),
+:deep(.el-tabs__item) {
+  color: var(--star-data-muted, #a8b3cf);
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: var(--star-data-accent, #b8a4ff);
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper) {
+  border: 1px solid var(--star-data-border, #293553);
+  border-radius: 10px;
+  background-color: var(--star-data-panel-raised, #17203a);
+  box-shadow: none;
+}
+
+:deep(.el-input__inner),
+:deep(.el-select__selected-item),
+:deep(.el-select__placeholder) {
+  color: var(--star-data-ink, #f4f3fb);
+}
+
+:deep(.el-empty__description p) {
+  color: var(--star-data-muted, #a8b3cf);
+}
+
+:deep(.el-loading-mask) {
+  background-color: rgb(10 13 24 / 66%);
+}
+
+@media (max-width: 1100px) {
+  .sites-overview__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .layout-wrapper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+
+  .quadrant:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    min-height: 480px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sites-view-container {
+    gap: 16px;
+    padding: 16px 12px 28px;
+  }
+
+  .sites-overview__heading {
+    align-items: flex-start;
+  }
+
+  .sites-overview__refresh {
+    flex: none;
+  }
+
+  .sites-overview__metrics {
+    gap: 9px;
+    margin-bottom: 9px;
+  }
+
+  .sites-overview__metric {
+    min-height: 88px;
+    gap: 9px;
+    padding: 12px 10px;
+  }
+
+  .sites-overview__metric-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+
+  .sites-overview__metric-note {
+    display: none;
+  }
+
+  .sites-overview__charts,
+  .layout-wrapper {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .sites-overview__chart-card {
+    padding: 16px;
+  }
+
+  .quadrant:nth-child(1),
+  .quadrant:nth-child(2),
+  .quadrant:nth-child(3) {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .quadrant,
+  .quadrant:nth-child(3) {
+    min-height: 340px;
+    padding: 12px;
+  }
+
+  .local-scan-quadrant,
+  .quadrant:nth-child(3) {
+    min-height: 460px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sites-overview__bar {
+    transition: none;
   }
 }
 </style>

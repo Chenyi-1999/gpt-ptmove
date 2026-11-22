@@ -624,7 +624,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -634,7 +634,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .site-data-card {
   width: 90vw;
   max-width: 1200px;
-  height: 90vh;
+  height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -652,17 +652,17 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   flex-direction: column;
   padding: 10px;
   min-height: 0; /* 确保flex子元素可以收缩 */
-  max-height: calc(90vh - 120px); /* 预留header和footer的空间 */
+  max-height: calc(90dvh - 120px); /* 预留header和footer的空间 */
   overflow: hidden; /* 防止内容溢出 */
 }
 
 .torrent-info {
   flex-shrink: 0;
   margin-bottom: 20px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--star-surface-muted);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--star-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -672,11 +672,11 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   gap: 10px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--star-border);
 }
 
 .torrent-icon {
-  color: #3b82f6;
+  color: var(--star-accent);
   font-size: 18px;
   flex-shrink: 0;
 }
@@ -684,7 +684,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .name-text {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--star-ink);
   line-height: 1.4;
   word-break: break-word;
 }
@@ -700,34 +700,34 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #ffffff;
+  background: var(--star-surface);
   border-radius: 8px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--star-surface-muted);
   transition: all 0.2s ease;
 }
 
 .stat-item:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  border-color: var(--star-accent);
+  box-shadow: 0 2px 4px var(--star-accent-soft);
   transform: translateY(-1px);
 }
 
 .stat-icon {
-  color: #3b82f6;
+  color: var(--star-accent);
   font-size: 16px;
   flex-shrink: 0;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--star-muted);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .stat-value {
   font-size: 13px;
-  color: #1e293b;
+  color: var(--star-ink);
   font-weight: 600;
   margin-left: 8px;
 }
@@ -769,17 +769,17 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .sites-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--star-surface);
   border-radius: 4px;
 }
 
 .sites-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--star-border);
   border-radius: 4px;
 }
 
 .sites-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--star-muted);
 }
 
 .right-panel {
@@ -794,7 +794,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
 /* 下载器选择区域 */
 .downloaders-section {
-  border-bottom: 1px solid #d1d5db;
+  border-bottom: 1px solid var(--star-border);
   padding-bottom: 16px;
   margin-bottom: 8px;
   width: 100%;
@@ -803,7 +803,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--star-ink);
   margin-bottom: 12px;
   text-align: center;
 }
@@ -818,23 +818,23 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .downloader-item {
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
+  border: 1px solid var(--star-border);
+  background: var(--star-surface-muted);
   font-size: 12px;
-  color: #374151;
+  color: var(--star-ink);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .downloader-item:hover {
-  border-color: #3b82f6;
-  background: #f0f9ff;
+  border-color: var(--star-accent);
+  background: var(--star-accent-soft);
 }
 
 .downloader-item--selected {
-  border-color: #3b82f6;
-  background: #3b82f6;
-  color: #ffffff;
+  border-color: var(--star-accent);
+  background: var(--star-action);
+  color: #fff;
 }
 
 /* 流程显示区域 */
@@ -846,7 +846,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   align-items: center;
   justify-content: center;
   padding: 16px 0;
-  border-bottom: 1px solid #d1d5db;
+  border-bottom: 1px solid var(--star-border);
 }
 
 .flow-cards {
@@ -859,8 +859,8 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
 .flow-card {
   flex: 1;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--star-surface);
+  border: 1px solid var(--star-border);
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -871,7 +871,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
 .card-title {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--star-muted);
   font-weight: 500;
   margin-bottom: 8px;
   text-align: center;
@@ -886,7 +886,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
 .empty-state {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--star-muted);
   text-align: center;
 }
 
@@ -901,7 +901,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .site-name {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--star-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -911,12 +911,12 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .downloader-info {
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--star-ink);
   text-align: center;
   padding: 8px 12px;
   border-radius: 4px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--star-surface-muted);
+  border: 1px solid var(--star-border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -924,28 +924,28 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .downloader-info.current {
-  background: #eff6ff;
-  border-color: #3b82f6;
-  color: #1e40af;
+  background: var(--star-accent-soft);
+  border-color: var(--star-accent);
+  color: var(--star-accent);
 }
 
 .downloader-info.target {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-  color: #374151;
+  background: var(--star-surface-muted);
+  border-color: var(--star-border);
+  color: var(--star-ink);
 }
 
 .downloader-info.target.selected {
-  background: #f0fdf4;
-  border-color: #10b981;
-  color: #047857;
+  background: var(--star-success-soft);
+  border-color: var(--star-success);
+  color: var(--star-success);
 }
 
 .flow-divider {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--star-muted);
   font-size: 16px;
   font-weight: bold;
   flex-shrink: 0;
@@ -962,7 +962,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .progress-title {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--star-ink);
   margin-bottom: 16px;
   text-align: center;
 }
@@ -974,29 +974,29 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
 /* Element Plus Progress 自定义样式 */
 :deep(.el-progress-bar__outer) {
-  background-color: #f1f5f9;
+  background-color: var(--star-surface-muted);
   border-radius: 4px;
 }
 
 :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(90deg, var(--star-accent) 0%, var(--star-blue) 100%);
   border-radius: 4px;
   transition: all 0.3s ease;
 }
 
 :deep(.el-progress.is-success .el-progress-bar__inner) {
-  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  background: var(--star-success);
 }
 
 :deep(.el-progress__text) {
-  color: #374151 !important;
+  color: var(--star-ink) !important;
   font-size: 12px !important;
   font-weight: 600 !important;
 }
 
 .progress-percentage {
   font-weight: 600;
-  color: #374151;
+  color: var(--star-ink);
 }
 
 .progress-steps-info {
@@ -1019,7 +1019,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #d1d5db;
+  background: var(--star-border);
   flex-shrink: 0;
   margin-top: 4px;
   transition: all 0.3s ease;
@@ -1033,14 +1033,14 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .step-name {
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--star-muted);
   margin-bottom: 2px;
   transition: all 0.3s ease;
 }
 
 .step-desc {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--star-muted);
   line-height: 1.3;
   transition: all 0.3s ease;
 }
@@ -1050,7 +1050,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   margin-top: 12px;
   font-size: 12px;
   font-weight: 500;
-  color: #3b82f6;
+  color: var(--star-accent);
 }
 
 /* 步骤状态样式 */
@@ -1059,18 +1059,18 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .step-info--active .step-indicator {
-  background: #3b82f6;
+  background: var(--star-accent);
   width: 14px;
   height: 14px;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px var(--star-accent-soft);
 }
 
 .step-info--active .step-name {
-  color: #3b82f6;
+  color: var(--star-accent);
 }
 
 .step-info--active .step-desc {
-  color: #6b7280;
+  color: var(--star-muted);
 }
 
 .step-info--completed {
@@ -1078,15 +1078,15 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .step-info--completed .step-indicator {
-  background: #10b981;
+  background: var(--star-success);
 }
 
 .step-info--completed .step-name {
-  color: #10b981;
+  color: var(--star-success);
 }
 
 .step-info--completed .step-desc {
-  color: #6b7280;
+  color: var(--star-muted);
 }
 
 .sites-grid {
@@ -1105,10 +1105,10 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .site-tile {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 2px;
-  background: #fafbfc;
+  background: var(--star-surface-muted);
   transition: all 0.3s ease;
   cursor: pointer;
   width: 75px;
@@ -1121,19 +1121,19 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .site-tile:hover {
-  border-color: #b3d8ff;
-  box-shadow: 0 2px 8px 0 rgba(179, 216, 255, 0.12);
+  border-color: var(--star-accent);
+  box-shadow: 0 2px 8px 0 var(--star-accent-soft);
   transform: translateY(-1px);
 }
 
 .site-card--selected .site-tile {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  box-shadow: 0 2px 8px 0 rgba(59, 130, 246, 0.2);
+  border-color: var(--star-accent);
+  background: var(--star-accent-soft);
+  box-shadow: 0 2px 8px 0 var(--star-accent-soft);
 }
 
 .site-card--selected .site-tile:hover {
-  border-color: #2563eb;
+  border-color: var(--star-blue);
   transform: translateY(-1px);
 }
 
@@ -1162,7 +1162,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .site-name-link {
   font-weight: 600;
   font-size: 14px;
-  color: #409eff;
+  color: var(--star-accent);
   text-decoration: none;
   display: block;
   white-space: nowrap;
@@ -1172,24 +1172,24 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 .site-name-link:hover {
-  color: #337ecc;
+  color: var(--star-accent-hover);
 }
 
 .site-link-icon {
-  color: #f56565;
+  color: var(--star-danger);
   text-decoration: none;
   display: flex;
   align-items: center;
 }
 
 .site-link-icon:hover {
-  color: #e53e3e;
+  color: var(--star-danger);
 }
 
 .info-item {
   margin-right: 15px;
   font-size: 13px;
-  color: #606266;
+  color: var(--star-muted);
 }
 
 .info-item:last-child {
@@ -1199,7 +1199,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 .site-name-text {
   font-weight: 600;
   font-size: 14px;
-  color: #303133;
+  color: var(--star-ink);
   display: block;
   white-space: nowrap;
   overflow: hidden;
@@ -1229,7 +1229,7 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 }
 
 :deep(.el-descriptions__body) {
-  background-color: #fafafa;
+  background-color: var(--star-surface-muted);
 }
 
 /* 中等屏幕适配 */
@@ -1297,11 +1297,11 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
   margin-top: 10px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .site-data-card {
     width: calc(100vw - 12px);
     max-width: calc(100vw - 12px);
-    height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
   }
 
   .site-data-content {
@@ -1316,6 +1316,17 @@ const retryTransferWithSimilarTorrent = async (similarTorrent: TransferSuggestio
 
   .torrent-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-item,
+  .stat-item--fixed {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .stat-value {
+    margin-left: 0;
+    overflow-wrap: anywhere;
   }
 
   .content-area {

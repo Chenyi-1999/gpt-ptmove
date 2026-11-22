@@ -2,7 +2,7 @@
 
 在控制台「站点管理」下载模板，编辑后选择JSON文件，先校验预览，再确认导入。单个文件最多64 KiB，UTF-8编码，一个文件描述一个站点。也可下载JSON Schema供编辑器校验；仓库提供[模板](sites/template.json)和[Schema](sites/schema.json)。
 
-第一版支持常见NexusPHP页面。模板声明解析方式，不执行Python/JavaScript，不包含Cookie、RSS密钥或密码。新的站点协议需要开发适配器；PTNexus也必须已支持所填写的站点映射。导入成功表示格式通过，实际站点仍需要验证。
+第一版支持常见NexusPHP页面。模板声明解析方式，不执行Python/JavaScript，不包含Cookie、RSS密钥或密码。新的站点协议需要开发适配器；STARPT 也必须已支持所填写的站点映射。导入成功表示格式通过，实际站点仍需要验证。
 
 关键字段：
 
@@ -14,7 +14,7 @@
 |base_url|站点HTTPS域名，不含路径、凭据、查询参数或片段|
 |roles|source、target或两者|
 |engine|固定nexusphp|
-|ptnexus_site|PTNexus中实际使用的站点代码；null时允许扫描，不能创建转种任务|
+|ptnexus_site|STARPT 中实际使用的站点代码；null时允许扫描，不能创建转种任务|
 |official_groups|官组名称，按资源标题最后的组名识别；仍需通过转载限制检查|
 |announce_hosts|允许的Tracker精确域名，必须填写后才能创建转种任务|
 |paths|listing、detail、download、search，必须站内相对路径；detail/download必须且仅含一个{id}，search含一个{query}|
@@ -28,4 +28,4 @@
 
 旧库自动迁移：原有候选、任务、发布证据、额度和ID归到zmpt→novahd，保留原关联。部署前需要一致性数据备份。新版NAS执行端为0.2.0；旧执行端不能领取新任务。已迁移的数据不能直接交给旧镜像，回滚必须使用升级前备份；如果升级后已有真实发布，应保留发布账本并修复前进。
 
-受保护81服务器规则继续有效，域名解析和种子中的全部Tracker地址都会检查；拒绝webseed及其他不受支持的额外网络地址。实际qB和PTNexus自身的网络与站点配置也需要联调核对，JSON模板不能替代下游服务的访问限制。
+受保护81服务器规则继续有效，域名解析和种子中的全部Tracker地址都会检查；拒绝webseed及其他不受支持的额外网络地址。实际qB 和 STARPT 自身的网络与站点配置也需要联调核对，JSON模板不能替代下游服务的访问限制。

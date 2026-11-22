@@ -158,7 +158,7 @@ func SiteProfileSchema() map[string]any {
 	props := map[string]any{"schema_version": map[string]any{"type": "integer", "const": 1}, "id": map[string]any{"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}, "name": str(100), "base_url": map[string]any{"type": "string", "format": "uri", "maxLength": 512, "pattern": "^https://"}, "engine": map[string]any{"type": "string", "const": "nexusphp"}, "ptnexus_site": map[string]any{"type": []string{"string", "null"}, "pattern": "^[a-z][a-z0-9_-]{0,63}$"}, "roles": map[string]any{"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": map[string]any{"enum": []string{"source", "target"}}}, "official_groups": map[string]any{"type": "array", "maxItems": 64, "items": str(100)}, "announce_hosts": map[string]any{"type": "array", "maxItems": 32, "items": str(253)}, "paths": object(paths), "selectors": object(selectors)}
 	schema := object(props)
 	schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-	schema["title"] = "PTNexus declarative site profile"
+	schema["title"] = "STARPT declarative site profile"
 	schema["required"] = []string{"id", "name", "base_url", "roles"}
 	return schema
 }

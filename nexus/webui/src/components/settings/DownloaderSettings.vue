@@ -1,31 +1,15 @@
 <template>
-  <div class="top-actions glass-pagination">
-    <el-button type="primary" size="large" @click="addDownloader" :icon="Plus">
-      添加下载器
-    </el-button>
-    <el-button type="success" size="large" @click="saveSettings" :loading="isSaving">
-      <el-icon><Select /></el-icon>
-      保存所有设置
-    </el-button>
-    <div class="realtime-switch-container">
-      <el-tooltip
-        content="开启后，图表页将每秒获取一次数据以显示“近1分钟”实时速率。关闭后将每分钟获取一次，以降低系统负载。"
-        placement="bottom"
-        :hide-after="0"
-      >
-        <el-form-item label="开启实时速率" class="switch-form-item">
-          <el-switch
-            v-model="settings.realtime_speed_enabled"
-            size="large"
-            inline-prompt
-            active-text="是"
-            inactive-text="否"
-          />
-        </el-form-item>
-      </el-tooltip>
-    </div>
-  </div>
-  <div class="settings-view" v-loading="isLoading">
+  <section class="downloader-page" v-loading="isLoading" aria-labelledby="downloaders-title">
+    <header class="downloader-page__header star-surface">
+      <h2 id="downloaders-title" class="settings-section-title">下载器</h2>
+      <div class="top-actions">
+        <el-button @click="addDownloader" :icon="Plus">添加下载器</el-button>
+        <el-button type="primary" @click="saveSettings" :loading="isSaving" :icon="Select">
+          保存所有设置
+        </el-button>
+      </div>
+    </header>
+    <el-empty v-if="!isLoading && !settings.downloaders.length" description="还没有下载器" />
     <div class="downloader-grid">
       <el-card
         v-for="downloader in settings.downloaders"
@@ -34,13 +18,12 @@
       >
         <template #header>
           <div class="card-header">
-            <el-tag
-              class="downloader-name-tag"
-              size="default"
-              :style="downloaderNameTagStyle(downloader)"
-            >
-              {{ downloader.name || '新下载器' }}
-            </el-tag>
+            <div class="downloader-heading">
+              <h3>{{ downloader.name || '新下载器' }}</h3>
+              <span v-if="downloader.type">
+                {{ downloader.type === 'qbittorrent' ? 'qBittorrent' : 'Transmission' }}
+              </span>
+            </div>
             <div class="header-controls">
               <div class="downloader-color-controls">
                 <el-popover
@@ -85,7 +68,6 @@
                       : 'info'
                 "
                 :plain="!connectionTestResults[downloader.id]"
-                style="width: 70px"
                 @click="testConnection(downloader)"
                 :loading="testingConnectionId === downloader.id"
                 :icon="Link"
@@ -93,25 +75,28 @@
                 测试
               </el-button>
               <el-button
-                type="warning"
                 :icon="FolderOpened"
-                style="width: 90px"
                 @click="openPathMappingDialog(downloader)"
               >
                 路径映射
               </el-button>
-              <el-switch v-model="downloader.enabled" style="margin: 0 10px" />
+              <el-switch
+                v-model="downloader.enabled"
+                :aria-label="downloader.name ? '启用 ' + downloader.name : '启用下载器'"
+              />
 
               <el-button
                 type="danger"
                 :icon="Delete"
                 circle
+                plain
+                :aria-label="downloader.name ? '删除 ' + downloader.name : '删除下载器'"
                 @click="confirmDeleteDownloader(downloader.id)"
               />
             </div>
           </div>
         </template>
-        <el-form :model="downloader" label-position="left" label-width="auto">
+        <el-form :model="downloader" label-position="top">
           <el-form-item label="名称">
             <div class="name-and-client-row">
               <el-input
@@ -123,6 +108,7 @@
               <el-select
                 v-model="downloader.type"
                 placeholder="请选择类型"
+                aria-label="下载器类型"
                 class="client-type-select"
                 @change="resetConnectionStatus(downloader.id)"
               >
@@ -290,20 +276,21 @@
         </el-form>
       </el-card>
     </div>
-  </div>
+  </section>
 
   <!-- 路径映射对话框 -->
   <el-dialog
     v-model="pathMappingDialogVisible"
     :title="`路径映射配置 - ${currentDownloader?.name || ''}`"
-    width="700px"
+    width="720px"
+    class="settings-dialog"
     :close-on-click-modal="false"
   >
     <div class="path-mapping-container">
-      <el-alert title="路径映射说明" type="info" :closable="false" style="margin-bottom: 16px">
-        <p>配置下载器路径到 PT Nexus 容器内路径的映射关系。</p>
+      <el-alert title="路径映射说明" type="info" :closable="false">
+        <p>配置下载器路径与 STARPT 容器内路径的映射关系。</p>
         <p><strong>下载器路径：</strong>下载器中显示的种子保存路径</p>
-        <p><strong>视频文件路径：</strong>挂载到 PT Nexus 容器内的路径或者盒子本地路径的路径</p>
+        <p><strong>视频文件路径：</strong>挂载到 STARPT 容器内的路径或下载器本地路径</p>
       </el-alert>
 
       <div class="mapping-list">
@@ -314,14 +301,14 @@
           <el-input v-model="mapping.local" placeholder="例如：/app/data/qb1" class="mapping-input">
             <template #prepend>视频文件路径</template>
           </el-input>
-          <el-button type="danger" :icon="Delete" circle @click="deletePathMapping(index)" />
+          <el-button type="danger" :icon="Delete" aria-label="删除此映射规则" circle @click="deletePathMapping(index)" />
         </div>
       </div>
 
       <el-button
         type="primary"
         :icon="Plus"
-        style="width: 100%; margin-top: 16px"
+        class="add-mapping"
         @click="addPathMapping"
       >
         添加映射规则
@@ -454,18 +441,6 @@ const randomDownloaderColor = () => {
   }
   const hue = Math.floor(Math.random() * 320) + 20
   return hslToHex(hue, 72, 45)
-}
-
-const downloaderNameTagStyle = (
-  downloader: { color?: string | null } | null | undefined,
-): Record<string, string> => {
-  const color = String(downloader?.color || '').trim()
-  if (!color) return {}
-  return {
-    '--el-tag-bg-color': color,
-    '--el-tag-border-color': color,
-    '--el-tag-text-color': '#ffffff',
-  }
 }
 
 // 路径映射相关状态
@@ -736,298 +711,250 @@ const savePathMappings = async () => {
 </script>
 
 <style scoped>
-.top-actions {
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 16px 24px;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+.downloader-page {
+  display: grid;
+  min-width: 0;
   gap: 16px;
 }
 
-.settings-view {
-  padding: 24px;
-  overflow-y: auto;
-  flex-grow: 1;
-  background-color: transparent;
+.downloader-page__header,
+.top-actions,
+.card-header,
+.header-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
 }
 
-/* 自定义滚动条样式 */
-.settings-view::-webkit-scrollbar {
-  width: 8px;
+.downloader-page__header {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px clamp(13px, 2vw, 20px);
+  border-radius: 12px;
 }
 
-.settings-view::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 4px;
+.top-actions,
+.header-controls {
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.settings-view::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.3);
-  border-radius: 4px;
-  transition: background 0.3s ease;
+.top-actions > .el-button,
+.header-controls > .el-button {
+  min-height: 36px;
+  margin-left: 0;
 }
 
-.settings-view::-webkit-scrollbar-thumb:hover {
-  background: rgba(144, 147, 153, 0.5);
-}
 
 .downloader-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 410px), 1fr));
+  align-items: start;
+  gap: 14px;
 }
 
 .downloader-card {
-  display: flex;
-  flex-direction: column;
+  min-width: 0;
 }
 
-.api-token-field {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+.downloader-card :deep(.el-card__header) {
+  padding: 14px 17px;
 }
 
-.api-token-field :deep(.el-input) {
-  flex: 1 1 180px;
-}
-
-.api-token-status,
-.credential-hint {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  line-height: 1.5;
+.downloader-card :deep(.el-card__body) {
+  padding: 15px 17px 0;
 }
 
 .card-header {
-  display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  gap: 10px 14px;
+}
+
+.downloader-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.downloader-heading h3 {
+  margin: 0;
+  color: var(--star-ink);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.downloader-heading > span {
+  color: var(--star-muted);
+  font-size: 0.75rem;
 }
 
 .header-controls {
-  display: flex;
-  align-items: center;
-}
-
-.downloader-name-tag {
-  font-weight: 600;
-  border-radius: 8px;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.downloader-color-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 8px;
+  max-width: 100%;
 }
 
 .downloader-color-trigger {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 6px;
-  border: 1px solid var(--el-border-color-light);
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  place-items: center;
+  border: 1px solid var(--star-border-strong);
+  border-radius: 8px;
+  background-clip: content-box;
   cursor: pointer;
-  outline: none;
-}
-
-.downloader-color-trigger:hover {
-  border-color: var(--el-border-color);
 }
 
 .downloader-color-trigger:focus-visible {
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.25);
-}
-
-.downloader-color-popover :deep(.el-color-picker-panel__footer) {
-  align-items: center;
+  outline: 2px solid var(--star-accent);
+  outline-offset: 2px;
 }
 
 .downloader-color-random-btn {
   margin-left: 8px;
 }
 
-.name-and-client-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 12px;
-}
-
-.name-input {
-  flex: 1;
-  /* 名称输入框占一半 */
-}
-
-.client-type-select {
-  flex: 1;
-  /* 客户端选择占一半 */
-}
-
+.name-and-client-row,
 .proxy-settings-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   width: 100%;
-  gap: 12px;
-  min-height: 32px;
+  gap: 8px;
+}
+
+.name-input {
+  flex: 2 1 165px;
+  min-width: 0;
+}
+
+.client-type-select {
+  flex: 1 1 128px;
+  min-width: 0;
 }
 
 .proxy-port-input {
-  flex: 1;
-}
-
-.proxy-port-input :deep(.el-input__wrapper) {
-  height: 32px;
-}
-
-.proxy-port-input :deep(input[type='number']) {
-  -moz-appearance: textfield;
-}
-
-.proxy-port-input :deep(input[type='number']::-webkit-inner-spin-button),
-.proxy-port-input :deep(input[type='number']::-webkit-outer-spin-button) {
-  -webkit-appearance: none;
-  margin: 0;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .proxy-port-input :deep(.el-input-group__append) {
-  padding: 0 5px;
-}
-
-.proxy-port-input :deep(.el-input-group__prepend) {
-  padding: 0 5px;
+  padding: 0 7px;
 }
 
 .input-append-wrapper {
   display: flex;
   align-items: center;
-  padding: 0 2px !important;
-  height: 100%;
 }
 
-.input-append-wrapper :deep(.el-switch) {
-  margin: 0;
-}
-
-.input-append-wrapper :deep(.el-switch__core) {
-  min-width: 36px;
-  height: 20px;
-}
-
-.input-append-wrapper :deep(.el-switch__label) {
-  font-size: 11px;
-  padding: 0 2px;
+.ratio-limiter-label,
+.api-token-field {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
 }
 
 .ratio-limiter-label {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 32px;
+  color: var(--star-muted);
+  font-size: 0.8125rem;
 }
 
-.ratio-limiter-text {
-  color: #606266;
-  white-space: nowrap;
+.api-token-field {
+  width: 100%;
 }
 
-.switch-form-item {
-  margin-bottom: 0;
-  margin-left: 8px;
+.api-token-field :deep(.el-input) {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
-/* 路径映射对话框样式 */
+.api-token-field :deep(.el-checkbox) {
+  height: auto;
+  max-width: 100%;
+  margin-right: 0;
+  white-space: normal;
+}
+
+.api-token-status,
+.credential-hint {
+  color: var(--star-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.credential-hint {
+  flex-basis: 100%;
+}
+
 .path-mapping-container {
-  padding: 8px 0;
+  display: grid;
+  gap: 14px;
 }
 
 .mapping-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  gap: 10px;
 }
 
 .mapping-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .mapping-input {
-  flex: 1;
+  min-width: 0;
 }
 
-@media (max-width: 1024px) {
-  .top-actions {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .downloader-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-  }
-
-  .card-header {
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .header-controls {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 8px;
-  }
+.mapping-input :deep(.el-input-group__prepend) {
+  padding: 0 9px;
 }
 
-@media (max-width: 768px) {
+.add-mapping {
+  justify-self: start;
+}
+
+@media (max-width: 600px) {
   .top-actions {
-    padding: 12px;
-    position: static;
-  }
-
-  .settings-view {
-    padding: 12px;
-  }
-
-  .downloader-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .name-and-client-row,
-  .proxy-settings-row,
-  .mapping-item {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .ratio-limiter-label {
-    justify-content: flex-start;
-  }
-
-  .header-controls {
     width: 100%;
-    justify-content: flex-start;
   }
 
-  .switch-form-item {
-    margin-left: 0;
+  .top-actions > .el-button,
+  .header-controls > .el-button,
+  .downloader-color-trigger {
+    min-height: 44px;
+  }
+
+  .downloader-color-trigger {
+    width: 44px;
+  }
+
+  .top-actions > .el-button {
+    flex: 1 1 auto;
+  }
+
+
+  .downloader-card :deep(.el-card__header),
+  .downloader-card :deep(.el-card__body) {
+    padding-inline: 12px;
+  }
+
+  .mapping-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mapping-input {
+    grid-column: 1;
+  }
+
+  .mapping-item > .el-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 </style>

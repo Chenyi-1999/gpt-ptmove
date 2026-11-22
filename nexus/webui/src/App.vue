@@ -270,7 +270,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatDotRound,
   Connection,
-  DataAnalysis,
   Document,
   Download,
   Expand,
@@ -310,7 +309,6 @@ const { hideWindowToTray, isMaximised, isWindowsDesktop, minimiseWindow, toggleW
 
 const primaryNavigation = [
   { to: '/', label: '首页', icon: House },
-  { to: '/info', label: '流量统计', icon: DataAnalysis },
   { to: '/torrents', label: '一种多站', icon: Switch },
   { to: '/data', label: '一键多种', icon: Connection },
   { to: '/seed-maintenance', label: '种子维护', icon: Operation },
@@ -655,7 +653,7 @@ const handleExportLogs = async () => {
 
 // parseFileName 从响应头中提取导出文件名，失败时回退默认名称。
 const parseFileName = (contentDisposition?: string) => {
-  const fallback = 'ptnexus-go-日志-24h.txt'
+  const fallback = 'starpt-日志-24h.txt'
   if (!contentDisposition || typeof contentDisposition !== 'string') {
     return fallback
   }

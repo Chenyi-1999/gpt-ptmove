@@ -1,6 +1,6 @@
 # 下载器端远程补截图
 
-0.3.1 提供独立的 Linux NAS Docker 媒体代理，复用 PTNexus 原生截图流程。媒体留在 NAS，152 只发送截图请求并接收 Pixhost 图片地址及 BBCode。支持 amd64 和 arm64 构建；32 位 ARM 不在此版本范围。
+0.3.1 提供独立的 Linux NAS Docker 媒体代理，调用 STARPT 客户端执行截图流程。媒体留在 NAS，152 只发送截图请求并接收 Pixhost 图片地址及 BBCode。支持 amd64 和 arm64 构建；32 位 ARM 不在此版本范围。
 
 流程与替换规则概览见 [截图替换设计说明（离线 HTML）](SCREENSHOT_REPLACEMENT_DESIGN.html)。
 

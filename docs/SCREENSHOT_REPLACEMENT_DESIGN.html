@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PTMove 基于 PTNexus 的远程补截图设计：原图校验、NAS 截帧、Pixhost 上传、资料替换与发布前复核。">
+  <meta name="description" content="STARPT 远程补截图设计：原图校验、NAS 截帧、Pixhost 上传、资料替换与发布前复核。">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; base-uri 'none'; form-action 'none'">
   <title>PTMove｜截图替换设计说明</title>
   <style>
@@ -136,7 +136,7 @@
   <a class="skip" href="#main">跳转到正文</a>
   <header class="wrap">
     <div class="masthead">
-      <div class="brand">PT<span>Move</span> / PTNexus 改版</div>
+      <div class="brand">STARPT</div>
       <div class="stamp">设计说明 · v0.3.1 修订版<br>更新于 2026-11-18</div>
     </div>
     <div class="hero">
@@ -159,7 +159,7 @@
   <main id="main" class="wrap">
     <section id="architecture" aria-labelledby="architecture-title">
       <div class="section-head"><span class="section-no">01</span><h2 id="architecture-title">三个位置，各自承担一件事</h2></div>
-      <p>沿用 PTNexus 的资料处理流程，在下载器所在的 Linux NAS 上增加一个可独立部署的 Docker 媒体代理。代理只开放受限的媒体处理接口。飞牛通过 HTTPS 主动从 152 领取任务，qB 查询和截图均在飞牛本机处理。</p>
+      <p>使用 STARPT 的资料处理流程，在下载器所在的 Linux NAS 上增加一个可独立部署的 Docker 媒体代理。代理只开放受限的媒体处理接口。飞牛通过 HTTPS 主动从 152 领取任务，qB 查询和截图均在飞牛本机处理。</p>
       <div class="architecture" aria-label="主程序发出媒体请求，NAS 代理处理并上传 Pixhost">
         <div class="node"><span class="label">控制与资料</span><h3>152 主程序</h3><p>校验原图、决定是否补图，发送媒体路径及截图请求，保存最终截图资料和审核状态。</p></div>
         <div class="arrow" aria-hidden="true">→</div>

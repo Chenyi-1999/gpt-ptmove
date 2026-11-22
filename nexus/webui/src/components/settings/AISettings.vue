@@ -1,8 +1,8 @@
 <template>
-  <main class="settings-page" v-loading="loading">
+  <section class="settings-page" v-loading="loading">
     <header class="page-heading">
       <div>
-        <h1>API 管理</h1>
+        <h2 class="settings-section-title">API 管理</h2>
         <p>管理机器密钥、权限与有效期，并为外部客户端准备安全的接入说明。</p>
       </div>
       <el-button type="primary" @click="openCreate">创建密钥</el-button>
@@ -49,7 +49,7 @@
             <el-input
               v-model="apiBaseInput"
               autocomplete="url"
-              placeholder="https://ptnexus.example.com"
+              placeholder="https://starpt.example.com"
             >
               <template #append>
                 <el-button @click="resetApiBase">恢复当前地址</el-button>
@@ -238,7 +238,8 @@
     <el-dialog
       v-model="createOpen"
       title="创建机器密钥"
-      width="min(560px, 94vw)"
+      width="560px"
+      class="settings-dialog"
       @closed="clearCreate"
     >
       <el-form label-position="top">
@@ -287,7 +288,8 @@
     <el-dialog
       v-model="tokenOpen"
       title="新机器密钥"
-      width="min(600px, 94vw)"
+      width="600px"
+      class="settings-dialog"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       @closed="clearIssuedToken"
@@ -332,7 +334,7 @@
         }}</el-tag>
       </div>
     </el-dialog>
-  </main>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -506,7 +508,7 @@ const loadOpenApi = async () => {
   try {
     const response = await axios.get('/api/machine-openapi')
     const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
-    downloadBlob(blob, 'ptnexus-machine-openapi.json')
+    downloadBlob(blob, 'starpt-machine-openapi.json')
   } catch {
     ElMessage.error('OpenAPI 文档下载失败，请检查管理员会话后重试。')
   } finally {
@@ -562,7 +564,7 @@ const downloadIntegrationPackage = () => {
   }
   downloadBlob(
     new Blob([JSON.stringify(integrationPackage.value, null, 2)], { type: 'application/json' }),
-    'ptnexus-ai-integration.json',
+    'starpt-ai-integration.json',
   )
 }
 
@@ -768,12 +770,10 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  min-width: 0;
-  padding: 20px;
-  overflow: auto;
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 .page-heading,
 .card-heading,
@@ -783,10 +783,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-.page-heading h1 {
-  font-size: 22px;
-  margin: 0 0 6px;
 }
 .page-heading p,
 .card-heading p {
@@ -799,7 +795,7 @@ onUnmounted(() => {
 }
 .connection-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 282px), 1fr));
   gap: 24px;
 }
 .deployment-info {
@@ -910,6 +906,15 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px 14px;
 }
+.custom-scope-list :deep(.el-checkbox) {
+  height: auto;
+  max-width: 100%;
+  margin-right: 0;
+  white-space: normal;
+}
+.custom-scope-list :deep(.el-checkbox__label) {
+  overflow-wrap: anywhere;
+}
 .permission-help {
   margin-top: 8px;
 }
@@ -924,17 +929,20 @@ onUnmounted(() => {
 }
 .settings-page :deep(.el-card),
 .settings-page :deep(.el-alert) {
+  min-width: 0;
   flex-shrink: 0;
 }
-@media (max-width: 900px) {
-  .connection-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
+
+.docs-action .el-button,
+.probe-controls .el-button,
+.issued-actions .el-button,
+.guide-actions .el-button {
+  margin-left: 0;
 }
 @media (max-width: 600px) {
-  .settings-page {
-    padding: 12px;
+  .settings-page :deep(.el-card__body),
+  .settings-page :deep(.el-card__header) {
+    padding-inline: 12px;
   }
   .page-heading {
     align-items: flex-start;

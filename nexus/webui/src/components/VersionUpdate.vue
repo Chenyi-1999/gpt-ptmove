@@ -31,10 +31,9 @@
         <!-- 强制更新提示 -->
         <div
           v-if="!isDialogLoading && isForceUpdate && !updateInfo.updateControl.disable_update"
-          class="force-update-notice"
-          style="color: #f56c6c; background: #fef0f0; border-color: #fde2e2"
+          class="force-update-notice force-update-notice--critical"
         >
-          <el-icon color="#f56c6c" size="18"><WarningFilled /></el-icon>
+          <el-icon color="#ff8f9a" size="18"><WarningFilled /></el-icon>
           <span>{{ forceUpdateNoticeText }}</span>
         </div>
 
@@ -42,7 +41,7 @@
           v-else-if="!isDialogLoading && updateInfo.updateControl.disable_update && updateInfo.hasUpdate"
           class="force-update-notice"
         >
-          <el-icon color="#e6a23c" size="18"><WarningFilled /></el-icon>
+          <el-icon color="#ffd27a" size="18"><WarningFilled /></el-icon>
           <span>{{ disableUpdateNoticeText }}</span>
         </div>
 
@@ -718,14 +717,14 @@ const performUpdate = async () => {
           try {
             await desktopBridge.LaunchInstaller(filePath)
             updateStatus.value = `${installerLabel}已打开，请按安装向导完成升级`
-            successMessage = `${installerLabel}已打开。继续安装时若检测到 PT Nexus 正在运行，安装器会提示关闭后再继续`
+            successMessage = `${installerLabel}已打开。继续安装时若检测到 STARPT 正在运行，安装器会提示关闭后再继续`
           } catch (launchError) {
             console.error('启动安装包失败:', launchError)
             if (desktopBridge && typeof desktopBridge.OpenPath === 'function') {
               try {
                 await desktopBridge.OpenPath(filePath)
                 updateStatus.value = `${installerLabel}已打开，请按安装向导完成升级`
-                successMessage = `${installerLabel}已打开。继续安装时若检测到 PT Nexus 正在运行，安装器会提示关闭后再继续`
+                successMessage = `${installerLabel}已打开。继续安装时若检测到 STARPT 正在运行，安装器会提示关闭后再继续`
               } catch (openError) {
                 console.error('打开安装包失败:', openError)
                 if (desktopBridge && typeof desktopBridge.RevealPath === 'function') {
@@ -756,7 +755,7 @@ const performUpdate = async () => {
           try {
             await desktopBridge.OpenPath(filePath)
             updateStatus.value = `${installerLabel}已打开，请按安装向导完成升级`
-            successMessage = `${installerLabel}已打开。继续安装时若检测到 PT Nexus 正在运行，安装器会提示关闭后再继续`
+            successMessage = `${installerLabel}已打开。继续安装时若检测到 STARPT 正在运行，安装器会提示关闭后再继续`
           } catch (openError) {
             console.error('打开安装包失败:', openError)
             if (desktopBridge && typeof desktopBridge.RevealPath === 'function') {
@@ -887,7 +886,22 @@ onMounted(() => {
 /* Update Dialog Styles */
 .update-card {
   border: none;
+  color: var(--star-ink, #f4f3fb);
+  background: var(--star-surface, #12182b);
 }
+
+:deep(.update-dialog.el-dialog) {
+  overflow: hidden;
+  border: 1px solid var(--star-border, #293553);
+  border-radius: 16px;
+  color: var(--star-ink, #f4f3fb);
+  background: var(--star-surface, #12182b);
+  box-shadow: 0 24px 72px rgb(0 0 0 / 42%);
+}
+
+:deep(.update-dialog .el-dialog__title) { color: var(--star-ink, #f4f3fb); }
+:deep(.update-dialog .el-dialog__header),
+:deep(.update-dialog .el-dialog__footer) { border-color: var(--star-border, #293553); }
 
  .update-content {
   display: flex;
@@ -901,7 +915,7 @@ onMounted(() => {
 }
 
 .dialog-loading-text {
-  color: #606266;
+  color: var(--star-muted, #a8b3cf);
   font-size: 14px;
   padding: 32px 0;
 }
@@ -911,9 +925,9 @@ onMounted(() => {
   align-items: center;
   gap: 15px;
   padding: 12px 20px;
-  background: #f8f9fa;
+  background: var(--star-surface-muted, #17203a);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--star-border, #293553);
   margin-bottom: 12px;
 }
 
@@ -923,23 +937,23 @@ onMounted(() => {
 
 .version-label {
   font-size: 13px;
-  color: #666;
+  color: var(--star-muted, #a8b3cf);
   margin-bottom: 6px;
 }
 
 .version-value {
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: var(--star-ink, #f4f3fb);
 }
 
 .version-value.new-version {
-  color: #67c23a;
+  color: #82dda3;
 }
 
 .version-arrow {
   font-size: 20px;
-  color: #999;
+  color: var(--star-muted, #a8b3cf);
 }
 
 .version-status {
@@ -947,7 +961,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #67c23a;
+  color: #82dda3;
   font-weight: 500;
 }
 
@@ -956,14 +970,20 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #fdf6ec;
-  border: 1px solid #faecd8;
+  background: #302719;
+  border: 1px solid rgb(255 210 122 / 30%);
   border-radius: 6px;
   color: #e6a23c;
   font-size: 14px;
   font-weight: 500;
   margin-top: 12px;
   margin-bottom: 12px;
+}
+
+.force-update-notice--critical {
+  color: #ff9ba4;
+  background: #351d2a;
+  border-color: rgb(255 143 154 / 34%);
 }
 
 .all-versions-section {
@@ -979,23 +999,23 @@ onMounted(() => {
 }
 
 .all-versions-section::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--star-surface-muted, #17203a);
   border-radius: 3px;
 }
 
 .all-versions-section::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #394766;
   border-radius: 3px;
 }
 
 .all-versions-section::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #586788;
 }
 
 .no-history {
   text-align: center;
   padding: 40px 20px;
-  color: #909399;
+  color: var(--star-muted, #a8b3cf);
   font-size: 16px;
 }
 
@@ -1023,7 +1043,8 @@ onMounted(() => {
   border-radius: 12px;
   padding: 10px 20px;
   margin-bottom: 15px;
-  background: linear-gradient(-20deg, #e9defa 0%, #fbfcdb 100%);
+  border: 1px solid rgb(184 164 255 / 22%);
+  background: linear-gradient(135deg, rgb(37 30 66 / 95%), rgb(23 32 58 / 96%));
 }
 
 .latest-version .version-header {
@@ -1039,14 +1060,14 @@ onMounted(() => {
   top: 8px;
   bottom: 8px;
   width: 4px;
-  background: linear-gradient(120deg, #ad67ee 0%, #50a6fd 100%);
+  background: linear-gradient(180deg, #b8a4ff, #6d52c8);
   border-radius: 2px;
   box-shadow: 0 0 10px rgba(64, 158, 255, 0.5);
 }
 
 .latest-version .version-name {
   font-weight: 700;
-  background: linear-gradient(120deg, #ad67ee 0%, #50a6fd 100%);
+  background: linear-gradient(120deg, #d4c8ff 0%, #9a85f0 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1054,8 +1075,8 @@ onMounted(() => {
 }
 
 .latest-version .version-date {
-  background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
-  color: white;
+  background: var(--star-action, #6d52c8);
+  color: #fff;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
@@ -1073,7 +1094,7 @@ onMounted(() => {
   top: 8px;
   bottom: 8px;
   width: 3px;
-  background: linear-gradient(to bottom, #c79081 0%, #dfa579 100%);
+  background: linear-gradient(to bottom, #7182ae, #485a82);
   border-radius: 2px;
 }
 
@@ -1086,8 +1107,8 @@ onMounted(() => {
 .version-name {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
-  background: linear-gradient(0deg, #c79081 0%, #dfa579 100%);
+  color: var(--star-ink, #f4f3fb);
+  background: linear-gradient(90deg, #d4c8ff, #8295c7);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1095,11 +1116,11 @@ onMounted(() => {
 
 .version-date {
   font-size: 13px;
-  color: #909399;
-  background: #f5f7fa;
+  color: var(--star-muted, #a8b3cf);
+  background: var(--star-surface-muted, #17203a);
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--star-border, #293553);
 }
 
 .version-changes {
@@ -1107,9 +1128,9 @@ onMounted(() => {
 }
 
 .version-note {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  color: #856404;
+  background: #302719;
+  border: 1px solid rgb(255 210 122 / 28%);
+  color: #ffd27a;
   padding: 12px;
   border-radius: 6px;
   margin-bottom: 15px;
@@ -1127,16 +1148,16 @@ onMounted(() => {
   align-items: flex-start;
   padding: 12px 15px;
   margin-bottom: 10px;
-  background: #fafafa;
+  background: var(--star-surface-muted, #17203a);
   border-radius: 6px;
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--star-border, #293553);
 }
 
 .changelog-number {
   flex-shrink: 0;
   width: 24px;
   height: 24px;
-  background: #409eff;
+  background: var(--star-action, #6d52c8);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -1151,7 +1172,7 @@ onMounted(() => {
   flex: 1;
   line-height: 24px;
   font-size: 14px;
-  color: #303133;
+  color: var(--star-ink, #f4f3fb);
 }
 
 :deep(.el-card__body) {
@@ -1182,7 +1203,7 @@ onMounted(() => {
 .progress-text {
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--star-muted, #a8b3cf);
   white-space: nowrap;
   min-width: 120px;
 }
@@ -1196,7 +1217,7 @@ onMounted(() => {
 }
 
 :deep(.el-progress-bar__outer) {
-  background-color: #f0f2f5;
+  background-color: var(--star-surface-muted, #17203a);
 }
 
 :deep(.el-progress-bar__inner) {
@@ -1211,9 +1232,10 @@ onMounted(() => {
 .version-note :deep(.cmd-copy-wrapper) {
   display: block; /* 独占一行 */
   margin-top: 10px; /* 与上方文字拉开距离 */
-  background: #ffffff; /* 纯白背景，在黄色的 note 中很清晰 */
-  border: 1px solid #e4e7ed; /* 浅灰边框 */
-  border-left: 4px solid #409eff; /* 左侧蓝色竖条，增加设计感 */
+  background: #221e34;
+  border: 1px solid var(--star-border, #293553);
+  border-left: 4px solid var(--star-accent, #b8a4ff);
+  color: var(--star-ink, #f4f3fb);
   border-radius: 4px;
   padding: 10px 15px;
   cursor: pointer;
@@ -1223,8 +1245,8 @@ onMounted(() => {
 
 /* 2. 鼠标悬停效果 */
 .version-note :deep(.cmd-copy-wrapper:hover) {
-  background: #f5f7fa; /* 悬停微灰 */
-  border-color: #c0c4cc;
+  background: var(--star-accent-soft, #251e42);
+  border-color: var(--star-accent, #b8a4ff);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* 轻微浮起阴影 */
   transform: translateY(-1px);
 }
@@ -1232,7 +1254,7 @@ onMounted(() => {
 /* 3. 点击时的按压效果 */
 .version-note :deep(.cmd-copy-wrapper:active) {
   transform: translateY(0);
-  background: #eef1f6;
+  background: #302a46;
 }
 
 /* 4. 顶部栏（图标 + 提示语） */
@@ -1242,18 +1264,18 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 6px;
   font-size: 12px;
-  color: #909399;
+  color: var(--star-muted, #a8b3cf);
 }
 
 .version-note :deep(.cmd-icon) {
-  color: #409eff;
+  color: var(--star-accent-hover, #d4c8ff);
   font-weight: bold;
 }
 
 .version-note :deep(.cmd-hint) {
   font-size: 12px;
-  color: #409eff;
-  background: #ecf5ff;
+  color: var(--star-accent-hover, #d4c8ff);
+  background: var(--star-accent-soft, #251e42);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -1262,7 +1284,7 @@ onMounted(() => {
 .version-note :deep(.cmd-code) {
   font-family: Consolas, Monaco, 'Courier New', monospace;
   font-size: 13px;
-  color: #303133; /* 深灰字体，清晰易读 */
+  color: var(--star-ink, #f4f3fb);
   line-height: 1.6; /* 增加行高 */
   word-break: break-all; /* 核心：强制换行，防止溢出 */
   white-space: pre-wrap; /* 保留空格但允许换行 */

@@ -136,7 +136,7 @@ onMounted(() => void load())
   min-width: 0;
   margin: 0 auto;
   padding: clamp(18px, 4vw, 48px);
-  color: var(--star-ink, #172333);
+  color: var(--star-ink, #f4f3fb);
 }
 
 .plugin-heading,
@@ -151,7 +151,7 @@ onMounted(() => void load())
 .plugin-heading h1, .plugin-content h2, .plugin-empty h2 { margin: 0; letter-spacing: -0.035em; }
 .plugin-heading h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.14; }
 .plugin-heading p, .plugin-description, .plugin-block p, .plugin-block small, .plugin-empty p {
-  color: var(--star-muted, #4b6078);
+  color: var(--star-muted, #a8b3cf);
   margin: 6px 0 0;
   line-height: 1.55;
 }
@@ -162,10 +162,10 @@ onMounted(() => void load())
   align-items: center;
   gap: 8px;
   padding: 8px 15px;
-  border: 1px solid var(--star-border, #d9e2ee);
+  border: 1px solid var(--star-border, #293553);
   border-radius: 10px;
-  background: var(--star-surface, #fff);
-  color: var(--star-accent, #175f8e);
+  background: var(--star-surface, #12182b);
+  color: var(--star-accent, #b8a4ff);
   font: inherit;
   font-weight: 600;
   white-space: nowrap;
@@ -177,9 +177,10 @@ onMounted(() => void load())
 .plugin-chev { width: 15px; height: 15px; }
 .plugin-layout { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr); gap: 16px; }
 .plugin-list, .plugin-content, .plugin-empty, .plugin-details {
-  border: 1px solid var(--star-border, #d9e2ee);
+  border: 1px solid var(--star-border, #293553);
   border-radius: 16px;
-  background: var(--star-surface, #fff);
+  background: var(--star-surface, #12182b);
+  box-shadow: 0 14px 38px rgb(0 0 0 / 12%);
 }
 .plugin-list { padding: 8px; align-self: start; }
 .plugin-list button {
@@ -200,34 +201,38 @@ onMounted(() => void load())
 }
 .plugin-list button span { flex: 1; overflow-wrap: anywhere; }
 .plugin-list button[aria-current='true'], .plugin-list button:hover {
-  background: var(--star-accent-soft, #e3f1fb);
-  color: var(--star-accent, #175f8e);
+  background: var(--star-accent-soft, #251e42);
+  color: var(--star-accent, #b8a4ff);
 }
 .plugin-content { padding: clamp(16px, 3vw, 28px); }
 .plugin-content h2, .plugin-block { overflow-wrap: anywhere; }
-.plugin-version { color: var(--star-muted, #4b6078); font-size: 0.82rem; }
+.plugin-version { color: var(--star-muted, #a8b3cf); font-size: 0.82rem; }
 .plugin-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px; margin-top: 20px; }
 .plugin-block {
   min-width: 0;
-  border: 1px solid var(--star-border, #d9e2ee);
+  border: 1px solid var(--star-border, #293553);
   border-radius: 12px;
   padding: 14px;
-  background: var(--star-surface-muted, #f5f8fc);
+  background: var(--star-surface-muted, #17203a);
 }
 .plugin-block h3 { margin: 0; font-size: 0.9rem; }
 .plugin-block a { display: flex; gap: 10px; justify-content: space-between; align-items: center; text-decoration: none; color: inherit; min-height: 28px; }
-.plugin-block a:hover strong { color: var(--star-accent, #175f8e); }
+.plugin-block a:hover strong { color: var(--star-accent-hover, #d4c8ff); }
 .plugin-block small { display: block; }
-.plugin-block .plugin-metric { font-size: 1.55rem; font-weight: 650; color: var(--star-ink, #172333); }
+.plugin-block .plugin-metric { font-size: 1.55rem; font-weight: 650; color: var(--star-ink, #f4f3fb); }
 .plugin-empty { padding: clamp(36px, 8vw, 90px) 18px; text-align: center; }
-.plugin-empty-icon { width: 35px; height: 35px; margin-bottom: 10px; color: var(--star-accent, #175f8e); }
+.plugin-empty-icon { width: 35px; height: 35px; margin-bottom: 10px; color: var(--star-accent, #b8a4ff); }
 .plugin-empty h2 { font-size: 1.15rem; }
 .plugin-details, .plugin-message { margin-top: 13px; padding: 12px 15px; overflow-wrap: anywhere; }
 .plugin-details summary { cursor: pointer; font-weight: 600; }
 .plugin-details summary svg { vertical-align: middle; margin-right: 5px; }
 .plugin-details p { margin-bottom: 0; }
-.plugin-warning, .plugin-error { color: var(--star-warning-ink, #8a4518); }
-:where(button, a, summary):focus-visible { outline: 2px solid var(--star-accent, #175f8e); outline-offset: 2px; }
+.plugin-warning, .plugin-error {
+  border: 1px solid rgb(255 198 98 / 26%);
+  color: var(--star-warning-ink, #ffd27a);
+  background: var(--star-warning-soft, #302719);
+}
+:where(button, a, summary):focus-visible { outline: 2px solid var(--star-accent, #b8a4ff); outline-offset: 2px; }
 
 @media (max-width: 700px) {
   .plugin-layout { grid-template-columns: 1fr; }

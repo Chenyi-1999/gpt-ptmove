@@ -494,8 +494,8 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(2px);
+  background: rgb(6 9 18 / 76%);
+  backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -506,17 +506,17 @@ onBeforeUnmount(() => {
   width: 840px;
   max-width: 96%;
   max-height: min(68vh, calc(100% - 8px));
-  background: #fff;
+  background: var(--star-surface, #12182b);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--star-border, #293553);
 }
 
 .flow-header {
   height: 42px;
   padding: 0 10px 0 12px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--star-border, #293553);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -525,7 +525,7 @@ onBeforeUnmount(() => {
 .flow-title {
   font-size: 13px;
   font-weight: 600;
-  color: #303133;
+  color: var(--star-ink, #f4f3fb);
 }
 
 .flow-actions {
@@ -536,9 +536,9 @@ onBeforeUnmount(() => {
 
 .connection-badge {
   font-size: 11px;
-  color: #067647;
-  background: #ecfdf3;
-  border: 1px solid #a6f4c5;
+  color: #91e4b1;
+  background: #142b29;
+  border: 1px solid rgb(116 220 163 / 35%);
   border-radius: 999px;
   padding: 1px 6px;
 }
@@ -560,10 +560,10 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 7px;
   padding: 6px 8px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border, #293553);
   border-radius: 6px;
-  background: #fff;
-  color: #111827;
+  background: var(--star-surface-muted, #17203a);
+  color: var(--star-ink, #f4f3fb);
 }
 
 .node-icon {
@@ -571,8 +571,8 @@ onBeforeUnmount(() => {
   min-width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid #cfd4dc;
-  color: #6b7280;
+  border: 1px solid #465477;
+  color: var(--star-muted, #a8b3cf);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -588,14 +588,14 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 600;
   line-height: 16px;
-  color: #111827;
+  color: var(--star-ink, #f4f3fb);
 }
 
 .node-message {
   margin-top: 1px;
   font-size: 12px;
   line-height: 15px;
-  color: #374151;
+  color: var(--star-muted, #a8b3cf);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -612,21 +612,21 @@ onBeforeUnmount(() => {
 .flow-arrow .arrow-line {
   width: 1px;
   flex: 1;
-  background: #cdd0d6;
+  background: #465477;
 }
 
 .flow-arrow .arrow-head {
   font-size: 9px;
   line-height: 8px;
-  color: #909399;
+  color: var(--star-muted, #a8b3cf);
 }
 
 .parallel-block {
   margin: 0 0 2px 16px;
-  border: 1px dashed #dcdfe6;
+  border: 1px dashed var(--star-border, #293553);
   border-radius: 6px;
   padding: 4px 6px;
-  background: #fafafa;
+  background: rgb(23 32 58 / 62%);
 }
 
 .parallel-row {
@@ -639,11 +639,11 @@ onBeforeUnmount(() => {
 .parallel-node {
   display: flex;
   gap: 4px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--star-border, #293553);
   border-radius: 4px;
-  background: #fff;
+  background: var(--star-surface-muted, #17203a);
   padding: 4px;
-  color: #111827;
+  color: var(--star-ink, #f4f3fb);
 }
 
 .parallel-icon {
@@ -651,8 +651,8 @@ onBeforeUnmount(() => {
   min-width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1px solid #cfd4dc;
-  color: #6b7280;
+  border: 1px solid #465477;
+  color: var(--star-muted, #a8b3cf);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -668,7 +668,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 600;
   line-height: 14px;
-  color: #111827;
+  color: var(--star-ink, #f4f3fb);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -678,7 +678,7 @@ onBeforeUnmount(() => {
   margin-top: 2px;
   font-size: 11px;
   line-height: 13px;
-  color: #374151;
+  color: var(--star-muted, #a8b3cf);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -692,14 +692,14 @@ onBeforeUnmount(() => {
 
 .error-detail-card {
   margin-top: 6px;
-  border: 1px solid #fecaca;
-  background: #fff5f5;
+  border: 1px solid rgb(255 143 154 / 34%);
+  background: #351d2a;
   border-radius: 6px;
   padding: 8px;
 }
 
 .error-detail-title {
-  color: #b42318;
+  color: #ff9ba4;
   font-size: 12px;
   font-weight: 700;
   margin-bottom: 4px;
@@ -711,75 +711,75 @@ onBeforeUnmount(() => {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #7a271a;
+  color: #ffc0c6;
   font-size: 12px;
   line-height: 1.45;
   font-family: 'Consolas', 'Monaco', monospace;
 }
 
 .status-pending {
-  border-color: #d1d5db;
-  background: #f9fafb;
+  border-color: var(--star-border, #293553);
+  background: rgb(23 32 58 / 58%);
 }
 
 .status-processing {
-  border-color: #b3d8ff;
-  background: #eff6ff;
+  border-color: rgb(130 160 255 / 46%);
+  background: #1b2744;
 }
 
 .status-success {
-  border-color: #c2e7b0;
-  background: #f0fdf4;
+  border-color: rgb(116 220 163 / 38%);
+  background: #142b29;
 }
 
 .status-warning {
-  border-color: #f3d19e;
-  background: #fffbeb;
+  border-color: rgb(255 210 122 / 38%);
+  background: #302719;
 }
 
 .status-error {
-  border-color: #fab6b6;
-  background: #fef2f2;
+  border-color: rgb(255 143 154 / 38%);
+  background: #351d2a;
 }
 
 .status-info {
-  border-color: #a0cfff;
-  background: #f0f9ff;
+  border-color: rgb(130 190 255 / 38%);
+  background: #172a42;
 }
 
 .flow-node.status-pending .node-icon,
 .parallel-node.status-pending .parallel-icon {
-  color: #6b7280;
+  color: var(--star-muted, #a8b3cf);
 }
 
 .flow-node.status-processing .node-icon,
 .parallel-node.status-processing .parallel-icon {
-  color: #2563eb;
-  border-color: #93c5fd;
+  color: #a9baff;
+  border-color: #758bdb;
 }
 
 .flow-node.status-success .node-icon,
 .parallel-node.status-success .parallel-icon {
-  color: #16a34a;
-  border-color: #86efac;
+  color: #91e4b1;
+  border-color: #55b982;
 }
 
 .flow-node.status-warning .node-icon,
 .parallel-node.status-warning .parallel-icon {
-  color: #d97706;
-  border-color: #fcd34d;
+  color: #ffd27a;
+  border-color: #d29b39;
 }
 
 .flow-node.status-error .node-icon,
 .parallel-node.status-error .parallel-icon {
-  color: #dc2626;
-  border-color: #fca5a5;
+  color: #ff9ba4;
+  border-color: #ce6571;
 }
 
 .flow-node.status-info .node-icon,
 .parallel-node.status-info .parallel-icon {
-  color: #0284c7;
-  border-color: #7dd3fc;
+  color: #91caff;
+  border-color: #5b9fd0;
 }
 
 .completion-message {
@@ -794,13 +794,13 @@ onBeforeUnmount(() => {
 }
 
 .completion-message-success {
-  color: #2e7d32;
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  color: #91e4b1;
+  background: linear-gradient(135deg, #142b29, #193c34);
 }
 
 .completion-message-error {
-  color: #b42318;
-  background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 100%);
+  color: #ff9ba4;
+  background: linear-gradient(135deg, #351d2a, #48212e);
 }
 
 .icon-complete {

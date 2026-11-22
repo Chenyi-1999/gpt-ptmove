@@ -1,18 +1,16 @@
 {
-  "version": "0.3.1",
-  "date": "2026-11-21",
+  "version": "1.0.0",
+  "date": "2026-11-22",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:0.3.1-starpt.8",
-  "image_id": "sha256:42029995b55eb387295df9357688e208a506802735d83a0c4c9e84302f5a7768",
+  "image": "ptmove-nexus:1.0.0",
+  "image_id": "sha256:1c166c1ec5ac61805c90f90217d159a157aa3b2f3090514b8b405f18475bdcac",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "900019a17ada63d2160d83a1f716fcdf35c69f97d0815569a1ecf7df4c7f494a",
+  "image_archive_sha256": "8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
-  "upstream_repository": "https://github.com/sqing33/PTNexus",
-  "upstream_commit": "53eee1fed09121867f956c798c158c13a475d51f",
   "automation_enabled": false,
   "schedule_enabled": false,
   "auto_publish": false,
@@ -161,7 +159,6 @@
       "date": "2026-11-19",
       "protocol": "native single-file multipart add via existing HTTPS pull transport",
       "max_request_bytes": 4194304,
-      "original_ptnexus_client_used": true,
       "test_bytes": 98464,
       "exact_info_hash_found_stopped": true,
       "temporary_test_item_removed": true,
@@ -345,5 +342,111 @@
       }
     },
     "verified_at": "2026-11-21T22:49:46+08:00"
+  },
+  "description_mediainfo": {
+    "image": "ptmove-nexus:0.3.1-starpt.9",
+    "image_id": "sha256:9c55641ccfaf4d344041bac7cc6e9c994ef607a316c8f3b9ec4042b7c1e953fa",
+    "rollback_image": "ptmove-nexus:0.3.1-starpt.8",
+    "health": "healthy",
+    "production_index_sha256": "999d5ca53626c0daf99d2304eab2bf62d462b1fbf6f66f47b29ae1cf797a6ddd",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "isolated_prepare_cases": 4,
+    "sample_report_sha256": "c0f10749a8a1e796a98c1ea7cf45b2835972de93b0353a0086d4252094a390f1",
+    "source_priority": [
+      "existing",
+      "quoted_description",
+      "configured_downloader"
+    ],
+    "go_full_tests": true,
+    "frontend_typecheck_lint_build": true,
+    "verified_at": "2026-11-21T23:55:15+08:00"
+  },
+  "dashboard_ui": {
+    "image": "ptmove-nexus:0.3.1-starpt.10",
+    "image_id": "sha256:1c42d38cd28bf5e8cea6e201c7e621b3dcf2b2bfdeb97758d22f0476ccc81b5e",
+    "rollback_image": "ptmove-nexus:0.3.1-starpt.9",
+    "health": "healthy",
+    "production_index_sha256": "be8b875c2fa120efeb1c8da0b3f21090ae28d36fb12c573592b7e85de7544b73",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "frontend_typecheck_lint_build": true,
+    "chart_endpoints": [
+      "/api/chart_data",
+      "/api/downloader_info",
+      "/api/site_stats",
+      "/api/group_stats"
+    ],
+    "browser_fixture_widths": [
+      1440,
+      390
+    ],
+    "browser_fixture_routes": [
+      "/",
+      "/sites"
+    ],
+    "browser_range_details_refresh_and_mobile_navigation": true,
+    "empty_and_error_states_verified": true,
+    "verified_at": "2026-11-22T00:04:52+08:00"
+  },
+  "web_theme_settings": {
+    "image": "ptmove-nexus:0.3.1-starpt.11",
+    "image_id": "sha256:78b13e80be7089f5e8306fb211a4d308ca7c588af0a5280f020e1c586cf73eb9",
+    "rollback_image": "ptmove-nexus:0.3.1-starpt.10",
+    "health": "healthy",
+    "production_index_sha256": "7e13c1f7a6007fac20296b675a612969a16ff6adf44cd6c77c1411a658da92f8",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "frontend_typecheck_lint_build": true,
+    "browser_all_main_routes_widths": [
+      1440,
+      390
+    ],
+    "browser_downloader_scroll_dialog_widths": [
+      1440,
+      1024,
+      390,
+      320
+    ],
+    "browser_long_fixture_downloader_cards": 5,
+    "browser_path_mapping_rows": 10,
+    "legacy_traffic_route_redirect": "/",
+    "verified_at": "2026-11-22T00:27:48+08:00"
+  },
+  "release_v1_0_0": {
+    "image": "ptmove-nexus:1.0.0",
+    "image_id": "sha256:1c166c1ec5ac61805c90f90217d159a157aa3b2f3090514b8b405f18475bdcac",
+    "rollback_image": "ptmove-nexus:0.3.1-starpt.11",
+    "health": "healthy",
+    "production_index_sha256": "7e13c1f7a6007fac20296b675a612969a16ff6adf44cd6c77c1411a658da92f8",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "version": "1.0.0",
+    "archive": "starpt-v1.0.0-linux-amd64.tar.gz",
+    "archive_bytes": 543336327,
+    "archive_sha256": "8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac",
+    "compose": "compose.starpt.yaml",
+    "compose_sha256": "3d5f27dfac2459c2cb87f076ad521b1e2708981d7c98e8ec365061ee0810de4a",
+    "compose_isolated_verified": true,
+    "go_full_tests": true,
+    "ui_verified_assets_reused": true,
+    "local_deployment_script_tests": 5,
+    "verified_at": "2026-11-22T08:25:20+08:00"
   }
 }

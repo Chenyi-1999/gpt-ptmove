@@ -1,5 +1,6 @@
 <template>
   <div class="settings-container">
+    <h2 class="settings-section-title">通用设置</h2>
     <div class="settings-grid">
       <!-- 用户信息设置卡片 -->
       <div
@@ -168,7 +169,7 @@
         title="本地背景图"
         width="720px"
         destroy-on-close
-        class="background-picker-dialog"
+        class="settings-dialog background-picker-dialog"
       >
         <div class="background-picker-toolbar">
           <el-button type="primary" :loading="uploadingBackground" @click="triggerBackgroundUpload">
@@ -318,7 +319,7 @@
             </el-form-item>
 
             <el-form-item label="查询路径限制" class="form-item">
-              <div style="display: flex; align-items: center; gap: 15px">
+              <div class="settings-inline-actions">
                 <el-switch
                   v-model="iyuuForm.path_filter_enabled"
                   active-text="启用路径过滤"
@@ -339,19 +340,12 @@
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: center">
               <el-form-item label class="form-item">
                 <div
-                  style="
-                    display: flex;
-                    margin: auto;
-                    gap: 20px;
-                    justify-content: center;
-                    padding: 15px 0;
-                  "
+                  class="settings-inline-actions"
                 >
                   <el-button
                     type="success"
                     @click="triggerIyuuQuery"
                     size="default"
-                    style="font-size: 14px; padding: 12px 24px"
                   >
                     手动触发查询
                   </el-button>
@@ -359,7 +353,6 @@
                     type="primary"
                     @click="showIyuuLogs"
                     size="default"
-                    style="font-size: 14px; padding: 12px 24px"
                   >
                     查看日志
                   </el-button>
@@ -391,28 +384,28 @@
       </div>
 
       <!-- IYUU日志对话框 -->
-      <el-dialog v-model="iyuuLogsDialogVisible" title="IYUU 查询日志" width="800px" top="50px">
-        <div v-loading="loadingLogs" style="height: 500px; overflow-y: auto">
-          <div v-if="iyuuLogs.length === 0" style="text-align: center; padding: 20px; color: #999">
+      <el-dialog v-model="iyuuLogsDialogVisible" title="IYUU 查询日志" width="800px" class="settings-dialog">
+        <div v-loading="loadingLogs" class="iyuu-log-list">
+          <div v-if="iyuuLogs.length === 0" class="iyuu-log-empty">
             暂无日志记录
           </div>
           <div v-else>
             <div
               v-for="(log, index) in iyuuLogs"
               :key="index"
-              style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 12px"
+              class="iyuu-log-entry"
             >
-              <span style="color: #999; margin-right: 10px">[{{ log.timestamp }}]</span>
+              <span class="iyuu-log-timestamp">[{{ log.timestamp }}]</span>
               <span
                 :style="{
                   color:
                     log.level === 'ERROR'
-                      ? '#F56C6C'
+                      ? 'var(--star-danger)'
                       : log.level === 'WARNING'
-                        ? '#E6A23C'
+                        ? 'var(--star-warning)'
                         : log.level === 'INFO'
-                          ? '#409EFF'
-                          : '#67C23A',
+                          ? 'var(--star-accent)'
+                          : 'var(--star-success)',
                 }"
                 >[{{ log.level }}]</span
               >
@@ -723,7 +716,7 @@
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    flex-wrap: nowrap;
+                    flex-wrap: wrap;
                     width: 100%;
                     margin-top: 8px;
                   "
@@ -795,7 +788,7 @@
           <el-form :model="tagsForm" label-position="top" class="settings-form">
             <!-- 第一行：标签开关 + 分类开关 -->
             <el-form-item label="" class="form-item">
-              <div style="display: flex; align-items: center; gap: 30px">
+              <div class="settings-inline-actions">
                 <div style="display: flex; align-items: center; gap: 12px">
                   <el-icon size="20">
                     <Collection />
@@ -819,11 +812,10 @@
 
               <!-- 第三行：输入框 + 添加标签按钮 -->
               <el-form-item label="" class="form-item">
-                <div style="display: flex; align-items: center; gap: 10px">
+                <div class="settings-inline-actions settings-inline-actions--input">
                   <el-input
                     v-model="newTagInput"
                     placeholder="输入新标签"
-                    style="height: 32px; width: 200px"
                     @keyup.enter="addCustomTag"
                   />
                   <el-button type="primary" size="small" @click="addCustomTag">
@@ -858,13 +850,12 @@
 
               <!-- 第七行：分类选择 -->
               <el-form-item class="form-item">
-                <div style="display: flex; align-items: center; gap: 10px">
+                <div class="settings-inline-actions settings-inline-actions--input">
                   <el-input
                     v-model="tagsForm.category.category"
                     placeholder="输入分类名称"
                     size="small"
                     clearable
-                    style="height: 32px; width: 200px"
                   />
                   <el-button type="primary" size="small" @click="autoSaveTagsSettings">
                     保存
@@ -912,7 +903,7 @@
   <!-- 路径选择弹窗 -->
   <div>
     <div>
-      <el-dialog v-model="pathSelectorVisible" title="选择IYUU查询路径" width="600px" top="50px">
+      <el-dialog v-model="pathSelectorVisible" title="选择IYUU查询路径" width="600px" class="settings-dialog">
         <div v-loading="loadingPaths" style="min-height: 300px">
           <div
             v-if="!loadingPaths && availablePaths.length === 0"
@@ -1909,31 +1900,9 @@ onMounted(() => {
 
 <style scoped>
 .settings-container {
-  padding: 20px;
-  background-color: transparent;
-  overflow-y: auto;
-  height: 100%;
-  box-sizing: border-box;
-}
-
-/* 自定义滚动条样式 */
-.settings-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.settings-container::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 4px;
-}
-
-.settings-container::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.3);
-  border-radius: 4px;
-  transition: background 0.3s ease;
-}
-
-.settings-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(144, 147, 153, 0.5);
+  display: grid;
+  min-width: 0;
+  gap: 14px;
 }
 
 .page-description {
@@ -1944,12 +1913,14 @@ onMounted(() => {
 
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 375px), 1fr));
+  align-items: start;
+  gap: 14px;
 }
 
 .settings-card {
   display: flex;
+  min-width: 0;
   flex-direction: column;
 }
 
@@ -1957,14 +1928,18 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--star-border);
   flex-shrink: 0;
 }
 
 .header-content {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
 .header-content h3 {
@@ -1980,17 +1955,16 @@ onMounted(() => {
 }
 
 .card-content {
-  padding: 16px;
-  height: 320px;
   display: flex;
+  min-width: 0;
+  gap: 8px;
+  padding: 16px;
   flex-direction: column;
 }
 
 .settings-form {
   width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  min-width: 0;
 }
 
 .form-item {
@@ -2085,11 +2059,9 @@ onMounted(() => {
 
 .background-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 148px), 1fr));
   gap: 12px;
   min-height: 180px;
-  max-height: 52vh;
-  overflow: auto;
 }
 
 .background-picker-item {
@@ -2097,7 +2069,7 @@ onMounted(() => {
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--star-surface-muted);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -2115,7 +2087,7 @@ onMounted(() => {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--star-canvas);
 }
 
 .background-picker-meta {
@@ -2170,48 +2142,54 @@ onMounted(() => {
   transform: translateY(10px);
 }
 
-/* 临时密码高亮样式 */
 .temp-password-highlight {
-  position: relative;
-  animation: pulse-border 2s ease-in-out infinite;
-}
-
-.temp-password-highlight::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, #ff6b6b, #ff8787, #ff6b6b);
-  border-radius: 12px;
-  z-index: -1;
-  opacity: 0.6;
-  animation: gradient-shift 3s ease infinite;
-}
-
-@keyframes pulse-border {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.01);
-  }
-}
-
-@keyframes gradient-shift {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
+  border-color: var(--star-warning);
 }
 
 .temp-password-highlight .card-header {
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 135, 135, 0.05));
+  background: var(--star-warning-soft);
+}
+
+.settings-inline-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-inline-actions > .el-button,
+.background-picker-toolbar .el-button {
+  margin-left: 0;
+}
+
+.settings-inline-actions--input {
+  width: 100%;
+}
+
+.settings-inline-actions--input .el-input {
+  flex: 1 1 128px;
+}
+
+.iyuu-log-list {
+  min-width: 0;
+}
+
+.iyuu-log-empty {
+  padding-block: 24px;
+  color: var(--star-muted);
+  text-align: center;
+}
+
+.iyuu-log-entry {
+  padding-block: 8px;
+  border-bottom: 1px solid var(--star-border);
+  font-size: 0.8125rem;
+}
+
+.iyuu-log-timestamp {
+  margin-inline-end: 8px;
+  color: var(--star-muted);
 }
 
 /* 路径树样式 */
@@ -2244,24 +2222,22 @@ onMounted(() => {
   font-size: 13px;
 }
 
-@media (max-width: 768px) {
-  .settings-container {
-    padding: 16px;
+@media (max-width: 600px) {
+  .background-current-row {
+    flex-wrap: wrap;
   }
 
-  .settings-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
+  .background-current-row .el-input {
+    flex-basis: 100%;
   }
 
-  .card-header {
-    padding: 12px 16px;
+  .credential-form {
+    padding-left: 0;
   }
 
+  .card-header,
   .card-content {
-    padding: 16px;
-    height: auto;
-    min-height: 320px;
+    padding-inline: 12px;
   }
 }
 </style>

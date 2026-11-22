@@ -194,6 +194,6 @@ onBeforeUnmount(() => {
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
   line-height: 1.4;
-  color: #606266;
+  color: var(--star-ink);
 }
 </style>

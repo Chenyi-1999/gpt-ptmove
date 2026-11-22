@@ -1,8 +1,8 @@
 <template>
-  <main class="settings-page" v-loading="loading">
+  <section class="settings-page" v-loading="loading">
     <header class="page-heading">
       <div>
-        <h1>自动下载与跨站管理</h1>
+        <h2 class="settings-section-title">自动下载与跨站管理</h2>
         <p>规则默认关闭。预览只读取候选和限制状态；确认后才会将选中项目加入下载队列。</p>
       </div>
       <el-tag type="info">{{ quotaLabel }}</el-tag>
@@ -179,7 +179,7 @@
               prop="created_at"
               label="开始时间" /></el-table></el-tab-pane></el-tabs
     ></el-card>
-  </main>
+  </section>
 </template>
 <script setup lang="ts">
 import axios from 'axios'
@@ -376,67 +376,84 @@ onMounted(load)
 </script>
 <style scoped>
 .settings-page {
-  padding: 20px;
-  overflow: auto;
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
+
 .page-heading,
 .card-head,
 .actions {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
-.page-heading h1 {
-  font-size: 22px;
-  margin: 0 0 6px;
-}
+
 .page-heading p,
 .hint {
-  color: var(--el-text-color-secondary);
-  margin: 0;
-  font-size: 13px;
+  margin: 4px 0 0;
+  color: var(--star-muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
 }
+
+.hint {
+  flex-basis: 100%;
+}
+
 .panel {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
+  min-width: 0;
+  border-radius: 12px;
 }
+
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr));
+  align-items: start;
   gap: 0 14px;
 }
+
+.form-grid :deep(.el-select),
+.form-grid :deep(.el-date-editor) {
+  width: 100%;
+}
+
 .range {
-  display: flex;
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
+
 .range :deep(.el-input-number) {
-  width: calc(50% - 16px);
+  width: 100%;
 }
+
 .actions {
   justify-content: flex-start;
   margin-bottom: 14px;
 }
-@media (max-width: 900px) {
-  .form-grid {
-    grid-template-columns: repeat(2, minmax(140px, 1fr));
-  }
+
+.actions > .el-button,
+.card-head > .el-button {
+  margin-left: 0;
 }
+
 @media (max-width: 600px) {
-  .settings-page {
-    padding: 12px;
+  .page-heading > .el-tag {
+    height: auto;
+    line-height: 1.4;
+    white-space: normal;
   }
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .page-heading {
-    align-items: flex-start;
-    flex-direction: column;
+
+  .panel :deep(.el-card__body),
+  .panel :deep(.el-card__header) {
+    padding-inline: 12px;
   }
 }
 </style>

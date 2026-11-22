@@ -1,4 +1,4 @@
-# PTMOVE fork of PTNexus, upstream 53eee1fed09121867f956c798c158c13a475d51f.
+# STARPT Go + Vue server image.
 FROM node:20-alpine AS webui-builder
 WORKDIR /src/webui
 ENV NODE_OPTIONS=--max-old-space-size=1024
@@ -28,9 +28,9 @@ RUN python fetch_native_assets.py /out/bdinfo
 FROM debian:bookworm-slim
 ARG APT_MIRROR=http://deb.debian.org
 LABEL org.opencontainers.image.title="STARPT" \
-      org.opencontainers.image.version="0.3.1" \
-      org.opencontainers.image.source="https://gitee.com/star1999/gpt-ptmove" \
-      org.opencontainers.image.base.name="sqing33/PTNexus@53eee1fed09121867f956c798c158c13a475d51f"
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.source="https://gitee.com/star1999/starpt" \
+      org.opencontainers.image.base.name="debian:bookworm-slim"
 RUN sed -i "s|http://deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates ffmpeg mediainfo mpv fonts-noto-cjk libicu72 util-linux \

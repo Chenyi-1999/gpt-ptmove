@@ -111,7 +111,7 @@
                         :stroke-width="6"
                         :show-text="false"
                       />
-                      <div style="font-size: 12px; margin-top: 4px; color: #606266">
+                      <div style="font-size: 12px; margin-top: 4px; color: var(--star-muted)">
                         {{ scope.row.progress_info?.progress_percent || 0 }}%
                       </div>
                     </div>
@@ -125,7 +125,7 @@
                         :stroke-width="6"
                         :show-text="false"
                       />
-                      <div style="font-size: 12px; margin-top: 4px; color: #606266">100%</div>
+                      <div style="font-size: 12px; margin-top: 4px; color: var(--star-muted)">100%</div>
                     </div>
                     <span v-else>-</span>
                   </template>
@@ -229,7 +229,7 @@
 
         <!-- 错误信息 -->
         <div v-if="selectedBDInfoRecord?.bdinfo_error" class="error-section">
-          <h4 style="margin: 15px 0 10px 0; color: #f56c6c">错误信息</h4>
+          <h4 style="margin: 15px 0 10px 0; color: var(--star-danger)">错误信息</h4>
           <el-alert
             :title="selectedBDInfoRecord.bdinfo_error"
             type="error"
@@ -240,7 +240,7 @@
 
         <!-- MediaInfo/BDInfo内容 -->
         <div v-if="selectedBDInfoRecord?.mediainfo" class="mediainfo-section">
-          <h4 style="margin: 15px 0 10px 0; color: #606266">
+          <h4 style="margin: 15px 0 10px 0; color: var(--star-muted)">
             {{ selectedBDInfoRecord?.is_bdinfo ? 'BDInfo' : 'MediaInfo' }} 内容
           </h4>
           <el-input
@@ -585,7 +585,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -593,9 +593,8 @@ onUnmounted(() => {
 }
 
 .record-view-card {
-  width: 1200px;
-  height: 800px;
-  max-height: 800px;
+  width: min(1200px, calc(100vw - 32px));
+  height: min(800px, calc(100dvh - 32px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -667,15 +666,15 @@ onUnmounted(() => {
     width: 8px;
   }
   &::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: var(--star-surface);
     border-radius: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+    background: var(--star-border);
     border-radius: 4px;
   }
   &::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    background: var(--star-muted);
   }
 }
 
@@ -699,10 +698,11 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #dcdfe6;
+  border-bottom: 1px solid var(--star-border);
 }
 
 .record-tabs-nav {
+  min-width: 0;
   display: flex;
   gap: 20px;
 }
@@ -711,18 +711,18 @@ onUnmounted(() => {
   padding: 8px 16px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  color: #606266;
+  color: var(--star-muted);
   font-weight: 500;
   transition: all 0.3s ease;
 }
 
 .tab-item:hover {
-  color: #409eff;
+  color: var(--star-accent);
 }
 
 .tab-item.active {
-  color: #409eff;
-  border-bottom-color: #409eff;
+  color: var(--star-accent);
+  border-bottom-color: var(--star-accent);
 }
 
 .record-close-btn {
@@ -736,7 +736,7 @@ onUnmounted(() => {
 .bdinfo-detail-card {
   width: 900px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -769,8 +769,8 @@ onUnmounted(() => {
   .record-view-card {
     width: calc(100vw - 16px);
     max-width: calc(100vw - 16px);
-    height: calc(100vh - 20px);
-    max-height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 20px);
   }
 
   .tab-header {

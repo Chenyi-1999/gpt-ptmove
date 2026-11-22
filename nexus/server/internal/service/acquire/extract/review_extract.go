@@ -105,6 +105,19 @@ type reviewExtractedData struct {
 	TMDbLink                 string
 }
 
+func torrentDescriptionHTML(pageHTML string) string {
+	description := extractElementInnerHTMLByID(pageHTML, "div", "kdescr")
+	if strings.TrimSpace(description) == "" {
+		description = extractElementInnerHTMLByID(pageHTML, "td", "kdescr")
+	}
+	return description
+}
+
+// TorrentDescriptionBBCode 返回详情页的原始简介，保留引用块供单独校验。
+func TorrentDescriptionBBCode(pageHTML string) string {
+	return renderBBCode(torrentDescriptionHTML(pageHTML))
+}
+
 func extractReviewDataFromHTML(pageHTML, fallbackTitle string) reviewExtractedData {
 	return extractReviewDataFromHTMLWithSite(pageHTML, fallbackTitle, "")
 }
@@ -124,10 +137,7 @@ func extractReviewDataFromHTMLWithSite(pageHTML, fallbackTitle string, siteCode 
 	result.Title = title
 
 	result.Subtitle = extractSubtitle(page)
-	descrHTML := extractElementInnerHTMLByID(page, "div", "kdescr")
-	if strings.TrimSpace(descrHTML) == "" {
-		descrHTML = extractElementInnerHTMLByID(page, "td", "kdescr")
-	}
+	descrHTML := torrentDescriptionHTML(page)
 
 	descrBBCode := htmlToBBCode(descrHTML)
 	extraStatementBBCode := extractExtraTextBBCode(page)
@@ -277,7 +287,10 @@ func extractDescriptionSections(descrHTML, descrBBCode, extraStatementBBCode str
 		isMediainfo := isLikelyMediaInfoText(quoteText)
 		isBDInfo := isLikelyBDInfoText(quoteText)
 		isReleaseInfoStyle := isReleaseInfoStyleQuote(quoteText)
-		if !foundMediainfoInQuote && (isMediainfo || isBDInfo || isReleaseInfoStyle) {
+		if isMediainfo || isBDInfo || isReleaseInfoStyle {
+			if foundMediainfoInQuote || (!isBDInfo && !isReleaseInfoStyle) {
+				continue
+			}
 			preserved := cleanQuoteInnerTextPreserveSpacing(block.Inner)
 			if preserved == "" {
 				preserved = quoteText
@@ -340,7 +353,7 @@ func extractDescriptionSections(descrHTML, descrBBCode, extraStatementBBCode str
 		isUnwanted := isUnwantedPatternQuote(quoteText)
 
 		if isMediainfo || isBDInfo || isReleaseInfoStyle {
-			if !foundMediainfoInQuote {
+			if !foundMediainfoInQuote && (isBDInfo || isReleaseInfoStyle) {
 				preserved := cleanQuoteInnerTextPreserveSpacing(block.Inner)
 				if preserved == "" {
 					preserved = quoteText
@@ -1233,6 +1246,10 @@ func extractElementInnerHTMLByID(pageHTML, tagName, elementID string) string {
 }
 
 func htmlToBBCode(fragment string) string {
+	return sanitizeBBCodeText(renderBBCode(fragment))
+}
+
+func renderBBCode(fragment string) string {
 	trimmed := strings.TrimSpace(fragment)
 	if trimmed == "" {
 		return ""
@@ -1244,19 +1261,19 @@ func htmlToBBCode(fragment string) string {
 
 	doc, err := xhtml.Parse(strings.NewReader("<div>" + trimmed + "</div>"))
 	if err != nil {
-		return sanitizeBBCodeText(sanitizeHTMLText(trimmed, true))
+		return sanitizeHTMLText(trimmed, true)
 	}
 
 	root := findFirstElementByTag(doc, "div")
 	if root == nil {
-		return sanitizeBBCodeText(sanitizeHTMLText(trimmed, true))
+		return sanitizeHTMLText(trimmed, true)
 	}
 
 	var builder strings.Builder
 	for child := root.FirstChild; child != nil; child = child.NextSibling {
 		builder.WriteString(renderNodeAsBBCode(child))
 	}
-	return sanitizeBBCodeText(builder.String())
+	return builder.String()
 }
 
 func normalizeCSSColorToBBCode(color string) string {
@@ -1468,6 +1485,14 @@ func renderNodeAsBBCode(node *xhtml.Node) string {
 		content := strings.TrimSpace(renderChildren())
 		if content == "" {
 			return ""
+		}
+		if tag != "blockquote" {
+			for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+				switch ancestor.Data {
+				case "fieldset", "blockquote", "pre":
+					return content
+				}
+			}
 		}
 		return "[quote]" + content + "[/quote]\n\n"
 	case "span", "font":
@@ -1737,9 +1762,37 @@ func splitPosterAndScreenshots(bbcode string) (string, string) {
 	return poster, toBBCodeImages(screens)
 }
 
+// withoutHTMLQuotes prevents a <pre> inside a description quote from
+// bypassing structural validation as if it were a standalone media field.
+func withoutHTMLQuotes(fragment string) string {
+	tokenizer := xhtml.NewTokenizer(strings.NewReader(fragment))
+	var result strings.Builder
+	depth := 0
+	for {
+		token := tokenizer.Next()
+		switch token {
+		case xhtml.ErrorToken:
+			return result.String()
+		case xhtml.StartTagToken, xhtml.EndTagToken:
+			tag, _ := tokenizer.TagName()
+			if string(tag) == "fieldset" || string(tag) == "blockquote" {
+				if token == xhtml.StartTagToken {
+					depth++
+				} else if depth > 0 {
+					depth--
+				}
+				continue
+			}
+		}
+		if depth == 0 {
+			result.Write(tokenizer.Raw())
+		}
+	}
+}
+
 func extractMediaInfoFromDetail(descrHTML, descrBBCode string) string {
 	preCandidates := make([]string, 0, 4)
-	for _, match := range rePreBlock.FindAllStringSubmatch(descrHTML, -1) {
+	for _, match := range rePreBlock.FindAllStringSubmatch(withoutHTMLQuotes(descrHTML), -1) {
 		if len(match) < 2 {
 			continue
 		}
@@ -1763,11 +1816,8 @@ func extractMediaInfoFromDetail(descrHTML, descrBBCode string) string {
 	if picked := pickMediaInfoCandidate(preCandidates); picked != "" {
 		return picked
 	}
-	if picked := pickMediaInfoCandidate(quoteCandidates); picked != "" {
-		return picked
-	}
-
-	// 找不到 MediaInfo 时再回退 BDInfo。
+	// 简介中的 MediaInfo 引用由准备流程按结构校验，保留这里的 BDInfo 兼容逻辑。
+	// 找不到独立 MediaInfo 时再回退 BDInfo。
 	if picked := pickBDInfoCandidate(preCandidates); picked != "" {
 		return picked
 	}
@@ -1788,6 +1838,10 @@ func extractMediaInfoFallbackFromPage(pageHTML string) string {
 	}
 
 	candidates := make([]string, 0, 12)
+
+	if description := torrentDescriptionHTML(page); description != "" {
+		page = strings.Replace(page, description, withoutHTMLQuotes(description), 1)
+	}
 
 	// 优先收集 <pre> 块：大部分站点会把原始 MediaInfo/BDInfo 放在 <pre> 内。
 	for _, match := range rePreBlock.FindAllStringSubmatch(page, -1) {

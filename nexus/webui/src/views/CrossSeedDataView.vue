@@ -1727,7 +1727,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1737,7 +1737,7 @@ onUnmounted(() => {
 .filter-card {
   width: 500px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -1752,6 +1752,7 @@ onUnmounted(() => {
 :deep(.filter-card .el-card__body) {
   padding: 0;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1771,7 +1772,7 @@ onUnmounted(() => {
 .path-tree-container {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 5px;
   margin-bottom: 20px;
@@ -1803,7 +1804,7 @@ onUnmounted(() => {
   min-height: 100px;
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 10px;
@@ -1838,15 +1839,21 @@ onUnmounted(() => {
 }
 
 .filter-card-footer {
-  padding: 5px 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--star-border);
+}
+
+.filter-card-footer :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .batch-fetch-main-card {
   width: min(1100px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   display: flex;
   flex-direction: column;
 }
@@ -1860,7 +1867,7 @@ onUnmounted(() => {
 .cross-seed-card {
   width: 90vw;
   max-width: 1200px;
-  height: 90vh;
+  height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -1924,9 +1931,10 @@ onUnmounted(() => {
 
 .cross-seed-data-view {
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0;
   box-sizing: border-box;
 }
 
@@ -1974,8 +1982,8 @@ onUnmounted(() => {
 }
 
 .mapped-cell.invalid-value {
-  color: #f56c6c;
-  background-color: #fef0f0;
+  color: var(--star-danger);
+  background-color: var(--star-danger-soft);
   font-weight: bold;
   padding: 8px 12px;
   height: calc(100% + 16px);
@@ -2005,24 +2013,24 @@ onUnmounted(() => {
 }
 
 .invalid-tag {
-  background-color: #fef0f0 !important;
-  border-color: #fbc4c4 !important;
+  background-color: var(--star-danger-soft) !important;
+  border-color: var(--star-danger) !important;
 }
 
 .restricted-tag {
-  background-color: #f56c6c !important;
-  border-color: #f56c6c !important;
-  color: #ffffff !important;
+  background-color: var(--star-danger-soft) !important;
+  border-color: var(--star-danger) !important;
+  color: var(--star-danger) !important;
   font-weight: bold !important;
 }
 
 :deep(.deleted-row) {
-  background-color: #fef0f0 !important;
-  color: #f56c6c !important;
+  background-color: var(--star-danger-soft) !important;
+  color: var(--star-danger) !important;
 }
 
 :deep(.deleted-row:hover) {
-  background-color: #fde2e2 !important;
+  background-color: color-mix(in srgb, var(--star-danger-soft), var(--star-danger) 18%) !important;
 }
 
 .title-cell {
@@ -2059,8 +2067,8 @@ onUnmounted(() => {
     .el-checkbox__input.is-disabled
     .el-checkbox__inner
 ) {
-  border-color: #f56c6c !important;
-  background-color: #fef0f0 !important;
+  border-color: var(--star-danger) !important;
+  background-color: var(--star-danger-soft) !important;
 }
 
 :deep(
@@ -2071,7 +2079,7 @@ onUnmounted(() => {
     .el-checkbox__input.is-disabled
     .el-checkbox__inner::after
 ) {
-  border-color: #f56c6c !important;
+  border-color: var(--star-danger) !important;
 }
 
 .target-site-filter-title {
@@ -2106,6 +2114,21 @@ onUnmounted(() => {
 
   .target-sites-radio-group {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-modal-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .maintenance-source-select,
+  .maintenance-source-id {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+
+  .maintenance-modal-actions :deep(.el-button + .el-button) {
+    margin-left: 0;
   }
 }
 

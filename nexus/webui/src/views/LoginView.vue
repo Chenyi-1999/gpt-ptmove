@@ -143,7 +143,9 @@ const onSubmit = async () => {
   width: min(100%, 758px);
   overflow: hidden;
   border-radius: 22px;
-  box-shadow: 0 18px 56px rgb(24 68 95 / 11%);
+  border: 1px solid var(--star-border);
+  background: var(--star-surface);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 34%), 0 0 72px rgb(109 82 200 / 12%);
 }
 
 .star-login__brand {
@@ -157,7 +159,8 @@ const onSubmit = async () => {
   padding: clamp(24px, 4vw, 50px);
   border-right: 1px solid var(--star-border);
   background:
-    linear-gradient(140deg, rgb(235 246 251 / 89%), rgb(214 239 247 / 90%)), var(--star-accent-soft);
+    radial-gradient(ellipse at 20% 10%, rgb(109 82 200 / 30%), transparent 58%),
+    linear-gradient(150deg, #17132d, #101629 74%);
 }
 
 .star-login__brand::before,
@@ -167,7 +170,7 @@ const onSubmit = async () => {
   right: -92px;
   width: 275px;
   height: 275px;
-  border: 1px solid #bddfea;
+  border: 1px solid rgb(184 164 255 / 20%);
   border-radius: 50%;
   content: '';
   pointer-events: none;
@@ -189,9 +192,9 @@ const onSubmit = async () => {
   width: 82px;
   height: 82px;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 75%);
+  border: 1px solid rgb(184 164 255 / 32%);
   border-radius: 22px;
-  background: rgb(255 255 255 / 50%);
+  background: rgb(37 30 66 / 72%);
 }
 
 .star-login__emblem img {
@@ -242,11 +245,18 @@ const onSubmit = async () => {
   width: 100%;
   min-height: 47px;
   padding: 8px 12px;
-  border: 1px solid var(--star-border-strong);
+  border: 1px solid var(--star-border);
   border-radius: 9px;
   color: var(--star-ink);
   background-color: var(--star-surface);
   font-size: 16px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.star-login__form input:focus-visible {
+  border-color: var(--star-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(184 164 255 / 16%);
 }
 
 .star-login__form .star-icon-button {
@@ -286,6 +296,12 @@ const onSubmit = async () => {
 .star-login__form .star-button {
   min-height: 47px;
   margin-top: 10px;
+  color: #fff;
+  background: var(--star-action);
+}
+
+.star-login__form .star-button:hover:not(:disabled) {
+  background: #8067dc;
 }
 
 .star-login__error {

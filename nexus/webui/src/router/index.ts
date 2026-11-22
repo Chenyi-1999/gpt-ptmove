@@ -13,8 +13,7 @@ const router = createRouter({
     },
     {
       path: '/info',
-      name: 'info',
-      component: () => import('../views/InfoView.vue'),
+      redirect: { name: 'home' },
     },
     {
       path: '/torrents',

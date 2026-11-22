@@ -2,7 +2,7 @@
 
 v0.2.0 adds JSON site profiles, frozen routes/rules, schema2 worker claims and the scoped AI API; see SITE_PROFILES.md and AI_API.md. v0.1.1 added encrypted secret `qb_api_key`. It takes precedence over qB username/password and uses the official qB 5.2+/WebAPI 2.14.1+ Bearer API mode, never auth/login/logout. NAS workers must now use execution_schema=2; legacy claims return409.
 
-New independent implementation; no PTNexus source copied. Python 3.12/FastAPI + SQLite, static HTML/CSS/JS frontend, pull-based NAS worker. Controller deployment uses152 public port18120; use HTTPS or a trusted encrypted channel for external API credentials. All source/target HTTP operations happen on NAS. No real publishing without configured credentials and explicit rule enablement.
+PTMove API service. Python 3.12/FastAPI + SQLite, static HTML/CSS/JS frontend, pull-based NAS worker. Controller deployment uses152 public port18120; use HTTPS or a trusted encrypted channel for external API credentials. All source/target HTTP operations happen on NAS. No real publishing without configured credentials and explicit rule enablement.
 
 ## Invariants
 
@@ -71,3 +71,7 @@ Frontend agent owns `ptmove/static/*` only. Root owns worker/adapters, packaging
 截图只追加 Pixhost 图片并按图片去重。MediaInfo 文本经预览后可补充或更改。生成草稿会上传所选截图至 Pixhost，预览只读取站上资料。实际编辑前保存原文与预期改动，同一目标版本只提交一次。回读不一致或超时时返回 `status: unknown`，打开编辑重新读取站上资料即可核对。不会调用发布队列或改变 qB 做种状态。
 
 更换封面时，预览仅传 `revision` 和 `cover_url`。服务端接受 Pixhost HTTPS 展示页、图片直链和对应缩略图地址，解析并核验可加载的原图。预览返回 `cover_url_before`、`cover_url_after` 和 `confirmation`。保存须传同一份 `revision`、`cover_url`，以及将 `cover_url_after` 原样传入的 `resolved_cover_url` 和 `confirmation`。封面操作需要单独提交，截图和 MediaInfo 字段禁止混传。保存后回读封面和站点表单，只有匹配预览时才返回已验证。
+
+## 转种准备中的 MediaInfo
+
+`POST /api/migrate/prepare_seed_info` 首先沿用草稿的完整媒体报告。报告缺失时，尝试从原简介或缓存简介的 `[quote]` 读取唯一的结构化 MediaInfo。识别成功后规范分行，补齐缺失的 `General` 标题，使用现有媒体校验规则，并在准备日志显示「MediaInfo 从简介提取」。无法确认引用时，使用已配置的飞牛媒体代理。禁转与分集限制继续由转种准备流程执行。

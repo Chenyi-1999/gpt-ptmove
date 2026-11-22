@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	extract "github.com/pt-nexus/server/internal/service/acquire/extract"
+	processingmedia "github.com/pt-nexus/server/internal/service/processing/media"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
 )
 
@@ -22,9 +23,18 @@ func PrepareMaintenanceSeedRecord(input FetchStoreProcessInput, deps FetchStoreP
 		TorrentID: input.SearchTerm, PageHTML: acquired.DetailHTML,
 	})
 	review := extracted.ReviewData
+	quotedReport := ""
+	if !processingmedia.HasUsableMediaReport(review.Mediainfo) {
+		quotedReport = processingmedia.QuotedMediaInfo(extract.TorrentDescriptionBBCode(acquired.DetailHTML))
+	}
 	if firstNonEmpty(review.Body, review.Statement, review.Poster, review.Screens, review.Mediainfo, review.Subtitle,
-		review.IMDbLink, review.DoubanLink, review.TMDbLink) == "" {
+		review.IMDbLink, review.DoubanLink, review.TMDbLink, quotedReport) == "" {
 		return nil, errors.New("源站详情没有提取到可更新的种子资料，请检查种子 ID 或站点配置")
+	}
+	if !processingmedia.HasUsableMediaReport(review.Mediainfo) {
+		if previousReport := toStringAny(previous["mediainfo"], ""); processingmedia.HasUsableMediaReport(previousReport) {
+			review.Mediainfo = previousReport
+		}
 	}
 	draft := NewSeedDraft(acquired.Meta.InfoHash, input.SearchTerm, acquired.SiteIdentifier, acquired.Nickname)
 	draft.Title = firstNonEmpty(toStringAny(previous["title"], ""), acquired.TorrentName)
@@ -36,7 +46,7 @@ func PrepareMaintenanceSeedRecord(input FetchStoreProcessInput, deps FetchStoreP
 		TaskID: input.TaskID, SavePath: acquired.SavePath, DownloaderID: acquired.DownloaderID,
 		TorrentNameForPath:   acquired.TorrentNameForPath,
 		ScreenshotReviewMode: processingshared.ScreenshotReviewModeInteractive,
-		RootConfig:           deps.FetchRepairDeps.RootConfig, ReviewData: review, DetailHTML: acquired.DetailHTML,
+		RootConfig:           deps.FetchRepairDeps.RootConfig, ReviewData: review, DetailHTML: acquired.DetailHTML, QuotedMediaInfo: quotedReport,
 		Draft: draft, MetaName: acquired.Meta.Name, SiteIdentifier: acquired.SiteIdentifier,
 	}, FetchRepairFinalizeDeps{
 		FetchRepairDeps: deps.FetchRepairDeps, Now: deps.Now,

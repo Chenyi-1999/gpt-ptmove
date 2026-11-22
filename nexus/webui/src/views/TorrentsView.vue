@@ -581,7 +581,7 @@
                 "
                 v-loading="sourceSiteQueryLoading[site.name]"
                 element-loading-spinner="el-icon-loading"
-                element-loading-background="rgba(0, 0, 0, 0.5)"
+                element-loading-background="rgb(3 5 12 / 74%)"
               >
                 {{ site.name }} ✓
               </el-tag>
@@ -615,7 +615,7 @@
                 "
                 v-loading="sourceSiteQueryLoading[site.name]"
                 element-loading-spinner="el-icon-loading"
-                element-loading-background="rgba(0, 0, 0, 0.5)"
+                element-loading-background="rgb(3 5 12 / 74%)"
               >
                 {{ site.name }}
               </el-tag>
@@ -653,7 +653,7 @@
             <p class="torrent-name">{{ selectedTorrentForMigration?.name }}</p>
           </div>
           <p>源站点: {{ directTransferSourceSite }}</p>
-          <p style="color: #909399; margin-bottom: 12px">
+          <p style="color: var(--star-muted); margin-bottom: 12px">
             当前流程不再进入编辑面板；如需修改标题、简介、标签等，请去“维护”页处理。
           </p>
 
@@ -743,7 +743,7 @@
           </el-descriptions>
 
           <el-divider content-position="left">结果</el-divider>
-          <div style="color: #606266; margin-bottom: 10px">
+          <div style="color: var(--star-muted); margin-bottom: 10px">
             {{ iyuuBatchTask?.message || '等待任务更新...' }}
           </div>
 
@@ -2454,7 +2454,7 @@ watch(nameSearch, () => {
 
 .expand-content {
   padding: 10px 20px;
-  background-color: #fafcff;
+  background-color: var(--star-surface-muted);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 5px;
@@ -2487,7 +2487,7 @@ watch(nameSearch, () => {
 }
 
 :deep(.expanded-row > td) {
-  background-color: #ecf5ff !important;
+  background-color: var(--star-accent-soft) !important;
 }
 
 .filter-overlay {
@@ -2496,7 +2496,7 @@ watch(nameSearch, () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2506,7 +2506,7 @@ watch(nameSearch, () => {
 .filter-card {
   width: 800px;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -2520,6 +2520,7 @@ watch(nameSearch, () => {
 :deep(.filter-card .el-card__body) {
   padding: 0;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -2537,10 +2538,16 @@ watch(nameSearch, () => {
 }
 
 .filter-card-footer {
-  padding: 5px 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--star-border);
+}
+
+.filter-card-footer :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .filter-card .el-checkbox-group,
@@ -2558,7 +2565,7 @@ watch(nameSearch, () => {
 .path-tree-container {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 5px;
 }
@@ -2580,7 +2587,7 @@ watch(nameSearch, () => {
   height: 160px;
   /* 固定高度，避免筛选结果变少时区域高度跳变 */
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 4px;
   padding: 10px;
   margin-top: 10px;
@@ -2605,16 +2612,16 @@ watch(nameSearch, () => {
 
 .source-site-tip {
   font-size: 13px;
-  color: #909399;
+  color: var(--star-muted);
   margin-bottom: 15px;
   text-align: center;
 }
 
 .site-list-box {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--star-border);
   border-radius: 6px;
   padding: 16px;
-  background-color: #fafafa;
+  background-color: var(--star-surface-muted);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -2662,7 +2669,7 @@ watch(nameSearch, () => {
   max-height: 100px;
   overflow-y: auto;
   padding: 5px;
-  background-color: #f5f7fa;
+  background-color: var(--star-surface-muted);
   border-radius: 4px;
 }
 
@@ -2692,7 +2699,7 @@ watch(nameSearch, () => {
 
 .site-operation-input .input-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--star-muted);
   margin-top: 5px;
   line-height: 1.4;
 }
@@ -2711,7 +2718,7 @@ watch(nameSearch, () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(3 5 12 / 74%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2721,26 +2728,27 @@ watch(nameSearch, () => {
 .cross-seed-card {
   width: 90vw;
   max-width: 1200px;
-  height: 90vh;
+  height: 90dvh;
   display: flex;
   flex-direction: column;
   position: relative; /* 添加相对定位，作为 LogProgress 的定位上下文 */
 }
 
 :deep(.cross-seed-card.el-card) {
-  background-color: #ffffff !important;
+  background-color: var(--star-surface) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
 :deep(.cross-seed-card .el-card__header) {
-  background-color: #ffffff !important;
-  border-bottom: 1px solid #e4e7ed;
+  background-color: var(--star-surface) !important;
+  border-bottom: 1px solid var(--star-border);
 }
 
 :deep(.cross-seed-card .el-card__body) {
   padding: 10px;
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -2753,6 +2761,7 @@ watch(nameSearch, () => {
 
 .cross-seed-content {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2793,7 +2802,7 @@ watch(nameSearch, () => {
   .cross-seed-card {
     width: calc(100vw - 12px);
     max-width: calc(100vw - 12px);
-    height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
   }
 }
 </style>

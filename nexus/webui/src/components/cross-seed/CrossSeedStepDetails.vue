@@ -261,7 +261,7 @@
                         >
                           <span
                             :style="{
-                              color: invalidTagsList.includes(option.value) ? '#F56C6C' : '',
+                              color: invalidTagsList.includes(option.value) ? 'var(--star-danger)' : '',
                             }"
                           >
                             {{ option.label }}

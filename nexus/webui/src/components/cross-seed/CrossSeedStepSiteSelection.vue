@@ -57,7 +57,7 @@
           content="ilolicon 仅支持动漫/动画内容，当前种子已自动禁用"
           placement="top"
         >
-          <el-icon style="margin-left: 4px; color: #f56c6c">
+          <el-icon style="margin-left: 4px; color: var(--star-danger)">
             <InfoFilled />
           </el-icon>
         </el-tooltip>
