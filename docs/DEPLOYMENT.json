@@ -897,6 +897,67 @@
       "requested_download_history_skips": 2,
       "duration_seconds": 518.8,
       "settings_and_task_counts_unchanged": true
-    }
+    },
+    "published": true,
+    "source_commit": "58fd5f16692fd1fb09f7c1f2381855bc9a526c39",
+    "git_tag": "v1.0.4",
+    "github": {
+      "private": true,
+      "tag": "v1.0.4",
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.4",
+      "draft": false,
+      "published": "2026-11-22T14:49:29Z",
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "state": "uploaded",
+          "digest": "sha256:c13489b241906bfd15711255c8cbecf10964a86f416078d58c3128bb52cea144"
+        },
+        {
+          "name": "starpt-v1.0.4-linux-amd64.tar.gz",
+          "size": 673404753,
+          "state": "uploaded",
+          "digest": "sha256:e59f5fb5bee852ce465ded12d0e9c418b5ad6ffea2804f97ad6b1ee3249f11a4"
+        },
+        {
+          "name": "starpt-v1.0.4-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "state": "uploaded",
+          "digest": "sha256:ae56ec0e25b4f267b201c03042107cbc4e82ace8874a4e31612849ac4a8fff72"
+        }
+      ]
+    },
+    "gitee": {
+      "release_id": 1354564,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.4",
+      "assets": [
+        {
+          "sha256": "c13489b241906bfd15711255c8cbecf10964a86f416078d58c3128bb52cea144",
+          "id": 3792698,
+          "size": 498,
+          "name": "compose.starpt.yaml"
+        },
+        {
+          "sha256": "ae56ec0e25b4f267b201c03042107cbc4e82ace8874a4e31612849ac4a8fff72",
+          "id": 3792699,
+          "size": 99,
+          "name": "starpt-v1.0.4-linux-amd64.tar.gz.sha256"
+        }
+      ],
+      "image_asset": null,
+      "image_distribution": "Full image attached to the same private GitHub release"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-22_222646__历史发布__STARPT-v1.0.4.zip",
+      "bytes": 690421822,
+      "sha256": "2a91c915a04980b929a96ae593f332077ba0bd7992fcd46e3d44211902027aee"
+    },
+    "deployment_reconfirmed": {
+      "image": "ptmove-nexus:1.0.4",
+      "health": "healthy",
+      "version": "1.0.4"
+    },
+    "published_verified_at": "2026-11-22T22:49:54+08:00"
   }
 }
