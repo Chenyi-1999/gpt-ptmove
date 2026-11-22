@@ -50,6 +50,15 @@ type Profile struct {
 // Scanner 只使用 GET 读取站点和种子元信息；不保存文件、不改配额、不调用下载器。
 type Scanner struct{ Client *http.Client }
 
+type inspectionStage uint8
+
+const (
+	inspectPreview inspectionStage = iota
+	inspectDownload
+	inspectPublish
+	inspectPublishSource
+)
+
 // NewScanner 创建有界请求的读取器，使用全局受保护传输层。
 func NewScanner() *Scanner { return &Scanner{Client: &http.Client{Timeout: 30 * time.Second}} }
 
@@ -64,8 +73,8 @@ func ProfileFrom(value any) (Profile, error) {
 	return p, err
 }
 
-// Scan 从 RSS 或列表扫描候选，并逐一读取详情、目标查重与完整种子元数据。
-func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie, targetCookie, rss string, settings policy.Settings) ([]policy.Candidate, error) {
+// Scan 从 RSS 或列表扫描候选，并逐一读取详情、查重证据与完整种子元数据。
+func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie, targetCookie, rss string, settings policy.Settings, excludedIDs ...map[string]bool) ([]policy.Candidate, error) {
 	base, zmpt := zmptListing(source)
 	// 默认保持 50 条详情请求的上限，较大的月度配置允许读取更多筛选后的条目。
 	detailLimit := 50
@@ -84,6 +93,9 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 				continue
 			}
 			seen[entry.id] = true
+			if len(excludedIDs) > 0 && excludedIDs[0][entry.id] {
+				continue
+			}
 			if zmpt && (!entry.flags.official || entry.flags.restricted || entry.flags.episode || entry.flags.downloaded) {
 				if listedSkips < 50 {
 					seeders := -1
@@ -98,7 +110,7 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 				continue
 			}
 			inspected++
-			c, err := s.inspect(ctx, source, target, sourceCookie, targetCookie, entry, false, false)
+			c, err := s.inspect(ctx, source, target, sourceCookie, targetCookie, entry, inspectPreview)
 			if err != nil {
 				c.Reasons = []string{"详情或查重读取失败"}
 				rows = append(rows, c)
@@ -139,16 +151,21 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 
 // Inspect 读取详情中的明确权限、做种数和完整 torrent。未知结构保持拒绝。
 func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie, id string) (policy.Candidate, error) {
-	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, true, false)
+	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, inspectDownload)
 }
 
 // InspectForPublish 在任务自己的完整下载之后复核源站与目标站，保留已下载标记给调用方。
 // 它允许已跟踪任务读取完整证据，仍按相同的官种、分集和禁转规则拒绝候选。
 func (s *Scanner) InspectForPublish(ctx context.Context, source, target Profile, sourceCookie, targetCookie, id string) (policy.Candidate, error) {
-	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, true, true)
+	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, inspectPublish)
 }
 
-func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie string, entry sourceListingEntry, recheckListing, ownDownload bool) (policy.Candidate, error) {
+// InspectSourceForPublish 复核批量查重任务的源站资格和种子元数据；调用方持有单独的目标证据。
+func (s *Scanner) InspectSourceForPublish(ctx context.Context, source Profile, sourceCookie, id string) (policy.Candidate, error) {
+	return s.inspect(ctx, source, Profile{}, sourceCookie, "", sourceListingEntry{id: id}, inspectPublishSource)
+}
+
+func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie string, entry sourceListingEntry, stage inspectionStage) (policy.Candidate, error) {
 	c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: -1, Leechers: -1}
 	if entry.seedersKnown {
 		c.Seeders = entry.seeders
@@ -178,7 +195,7 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 	c.RestrictionsKnown, c.Allowed = Restrictions(doc, source)
 	applySourceEvidence(&c, entry.flags)
 	applySourceEvidence(&c, detailSourceEvidence(doc, source, zmpt))
-	if zmpt && recheckListing && c.RestrictionsKnown && c.Allowed && !c.Episode {
+	if zmpt && stage != inspectPreview && c.RestrictionsKnown && c.Allowed && !c.Episode {
 		row, rowErr := s.recheckZmptListingEntry(ctx, listing, source, sourceCookie, entry.id, c.Title)
 		if rowErr != nil {
 			return c, rowErr
@@ -221,6 +238,7 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 		}
 	}
 	checked := c
+	ownDownload := stage == inspectPublish || stage == inspectPublishSource
 	if ownDownload {
 		checked.PreviouslyDownloaded = false
 	}
@@ -236,6 +254,13 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 	c.InfoHash = meta.InfoHash
 	if c.Title == "" {
 		c.Title = meta.Name
+	}
+	if stage == inspectPublishSource {
+		return c, nil
+	}
+	if !ownDownload && IsZmPTSource(source) {
+		c.DuplicateKnown, c.Duplicate = s.zmptCrossSeedDuplicate(ctx, source, target, sourceCookie, doc, detail, c.InfoHash)
+		return c, nil
 	}
 	if isNovaHD(target) {
 		c.DuplicateKnown, c.Duplicate = s.novaHDDuplicate(ctx, source, target, targetCookie, doc, c)
@@ -313,12 +338,19 @@ func sameOrigin(base, ref string) (string, error) {
 	return u.String(), nil
 }
 func (s *Scanner) get(ctx context.Context, target, cookie string, limit int64, acceptURL ...func(*url.URL) bool) ([]byte, error) {
+	return s.getWithHeaders(ctx, target, cookie, limit, nil, acceptURL...)
+}
+
+func (s *Scanner) getWithHeaders(ctx context.Context, target, cookie string, limit int64, headers http.Header, acceptURL ...func(*url.URL) bool) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, errors.New("读取地址无效")
 	}
 	if len(acceptURL) > 0 && !acceptURL[0](req.URL) {
 		return nil, errors.New("读取地址的种子标识无效")
+	}
+	for key, values := range headers {
+		req.Header[key] = values
 	}
 	req.Header.Set("Cookie", cookie)
 	req.Header.Set("User-Agent", "PTNexus-Automation/1.0")

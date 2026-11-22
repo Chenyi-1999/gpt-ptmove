@@ -151,18 +151,27 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if err != nil || !complete {
 		return errors.New("源种子并非全部文件完成")
 	}
-	tp, _ := acquireautomation.ProfileFrom(snapshot.Target)
 	sourceCookie, err := a.profiles.Cookie(task.Source)
 	if err != nil {
 		return errors.New("源凭据不可用")
 	}
-	targetCookie, err := a.profiles.Cookie(task.Target)
-	if err != nil {
-		return errors.New("目标凭据不可用")
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	candidate, err := a.scanner.InspectForPublish(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
+	var candidate policy.Candidate
+	if task.BatchCheck {
+		if task.BatchCheckedAt <= 0 || task.BatchDuplicate || !usesIYUUBatches(snapshot) {
+			return errors.New("缺少本批 IYUU 查重通过记录")
+		}
+		candidate, err = a.scanner.InspectSourceForPublish(ctx, sp, sourceCookie, task.SourceID)
+		candidate.DuplicateKnown = true
+	} else {
+		tp, _ := acquireautomation.ProfileFrom(snapshot.Target)
+		targetCookie, cookieErr := a.profiles.Cookie(task.Target)
+		if cookieErr != nil {
+			return errors.New("目标凭据不可用")
+		}
+		candidate, err = a.scanner.InspectForPublish(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
+	}
 	if candidate.RestrictionsKnown && !candidate.Allowed {
 		return errors.New("源站标记禁转或限转，已停止发布")
 	}

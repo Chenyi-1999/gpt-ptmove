@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -20,9 +21,11 @@ type Settings struct {
 	ScheduleTime         string  `json:"schedule_time"`
 	Timezone             string  `json:"timezone"`
 	MonthlyLimit         int     `json:"monthly_limit"`
+	BatchSize            int     `json:"batch_size"`
+	DuplicateAction      string  `json:"duplicate_action"`
+	DuplicateDirectory   string  `json:"duplicate_directory"`
 	MinSizeGiB           float64 `json:"min_size_gib"`
 	MaxSizeGiB           float64 `json:"max_size_gib"`
-	MonthlyBudgetGiB     float64 `json:"monthly_budget_gib"`
 	MinSeeders           int     `json:"min_seeders"`
 	MinLeechers          int     `json:"min_leechers"`
 	ReserveSpaceGiB      float64 `json:"reserve_space_gib"`
@@ -57,7 +60,7 @@ type Candidate struct {
 
 // Defaults 返回关闭执行和调度的首装配置。
 func Defaults() Settings {
-	return Settings{ScheduleDay: 1, ScheduleTime: "02:00", Timezone: "Asia/Shanghai", MonthlyLimit: 6, MinSizeGiB: 1, MaxSizeGiB: 10, MonthlyBudgetGiB: 60, MinSeeders: 3, PreferOfficial: true, TargetAbsentPriority: true, SourceSite: "zmpt", TargetSite: "novahd"}
+	return Settings{ScheduleDay: 1, ScheduleTime: "02:00", Timezone: "Asia/Shanghai", MonthlyLimit: 6, BatchSize: 20, DuplicateAction: "keep", MinSizeGiB: 1, MaxSizeGiB: 10, MinSeeders: 3, PreferOfficial: true, TargetAbsentPriority: true, SourceSite: "zmpt", TargetSite: "novahd"}
 }
 
 // DecodeSettings 读取完整配置并校验边界，损坏配置不会启用模块。
@@ -71,12 +74,15 @@ func DecodeSettings(raw string) (Settings, error) {
 	return v, Validate(v)
 }
 
-// MergeSettings 只接受白名单字段，拒绝未知参数与非有限数。
+// MergeSettings 只保留受支持的字段，忽略旧客户端提交的月度体积预算。
 func MergeSettings(current Settings, patch map[string]any) (Settings, error) {
 	data, _ := json.Marshal(current)
 	all := map[string]any{}
 	_ = json.Unmarshal(data, &all)
 	for key, val := range patch {
+		if key == "monthly_budget_gib" {
+			continue
+		}
 		if _, ok := all[key]; !ok {
 			return current, errors.New("未知自动化设置字段: " + key)
 		}
@@ -98,16 +104,32 @@ func Validate(s Settings) error {
 	if s.MonthlyLimit < 1 || s.MonthlyLimit > 100 || s.MinSeeders < 0 || s.MinSeeders > 100000 || s.MinLeechers < 0 || s.MinLeechers > 100000 {
 		return errors.New("月度次数需为 1–100，做种数不可为负")
 	}
-	for _, n := range []float64{s.MinSizeGiB, s.MaxSizeGiB, s.MonthlyBudgetGiB} {
+	if s.BatchSize < 1 || s.BatchSize > 100 {
+		return errors.New("每批种子数量需为 1–100")
+	}
+	switch s.DuplicateAction {
+	case "keep", "delete":
+	case "move":
+		destination := strings.TrimRight(s.DuplicateDirectory, "/")
+		if !path.IsAbs(destination) || path.Clean(destination) != destination || strings.TrimSpace(s.DuplicateDirectory) != s.DuplicateDirectory || strings.ContainsAny(destination, "\\:\x00\r\n") {
+			return errors.New("移动重复种子需要填写下载器内规范的 Linux 绝对目录")
+		}
+		if destination == strings.TrimRight(s.SavePath, "/") {
+			return errors.New("重复目录须与下载保存目录不同")
+		}
+	default:
+		return errors.New("请选择有效的重复种子处理方式")
+	}
+	for _, n := range []float64{s.MinSizeGiB, s.MaxSizeGiB} {
 		if math.IsNaN(n) || math.IsInf(n, 0) || n <= 0 || n > 100000 {
-			return errors.New("体积和预算必须为有限正数")
+			return errors.New("体积必须为有限正数")
 		}
 	}
 	if math.IsNaN(s.ReserveSpaceGiB) || math.IsInf(s.ReserveSpaceGiB, 0) || s.ReserveSpaceGiB < 0 || s.ReserveSpaceGiB > 100000 {
 		return errors.New("保留空间需为有限非负数")
 	}
-	if s.MinSizeGiB > s.MaxSizeGiB || s.MaxSizeGiB > s.MonthlyBudgetGiB {
-		return errors.New("体积范围超出月度预算")
+	if s.MinSizeGiB > s.MaxSizeGiB {
+		return errors.New("最小种子体积不能大于最大种子体积")
 	}
 	if s.Timezone != "Asia/Shanghai" || s.ScheduleDay < 1 || s.ScheduleDay > 28 {
 		return errors.New("调度必须使用上海时区且日期为 1–28")
@@ -174,7 +196,7 @@ func Evaluate(c Candidate, s Settings) Candidate {
 	return c
 }
 
-// Rank 将合格条目按完整体积降序排列，同体积优先当前做种数较多的条目。
+// Rank 将合格条目按完整体积升序排列，同体积优先当前做种数较多的条目。
 func Rank(rows []Candidate, _ Settings) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
@@ -182,7 +204,7 @@ func Rank(rows []Candidate, _ Settings) {
 			return a.Eligible
 		}
 		if a.Size != b.Size {
-			return a.Size > b.Size
+			return a.Size < b.Size
 		}
 		return a.Seeders > b.Seeders
 	})

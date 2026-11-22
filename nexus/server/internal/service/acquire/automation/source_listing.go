@@ -36,7 +36,7 @@ func zmptListing(source Profile) (*url.URL, bool) {
 	return u, err == nil && u.Scheme == "https" && strings.EqualFold(u.Host, "zmpt.cc") && u.EscapedPath() == "/torrents.php"
 }
 
-// zmptListingURL 使用织梦高级搜索的体积区间，并保持体积降序和官方标签筛选。
+// zmptListingURL 先搜索体积较小的官种，再按完整种子的字节数核对体积区间。
 func zmptListingURL(base *url.URL, settings policy.Settings, page int) string {
 	u := *base
 	query := u.Query()
@@ -45,7 +45,7 @@ func zmptListingURL(base *url.URL, settings policy.Settings, page int) string {
 	query.Set("size_begin", strconv.Itoa(int(math.Floor(settings.MinSizeGiB))))
 	query.Set("size_end", strconv.Itoa(int(math.Ceil(settings.MaxSizeGiB))))
 	query.Set("sort", "5")
-	query.Set("type", "desc")
+	query.Set("type", "asc")
 	if settings.MinSeeders > 0 {
 		query.Set("incldead", "1")
 		query.Set("seeders_begin", strconv.Itoa(settings.MinSeeders))

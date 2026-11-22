@@ -1,6 +1,7 @@
 package automation
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -73,13 +74,13 @@ func TestOfficialEpisodeDownloadedAndTargetAbsenceAreMandatory(t *testing.T) {
 
 func TestRankEligibleThenSizeThenPeers(t *testing.T) {
 	rows := []Candidate{
-		{ID: "small-popular", Eligible: true, Size: GiB, Seeders: 90},
-		{ID: "larger", Eligible: true, Size: 2 * GiB, Seeders: 3},
-		{ID: "larger-popular", Eligible: true, Size: 2 * GiB, Seeders: 4},
-		{ID: "largest-rejected", Size: 3 * GiB, Seeders: 90},
+		{ID: "larger", Eligible: true, Size: 2 * GiB, Seeders: 90},
+		{ID: "small-rejected", Size: GiB / 2, Seeders: 90},
+		{ID: "small", Eligible: true, Size: GiB, Seeders: 3},
+		{ID: "small-popular", Eligible: true, Size: GiB, Seeders: 4},
 	}
 	Rank(rows, Defaults())
-	for i, expected := range []string{"larger-popular", "larger", "small-popular", "largest-rejected"} {
+	for i, expected := range []string{"small-popular", "small", "larger", "small-rejected"} {
 		if rows[i].ID != expected {
 			t.Fatalf("rank at %d = %q, want %q", i, rows[i].ID, expected)
 		}
@@ -95,11 +96,30 @@ func TestLegacyPreferenceSettingsRemainAccepted(t *testing.T) {
 		t.Fatalf("legacy settings patch failed to decode: %v", err)
 	}
 }
-func TestSettingsRejectUnknownAndImpossibleBudget(t *testing.T) {
+func TestSettingsValidateSizeBoundsAndBatchOptions(t *testing.T) {
 	s := Defaults()
-	for _, patch := range []map[string]any{{"password": "secret"}, {"monthly_limit": 0}, {"max_size_gib": 100}, {"reserve_space_gib": -1}, {"schedule_time": "not a time"}} {
+	for _, patch := range []map[string]any{
+		{"password": "secret"}, {"monthly_limit": 0}, {"max_size_gib": 0.5}, {"reserve_space_gib": -1},
+		{"schedule_time": "not a time"}, {"batch_size": 0}, {"batch_size": 101},
+		{"duplicate_action": "unknown"}, {"duplicate_action": "move", "duplicate_directory": "relative"},
+	} {
 		if _, err := MergeSettings(s, patch); err == nil {
 			t.Fatalf("invalid settings accepted %+v", patch)
 		}
+	}
+	old, err := DecodeSettings(`{"max_size_gib":100,"monthly_budget_gib":1}`)
+	if err != nil || old.BatchSize != 20 || old.DuplicateAction != "keep" {
+		t.Fatalf("legacy byte cap blocked an otherwise valid setting: %+v, %v", old, err)
+	}
+	next, err := MergeSettings(s, map[string]any{
+		"batch_size": 30, "duplicate_action": "move", "duplicate_directory": "/qb/duplicates",
+		"monthly_budget_gib": 1,
+	})
+	if err != nil || next.BatchSize != 30 {
+		t.Fatalf("valid batch options rejected: %v", err)
+	}
+	raw, err := json.Marshal(next)
+	if err != nil || strings.Contains(string(raw), "monthly_budget_gib") {
+		t.Fatalf("obsolete monthly size limit exposed by settings JSON: %s, %v", raw, err)
 	}
 }

@@ -90,7 +90,12 @@ func (h *AutomationHandler) ListRuns(c *gin.Context) {
 
 // ListTasks 返回真实任务和保守配额。
 func (h *AutomationHandler) ListTasks(c *gin.Context) {
-	result, status := h.service.ListTasks()
+	if c.Query("active") == "1" {
+		result, status := h.service.ListActiveTasks(c.Request.Context())
+		c.JSON(status, result)
+		return
+	}
+	result, status := h.service.ListTasksContext(c.Request.Context())
 	c.JSON(status, result)
 }
 

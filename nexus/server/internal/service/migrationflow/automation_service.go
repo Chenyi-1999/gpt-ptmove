@@ -31,6 +31,7 @@ type AutomationService struct {
 	scanner        *acquireautomation.Scanner
 	now            func() time.Time
 	downloaderHook func(string) (automationDownloader, error)
+	iyuuLookup     func(context.Context, string, []string) (map[string]bool, error)
 	mu             sync.Mutex
 	start          sync.Once
 }
@@ -54,6 +55,11 @@ func NewAutomationService(store *repository.Store, cfg *config.Manager, migrate 
 		migrate.automation = s
 	}
 	return s, nil
+}
+
+// SetIYUUDuplicateLookup 注入已有的 IYUU 批量查询服务，在启动调度前调用。
+func (s *AutomationService) SetIYUUDuplicateLookup(lookup func(context.Context, string, []string) (map[string]bool, error)) {
+	s.iyuuLookup = lookup
 }
 func automationID(prefix string) string {
 	data := make([]byte, 16)
@@ -176,7 +182,7 @@ func (s *AutomationService) resolveContext(ctx context.Context, v policy.Setting
 	}
 	return source, target, nil
 }
-func (s *AutomationService) scan(ctx context.Context, v policy.Settings) ([]policy.Candidate, automationSnapshot, error) {
+func (s *AutomationService) scan(ctx context.Context, v policy.Settings, excludedIDs ...map[string]bool) ([]policy.Candidate, automationSnapshot, error) {
 	source, target, err := s.resolveContext(ctx, v)
 	if err != nil {
 		return nil, automationSnapshot{}, err
@@ -202,7 +208,7 @@ func (s *AutomationService) scan(ctx context.Context, v policy.Settings) ([]poli
 	if err != nil {
 		return nil, snapshot, errors.New("源站订阅配置不可用")
 	}
-	rows, err := s.scanner.Scan(ctx, sp, tp, sourceCookie, targetCookie, rss, v)
+	rows, err := s.scanner.Scan(ctx, sp, tp, sourceCookie, targetCookie, rss, v, excludedIDs...)
 	if err == nil {
 		s.excludePreviouslyDownloaded(ctx, source.ID, rows, v)
 	}
@@ -343,6 +349,9 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 	if err != nil {
 		return automationError(err, 400)
 	}
+	if execute && usesIYUUBatches(automationSnapshot{Settings: v, Source: *source}) && !s.iyuuConfigured() {
+		return automationError(errors.New("请先在 IYUU 设置中配置令牌，再运行织梦自动下载"), 400)
+	}
 	if execute && len(target.AnnounceHosts) == 0 {
 		return automationError(errors.New("目标站缺少可信 announce_hosts，无法安全核对目标做种；只读扫描仍可用"), 400)
 	}
@@ -362,6 +371,15 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 // ListTasks 返回真实任务和当前月份预留，不创建演示记录。
 func (s *AutomationService) ListTasks() (map[string]any, int) {
 	return s.ListTasksContext(context.Background())
+}
+
+// ListActiveTasks 为工作台读取当前并行任务，不扫描站点或下载器。
+func (s *AutomationService) ListActiveTasks(ctx context.Context) (map[string]any, int) {
+	rows, err := s.repo.WithContext(ctx).ActiveTasks()
+	if err != nil {
+		return automationError(errors.New("读取进行中任务失败"), 500)
+	}
+	return map[string]any{"success": true, "tasks": rows}, 200
 }
 
 // ListTasksContext 在机器事务中读取真实任务和用量，不产生外部操作。
@@ -549,7 +567,7 @@ func (s *AutomationService) Tick(ctx context.Context) {
 			continue
 		}
 		switch task.State {
-		case "reserved", "downloading", "preparing", repository.AutomationStateWaitingMedia, "ready":
+		case "reserved", "downloading", "preparing", repository.AutomationStateWaitingMedia, "ready", repository.AutomationStateDuplicateCleanup:
 		default:
 			continue
 		}
@@ -561,6 +579,7 @@ func (s *AutomationService) Tick(ctx context.Context) {
 		s.advanceTask(ctx, claimed)
 		_ = s.repo.Release(task.ID, token)
 	}
+	s.processIYUUBatches(ctx, v)
 }
 func (s *AutomationService) failTask(task repository.AutomationTask, message string, review bool) {
 	state := "failed"

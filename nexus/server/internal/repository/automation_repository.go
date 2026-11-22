@@ -12,7 +12,7 @@ import (
 
 var (
 	ErrAutomationFence     = errors.New("自动任务租约或状态已改变")
-	ErrAutomationQuota     = errors.New("本月次数或流量预算不足")
+	ErrAutomationQuota     = errors.New("本月发种额度已用完或已预留")
 	ErrAutomationDuplicate = errors.New("该源种子已预留、已下载、已发布或结果待核对")
 )
 
@@ -23,6 +23,10 @@ const (
 	AutomationStateWaitingTarget = "waiting_target"
 	// AutomationStateAlreadyExists 表示已确认目标站有对应种子，不会再上传。
 	AutomationStateAlreadyExists = "already_exists"
+	// AutomationStateWaitingBatch 等待同批完整下载的辅种查询。
+	AutomationStateWaitingBatch = "waiting_batch"
+	// AutomationStateDuplicateCleanup 已确认重复，等待处理本任务添加的源种子。
+	AutomationStateDuplicateCleanup = "duplicate_cleanup"
 )
 
 // AutomationSettingsRecord 保存模块设置；凭据仍由原生站点和下载器配置管理。
@@ -51,46 +55,56 @@ type AutomationRun struct {
 	LeaseUntil     int64   `json:"-"`
 }
 
-// AutomationQuota 保存上海月份的保守预留账本；开始下载后不自动释放。
+// AutomationQuota 保存下载预留统计及从任务状态核算的发种配额。
 type AutomationQuota struct {
-	Month string `json:"month" gorm:"primaryKey;size:7"`
-	Count int    `json:"count"`
-	Bytes int64  `json:"bytes"`
+	Month     string `json:"month" gorm:"primaryKey;size:7"`
+	Count     int    `json:"count"`
+	Bytes     int64  `json:"bytes"`
+	Published int64  `json:"published" gorm:"-"`
+	Pending   int64  `json:"pending" gorm:"-"`
 }
 
 // AutomationTask 保存自动任务状态与冻结的非秘密站点快照。发布尝试后禁止再次上传。
 type AutomationTask struct {
-	ID                string `json:"id" gorm:"primaryKey;size:100"`
-	RunID             string `json:"run_id"`
-	Month             string `json:"month" gorm:"uniqueIndex:automation_route_month,priority:4;size:7"`
-	Source            string `json:"source" gorm:"uniqueIndex:automation_route_month,priority:1;size:100"`
-	Target            string `json:"target" gorm:"uniqueIndex:automation_route_month,priority:2;size:100"`
-	SourceID          string `json:"source_id" gorm:"uniqueIndex:automation_route_month,priority:3;size:150"`
-	Title             string `json:"title"`
-	InfoHash          string `json:"info_hash" gorm:"index;size:40"`
-	Size              int64  `json:"size"`
-	Seeders           int    `json:"seeders"`
-	Official          bool   `json:"official"`
-	State             string `json:"state" gorm:"index;size:32"`
-	Message           string `json:"message"`
-	Snapshot          string `json:"-" gorm:"type:text"`
-	DownloaderID      string `json:"downloader_id"`
-	SavePath          string `json:"save_path"`
-	TorrentPath       string `json:"-"`
-	QueueID           *int64 `json:"queue_id,omitempty" gorm:"uniqueIndex"`
-	PublishAttempted  bool   `json:"publish_attempted"`
-	DownloadAttempted bool   `json:"download_attempted"`
-	Explicit          bool   `json:"explicit"`
-	TargetTorrentPath string `json:"-"`
-	TargetHash        string `json:"target_hash"`
-	ResultURL         string `json:"result_url"`
-	ResultJSON        string `json:"-" gorm:"type:text"`
-	LeaseToken        string `json:"-"`
-	LeaseUntil        int64  `json:"-"`
-	LastPolledAt      int64  `json:"-" gorm:"index"`
-	MediaRetryAt      int64  `json:"-"`
-	CreatedAt         int64  `json:"created_at"`
-	UpdatedAt         int64  `json:"updated_at"`
+	ID                        string   `json:"id" gorm:"primaryKey;size:100"`
+	RunID                     string   `json:"run_id"`
+	Month                     string   `json:"month" gorm:"index;uniqueIndex:automation_route_month,priority:4;size:7"`
+	Source                    string   `json:"source" gorm:"uniqueIndex:automation_route_month,priority:1;size:100"`
+	Target                    string   `json:"target" gorm:"uniqueIndex:automation_route_month,priority:2;size:100"`
+	SourceID                  string   `json:"source_id" gorm:"uniqueIndex:automation_route_month,priority:3;size:150"`
+	Title                     string   `json:"title"`
+	InfoHash                  string   `json:"info_hash" gorm:"index;size:40"`
+	Size                      int64    `json:"size"`
+	Seeders                   int      `json:"seeders"`
+	Official                  bool     `json:"official"`
+	State                     string   `json:"state" gorm:"index;size:32"`
+	Message                   string   `json:"message"`
+	Snapshot                  string   `json:"-" gorm:"type:text"`
+	DownloaderID              string   `json:"downloader_id"`
+	SavePath                  string   `json:"save_path"`
+	TorrentPath               string   `json:"-"`
+	QueueID                   *int64   `json:"queue_id,omitempty" gorm:"uniqueIndex"`
+	PublishAttempted          bool     `json:"publish_attempted"`
+	PublishMonth              string   `json:"-" gorm:"index;size:7"`
+	PublishConfirmedAt        int64    `json:"publish_confirmed_at,omitempty"`
+	DownloadAttempted         bool     `json:"download_attempted"`
+	DownloadProgress          *float64 `json:"download_progress,omitempty"`
+	BatchCheck                bool     `json:"batch_check"`
+	BatchCheckedAt            int64    `json:"batch_checked_at,omitempty"`
+	BatchRetryAt              int64    `json:"-"`
+	BatchDuplicate            bool     `json:"-"`
+	DuplicateCleanupAttempted bool     `json:"duplicate_cleanup_attempted"`
+	Explicit                  bool     `json:"explicit"`
+	TargetTorrentPath         string   `json:"-"`
+	TargetHash                string   `json:"target_hash"`
+	ResultURL                 string   `json:"result_url"`
+	ResultJSON                string   `json:"-" gorm:"type:text"`
+	LeaseToken                string   `json:"-"`
+	LeaseUntil                int64    `json:"-"`
+	LastPolledAt              int64    `json:"-" gorm:"index"`
+	MediaRetryAt              int64    `json:"-"`
+	CreatedAt                 int64    `json:"created_at"`
+	UpdatedAt                 int64    `json:"updated_at"`
 }
 
 // AutomationRepository 提供原子配额、租约和原生队列交接；不执行网络操作。
@@ -128,7 +142,10 @@ func (r *AutomationRepository) SaveSettings(value string, disabled bool, now tim
 			if err := tx.Model(&AutomationRun{}).Where("status IN ?", []string{"queued", "scanning"}).Updates(map[string]any{"execute": false, "explicit": false}).Error; err != nil {
 				return err
 			}
-			return tx.Model(&AutomationTask{}).Where("state IN ?", []string{"reserved", "downloading", "preparing", AutomationStateWaitingMedia, AutomationStateWaitingTarget, "ready", "published", "seeding", "reconciling", "needs_review"}).Updates(map[string]any{"explicit": false}).Error
+			if err := tx.Model(&AutomationRun{}).Where("status = ?", "batch_active").Update("explicit", false).Error; err != nil {
+				return err
+			}
+			return tx.Model(&AutomationTask{}).Where("state IN ?", []string{"reserved", "downloading", "preparing", AutomationStateWaitingMedia, AutomationStateWaitingTarget, AutomationStateWaitingBatch, AutomationStateDuplicateCleanup, "ready", "published", "seeding", "reconciling", "needs_review"}).Updates(map[string]any{"explicit": false}).Error
 		}
 		return nil
 	})
@@ -145,12 +162,12 @@ func (r *AutomationRepository) FinishRun(id, status, message string, selected in
 // automationDownloadStates 包含已开始下载或已进入其后阶段的旧任务，兼容缺少下载标记的记录。
 var automationDownloadStates = []string{
 	"downloading", "preparing", AutomationStateWaitingMedia, "ready", "queued_publish", "publishing",
-	"published", "seeding", "succeeded", "reconciling", "needs_review",
+	"published", "seeding", "succeeded", "reconciling", "needs_review", AutomationStateWaitingBatch, AutomationStateDuplicateCleanup,
 }
 
 var automationRunnableStates = []string{
 	"reserved", "downloading", "preparing", AutomationStateWaitingMedia,
-	"ready", "published", "seeding", "reconciling",
+	"ready", "published", "seeding", "reconciling", AutomationStateDuplicateCleanup,
 }
 
 // automationSourceIdentity 按同源标识或规范化信息哈希匹配载荷，不受目标站或月份影响。
@@ -175,25 +192,32 @@ func (r *AutomationRepository) HasDownloadHistory(source, sourceID, hash, except
 	return existing > 0, err
 }
 
-// Reserve 在同一事务内创建任务并条件扣减月度次数与字节预算。
-func (r *AutomationRepository) Reserve(task *AutomationTask, maxCount int, maxBytes int64) error {
+// Reserve 在同一事务内预留一个可能成功的发布名额并记录下载统计。旧字节上限参数仅为调用兼容保留。
+func (r *AutomationRepository) Reserve(task *AutomationTask, maxCount int, _ int64) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if task.Size <= 0 || task.Size > maxBytes || maxCount <= 0 {
+		if task.Size <= 0 || maxCount <= 0 {
 			return ErrAutomationQuota
 		}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&AutomationQuota{Month: task.Month}).Error; err != nil {
 			return err
 		}
-		updated := tx.Model(&AutomationQuota{}).Where("month = ? AND count < ? AND bytes <= ?", task.Month, maxCount, maxBytes-task.Size).Updates(map[string]any{"count": gorm.Expr("count + 1"), "bytes": gorm.Expr("bytes + ?", task.Size)})
+		updated := tx.Model(&AutomationQuota{}).Where("month = ?", task.Month).Updates(map[string]any{"count": gorm.Expr("count + 1"), "bytes": gorm.Expr("bytes + ?", task.Size)})
 		if updated.Error != nil {
 			return updated.Error
 		}
 		if updated.RowsAffected != 1 {
 			return ErrAutomationQuota
 		}
+		published, pending, err := automationMonthUsage(tx, task.Month)
+		if err != nil {
+			return err
+		}
+		if published+pending >= int64(maxCount) {
+			return ErrAutomationQuota
+		}
 		// 在当月配额行串行化写入后重读，命中时回滚本次配额扣减。
 		var duplicate AutomationTask
-		err := automationSourceIdentity(tx, task.Source, task.SourceID, task.InfoHash).
+		err = automationSourceIdentity(tx, task.Source, task.SourceID, task.InfoHash).
 			Where("(download_attempted = ? OR publish_attempted = ? OR state IN ? OR state IN ? OR (source = ? AND target = ? AND month = ?))",
 				true, true, automationDownloadStates, []string{"reserved", AutomationStateWaitingTarget}, task.Source, task.Target, task.Month).
 			Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").Take(&duplicate).Error
@@ -214,6 +238,30 @@ func (r *AutomationRepository) Tasks() ([]AutomationTask, error) {
 	return rows, err
 }
 
+// AutomationTaskProgress 是工作台只读列表需要的公开字段。
+type AutomationTaskProgress struct {
+	ID               string   `json:"id"`
+	Title            string   `json:"title"`
+	Source           string   `json:"source"`
+	Target           string   `json:"target"`
+	Size             int64    `json:"size"`
+	State            string   `json:"state"`
+	Message          string   `json:"message"`
+	DownloadProgress *float64 `json:"download_progress,omitempty"`
+	UpdatedAt        int64    `json:"updated_at"`
+}
+
+// ActiveTasks 返回工作台所需的并行任务状态，跳过历史与内部配置。
+func (r *AutomationRepository) ActiveTasks() ([]AutomationTaskProgress, error) {
+	rows := []AutomationTaskProgress{}
+	states := []string{"reserved", "downloading", AutomationStateWaitingBatch, "preparing", AutomationStateWaitingMedia,
+		"ready", "queued_publish", "publishing", "published", "seeding", "reconciling", AutomationStateDuplicateCleanup}
+	err := r.db.Model(&AutomationTask{}).
+		Select("id", "title", "source", "target", "size", "state", "message", "download_progress", "updated_at").
+		Where("state IN ?", states).Order("updated_at DESC").Order("id ASC").Find(&rows).Error
+	return rows, err
+}
+
 // Runs 返回最近扫描历史。
 func (r *AutomationRepository) Runs() ([]AutomationRun, error) {
 	rows := []AutomationRun{}
@@ -221,13 +269,17 @@ func (r *AutomationRepository) Runs() ([]AutomationRun, error) {
 	return rows, err
 }
 
-// Quota 返回月份用量，空账本视为零。
+// Quota 返回月份下载统计、已发布数量和在途占用，空账本视为零。
 func (r *AutomationRepository) Quota(month string) (AutomationQuota, error) {
 	row := AutomationQuota{Month: month}
 	err := r.db.Where("month = ?", month).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		err = nil
 	}
+	if err != nil {
+		return row, err
+	}
+	row.Published, row.Pending, err = automationMonthUsage(r.db, month)
 	return row, err
 }
 
@@ -256,6 +308,9 @@ func (r *AutomationRepository) Claim(id, token string, now time.Time) (Automatio
 // Advance 匹配租约和预期状态后保存检查点，租约过期时拒绝写入。
 func (r *AutomationRepository) Advance(id, token, expected string, values map[string]any, now time.Time) error {
 	values["updated_at"] = now.UnixMilli()
+	if values["state"] == "succeeded" || (values["state"] == "needs_review" && (expected == "published" || expected == "seeding")) {
+		values["publish_confirmed_at"] = automationConfirmTime(now)
+	}
 	result := r.db.Model(&AutomationTask{}).Where("id = ? AND lease_token = ? AND lease_until > ? AND state = ?", id, token, now.UnixMilli(), expected).Updates(values)
 	if result.Error != nil {
 		return result.Error
@@ -307,13 +362,19 @@ func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 		if row.PublishAttempted || row.State == "succeeded" {
 			return errors.New("发布已尝试，必须先核对结果")
 		}
-		if row.State == AutomationStateAlreadyExists {
+		if row.State == AutomationStateAlreadyExists || row.DuplicateCleanupAttempted {
 			return ErrAutomationFence
 		}
 		if row.State == "cancelled" {
 			return nil
 		}
-		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND publish_attempted = ?", id, row.State, false).Updates(map[string]any{"state": "cancelled", "message": "用户取消；已有下载保持原状", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
+		next, message := "cancelled", "用户取消；已有下载保持原状"
+		if row.State == AutomationStateDuplicateCleanup {
+			next, message = AutomationStateAlreadyExists, "目标站已有对应种子，用户取消重复处理"
+		}
+		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND publish_attempted = ?", id, row.State, false).
+			Where("(duplicate_cleanup_attempted IS NULL OR duplicate_cleanup_attempted = ?)", false).
+			Updates(map[string]any{"state": next, "message": message, "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -338,15 +399,38 @@ func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 	})
 }
 
-// Retry 仅恢复未尝试上传的失败或查重待核对任务，沿用原来的预留与下载标记。
+// Retry 仅恢复未尝试上传的失败或查重待核对任务，失败任务重新核对当月可用名额。
 func (r *AutomationRepository) Retry(id string, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		var settings AutomationSettingsRecord
+		var flags struct {
+			MonthlyLimit int `json:"monthly_limit"`
+		}
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&settings, 1).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil && json.Unmarshal([]byte(settings.JSON), &flags) != nil {
+			return errors.New("自动化配置无法读取")
+		}
 		var task AutomationTask
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&task, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if (task.State != "failed" && task.State != AutomationStateWaitingTarget) || task.PublishAttempted {
+		if (task.State != "failed" && task.State != AutomationStateWaitingTarget) || task.PublishAttempted || task.DuplicateCleanupAttempted {
 			return ErrAutomationFence
+		}
+		if task.State == "failed" && flags.MonthlyLimit > 0 {
+			if err := lockAutomationQuotaMonth(tx, task.Month); err != nil {
+				return err
+			}
+			published, pending, err := automationMonthUsage(tx, task.Month)
+			if err != nil {
+				return err
+			}
+			if published+pending >= int64(flags.MonthlyLimit) {
+				return ErrAutomationQuota
+			}
 		}
 		next := "reserved"
 		if task.DownloadAttempted {
@@ -369,6 +453,11 @@ func (r *AutomationRepository) Retry(id string, now time.Time) error {
 		if result.RowsAffected != 1 {
 			return ErrAutomationFence
 		}
+		if task.BatchCheck && task.RunID != "" && next != "queued_publish" {
+			return tx.Model(&AutomationRun{}).
+				Where("id = ? AND month = ? AND status IN ?", task.RunID, task.Month, []string{"completed", "failed"}).
+				Updates(map[string]any{"status": "batch_active", "finished_at": 0, "message": "已登记原批次任务重试"}).Error
+		}
 		return nil
 	})
 } // Enqueue 将原生队列行与任务唯一关联放在同一事务；交接失败全部回滚。
@@ -384,7 +473,9 @@ func (r *AutomationRepository) Enqueue(task AutomationTask, queue *PublishQueueT
 		if err := tx.Create(queue).Error; err != nil {
 			return err
 		}
-		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND lease_token = ? AND lease_until > ? AND queue_id IS NULL AND publish_attempted = ?", task.ID, "ready", task.LeaseToken, now.UnixMilli(), false).Updates(map[string]any{"queue_id": queue.ID, "state": "queued_publish", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
+		result := tx.Model(&AutomationTask{}).Where("id = ? AND state = ? AND lease_token = ? AND lease_until > ? AND queue_id IS NULL AND publish_attempted = ?", task.ID, "ready", task.LeaseToken, now.UnixMilli(), false).
+			Where("(batch_check IS NULL OR batch_check = ? OR (batch_checked_at > 0 AND batch_duplicate = ?))", false, false).
+			Updates(map[string]any{"queue_id": queue.ID, "state": "queued_publish", "lease_token": "", "lease_until": 0, "updated_at": now.UnixMilli()})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -409,8 +500,9 @@ func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time
 			return err
 		}
 		var flags struct {
-			Enabled     bool `json:"enabled"`
-			AutoPublish bool `json:"auto_publish"`
+			Enabled      bool `json:"enabled"`
+			AutoPublish  bool `json:"auto_publish"`
+			MonthlyLimit int  `json:"monthly_limit"`
 		}
 		if json.Unmarshal([]byte(settings.JSON), &flags) != nil || !flags.Enabled || !flags.AutoPublish {
 			return errors.New("模块或自动发布已关闭")
@@ -419,8 +511,21 @@ func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time
 		if err := tx.First(&task, "queue_id = ?", queueID).Error; err != nil {
 			return err
 		}
-		if task.State != "queued_publish" || task.PublishAttempted {
+		if task.State != "queued_publish" || task.PublishAttempted || (task.BatchCheck && (task.BatchCheckedAt <= 0 || task.BatchDuplicate)) {
 			return ErrAutomationFence
+		}
+		publishMonth := automationShanghaiMonth(now)
+		if flags.MonthlyLimit > 0 {
+			if err := lockAutomationQuotaMonth(tx, publishMonth); err != nil {
+				return err
+			}
+			var taken int64
+			if err := automationPublishSlots(tx, publishMonth).Count(&taken).Error; err != nil {
+				return err
+			}
+			if taken >= int64(flags.MonthlyLimit) {
+				return ErrAutomationQuota
+			}
 		}
 		var n int64
 		if err := tx.Model(&AutomationTask{}).Where("id <> ? AND source = ? AND target = ? AND (source_id = ? OR info_hash = ?) AND publish_attempted = ?", task.ID, task.Source, task.Target, task.SourceID, task.InfoHash, true).Count(&n).Error; err != nil {
@@ -434,7 +539,7 @@ func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time
 				return err
 			}
 		}
-		result := tx.Model(&AutomationTask{}).Where("queue_id = ? AND state = ? AND publish_attempted = ?", queueID, "queued_publish", false).Updates(map[string]any{"publish_attempted": true, "state": "publishing", "updated_at": now.UnixMilli()})
+		result := tx.Model(&AutomationTask{}).Where("queue_id = ? AND state = ? AND publish_attempted = ?", queueID, "queued_publish", false).Updates(map[string]any{"publish_attempted": true, "publish_month": publishMonth, "state": "publishing", "updated_at": now.UnixMilli()})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -478,9 +583,13 @@ func (r *AutomationRepository) finishPublishQueue(queueID int64, attempted bool,
 		if attempted {
 			expected = "publishing"
 		}
+		taskUpdates := map[string]any{"state": state, "result_url": url, "result_json": result, "message": message, "updated_at": now.UnixMilli()}
+		if state == "published" {
+			taskUpdates["publish_confirmed_at"] = automationConfirmTime(now)
+		}
 		task := tx.Model(&AutomationTask{}).
 			Where("queue_id = ? AND state = ? AND publish_attempted = ?", queueID, expected, attempted).
-			Updates(map[string]any{"state": state, "result_url": url, "result_json": result, "message": message, "updated_at": now.UnixMilli()})
+			Updates(taskUpdates)
 		if task.Error != nil {
 			return task.Error
 		}
@@ -582,7 +691,7 @@ func isAutomationExistingResult(raw string) bool {
 
 // Reconcile 保存已验证的目标做种证据，不触发上传也不释放预留。
 func (r *AutomationRepository) Reconcile(id, url, result string, now time.Time) error {
-	res := r.db.Model(&AutomationTask{}).Where("id = ? AND state IN ?", id, []string{"needs_review", "published", "seeding"}).Updates(map[string]any{"state": "succeeded", "result_url": url, "result_json": result, "message": "已核对目标种子并确认完整做种", "updated_at": now.UnixMilli()})
+	res := r.db.Model(&AutomationTask{}).Where("id = ? AND state IN ?", id, []string{"needs_review", "published", "seeding"}).Updates(map[string]any{"state": "succeeded", "publish_confirmed_at": automationConfirmTime(now), "result_url": url, "result_json": result, "message": "已核对目标种子并确认完整做种", "updated_at": now.UnixMilli()})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -678,7 +787,8 @@ func (r *AutomationRepository) PendingRuns() ([]AutomationRun, error) {
 // WorkTasks 只读取可推进任务，避免终态历史挤出待执行任务。
 func (r *AutomationRepository) WorkTasks() ([]AutomationTask, error) {
 	rows := []AutomationTask{}
-	err := r.db.Where("state IN ?", automationRunnableStates).Order("last_polled_at ASC").Order("created_at ASC").Order("id ASC").Limit(50).Find(&rows).Error
+	err := r.db.Where("state IN ?", automationRunnableStates).Order("last_polled_at ASC").
+		Order("CASE WHEN state = 'reserved' THEN size ELSE 0 END ASC").Order("created_at ASC").Order("id ASC").Limit(50).Find(&rows).Error
 	return rows, err
 }
 

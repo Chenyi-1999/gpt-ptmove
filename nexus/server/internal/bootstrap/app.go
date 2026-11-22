@@ -95,6 +95,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化自动化模块失败: %w", err)
 	}
+	automationService.SetIYUUDuplicateLookup(torrentDataService.QueryIYUUDuplicates)
 	migrateService.StartPublishQueueWorker()
 	torrentTransferService := service.NewTorrentTransferService(migrateRepo, cfgManager)
 

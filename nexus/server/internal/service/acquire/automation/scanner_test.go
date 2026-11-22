@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
 	"golang.org/x/net/html"
 )
@@ -79,8 +80,11 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	settings.MinSizeGiB, settings.MaxSizeGiB = 6.25, 6.75
 	settings.MonthlyLimit, settings.MinLeechers = 60, 1
 	official := zmptTestTag("官方")
-	inspectedTitles := map[string]string{"500": "New smaller release", "501": "New larger release", "502": "Out of Exact Bounds", "503": "Already on Target"}
+	inspectedTitles := map[string]string{"500": "New smaller release", "501": "New larger release", "502": "Above Exact Bounds", "503": "Already on Target", "504": "Below Exact Bounds"}
+	sizes := map[string]int64{"500": 13 * policy.GiB / 2, "501": 53 * policy.GiB / 8, "502": 55 * policy.GiB / 8, "503": 51 * policy.GiB / 8, "504": 49 * policy.GiB / 8}
 	var requests []string
+	widgetRequests, targetRequests := 0, 0
+	knownHashes := map[string]string{}
 	s := NewScanner()
 	s.Client.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
 		requests = append(requests, req.URL.Host+req.URL.RequestURI())
@@ -91,14 +95,21 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 		var body string
 		switch {
 		case req.URL.Host == "target.example.com":
-			if req.URL.Query().Get("search") == "Already on Target" {
-				body = `<a href="details.php?id=99">existing</a>`
+			targetRequests++
+			t.Fatalf("candidate scan used target search before publish: %s", req.URL)
+		case req.URL.Host == "zmpt.cc" && req.URL.Path == "/nodeapi/iyuu/getIyuuByInfoHash":
+			widgetRequests++
+			if req.Header.Get("X-Requested-With") != "XMLHttpRequest" || knownHashes[req.URL.Query().Get("hash")] == "" {
+				t.Fatalf("widget request did not use a known source infohash and XHR header: %s", req.URL)
+			}
+			if knownHashes[req.URL.Query().Get("hash")] == "Already on Target" {
+				body = `{"code":0,"message":"success","data":[{"url":"https://target.example.com/details.php?id=123","name":"Target","icon":"https://icons.example.com/target.png"}]}`
 			} else {
-				body = `<p>没有找到相关种子</p>`
+				body = `{"code":0,"message":"success","data":[]}`
 			}
 		case req.URL.Path == "/torrents.php":
 			q := req.URL.Query()
-			for key, want := range map[string]string{"tag_id": "3", "sort": "5", "type": "desc", "size_begin": "6", "size_end": "7", "seeders_begin": "3", "leechers_begin": "1", "incldead": "1"} {
+			for key, want := range map[string]string{"tag_id": "3", "sort": "5", "type": "asc", "size_begin": "6", "size_end": "7", "seeders_begin": "3", "leechers_begin": "1", "incldead": "1"} {
 				if q.Get(key) != want {
 					t.Errorf("listing query %s = %q, want %q", key, q.Get(key), want)
 				}
@@ -114,17 +125,22 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 					rows.WriteString(zmptTestRow(fmt.Sprint(n), "Previous download", official+zmptTestBar("seeding 100%")))
 				}
 			case "1":
-				rows.WriteString(zmptTestRowWithSeeders("500", "New smaller release", official+`<img title="审核通过" style="color: green">`, "8"))
 				rows.WriteString(zmptTestRowWithSeeders("501", "New larger release", official, "13"))
-				rows.WriteString(zmptTestRow("502", "Out of Exact Bounds", official))
+				rows.WriteString(zmptTestRowWithSeeders("500", "New smaller release", official+`<img title="审核通过" style="color: green">`, "8"))
+				rows.WriteString(zmptTestRow("502", "Above Exact Bounds", official))
 				rows.WriteString(zmptTestRow("503", "Already on Target", official))
+				rows.WriteString(zmptTestRow("504", "Below Exact Bounds", official))
 			}
 			body = `<a href="torrents.php?tag_id=3">官方</a><table class="torrents">` + rows.String() + `</table>`
-		case req.URL.Path == "/details.php" && id >= "500" && id <= "503":
-			body = zmptTestDetail(id, inspectedTitles[id])
-		case req.URL.Path == "/download.php" && id >= "500" && id <= "503":
-			size := map[string]int64{"500": 13 * policy.GiB / 2, "501": 53 * policy.GiB / 8, "502": 55 * policy.GiB / 8, "503": 13 * policy.GiB / 2}[id]
-			body = zmptTestTorrent(size)
+		case req.URL.Path == "/details.php" && sizes[id] > 0:
+			body = zmptTestDetailWithTorrent(id, inspectedTitles[id], []byte(zmptTestTorrent(sizes[id])))
+		case req.URL.Path == "/download.php" && sizes[id] > 0:
+			body = zmptTestTorrent(sizes[id])
+			meta, err := acquirefetch.ParseTorrentMeta([]byte(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			knownHashes[meta.InfoHash] = inspectedTitles[id]
 		default:
 			t.Fatalf("read excluded or unexpected URL %s", req.URL)
 		}
@@ -134,7 +150,7 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 54 || !rows[0].Eligible || rows[0].ID != "501" || rows[0].Seeders != 13 || !rows[1].Eligible || rows[1].ID != "500" || rows[1].Seeders != 8 {
+	if len(rows) != 55 || !rows[0].Eligible || rows[0].ID != "500" || rows[0].Seeders != 8 || !rows[1].Eligible || rows[1].ID != "501" || rows[1].Seeders != 13 {
 		t.Fatalf("expected both eligible rows in size order after the skipped first page, got %d rows, first %#v", len(rows), rows[:min(2, len(rows))])
 	}
 	byID := map[string]policy.Candidate{}
@@ -144,8 +160,13 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	if byID["1"].Official || byID["1"].Eligible || !byID["2"].RestrictionsKnown || byID["2"].Allowed || !byID["3"].Episode || !byID["4"].PreviouslyDownloaded || !byID["10"].PreviouslyDownloaded || byID["502"].Eligible || !byID["503"].Duplicate || byID["503"].Eligible {
 		t.Fatalf("ineligible rows bypassed: %+v", byID)
 	}
-	if n := len(requests); n != 15 {
-		t.Fatalf("visited %d pages/details/torrents/target searches, want 15: %v", n, requests)
+	for _, id := range []string{"502", "504"} {
+		if candidate := byID[id]; candidate.Eligible || !strings.Contains(strings.Join(candidate.Reasons, " "), "完整种子体积不符合规则") {
+			t.Fatalf("exact size bounds not enforced for %s: %+v", id, candidate)
+		}
+	}
+	if n := len(requests); n != 18 || widgetRequests != 5 || targetRequests != 0 {
+		t.Fatalf("visited %d pages/details/torrents/widget lookups, widget=%d target=%d, want 18/5/0: %v", n, widgetRequests, targetRequests, requests)
 	}
 }
 
@@ -166,7 +187,7 @@ func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
 			targetReads++
 			body = `<p>没有找到相关种子</p>`
 		case req.URL.Path == "/details.php":
-			body = `<h1>Unrelated header</h1>` + zmptTestDetail("500", detailsTitle+`<span>[ 免费 ] 剩余时间： 1天</span>`)
+			body = `<h1>Unrelated header</h1>` + zmptTestDetailWithTorrent("500", detailsTitle+`<span>[ 免费 ] 剩余时间： 1天</span>`, []byte(zmptTestTorrent(policy.GiB)))
 		case req.URL.Path == "/torrents.php":
 			seenSearch = req.URL.Query().Get("search")
 			if req.URL.Query().Get("tag_id") != "3" {
@@ -176,6 +197,11 @@ func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
 		case req.URL.Path == "/download.php":
 			torrentReads++
 			body = zmptTestTorrent(policy.GiB)
+		case req.URL.Path == "/nodeapi/iyuu/getIyuuByInfoHash":
+			if req.URL.Query().Get("hash") == "" || req.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+				t.Fatalf("publish flow omitted the source widget hash lookup: %s", req.URL)
+			}
+			body = `{"code":0,"message":"success","data":[]}`
 		default:
 			t.Fatalf("unexpected URL %s", req.URL)
 		}
@@ -294,14 +320,14 @@ func TestZmptInspectFallsBackToDetailSeedersWhenListingCountIsMissing(t *testing
 		requests = append(requests, req.URL.Host+req.URL.Path)
 		var body string
 		switch {
-		case req.URL.Host == "target.example.com":
-			body = `<p>没有找到相关种子</p>`
 		case req.URL.Path == "/details.php":
-			body = zmptTestDetail("1", "Fallback-ZmWeb")
+			body = zmptTestDetailWithTorrent("1", "Fallback-ZmWeb", []byte(zmptTestTorrent(policy.GiB)))
 		case req.URL.Path == "/torrents.php":
 			body = `<table class="torrents">` + zmptTestRowNoSeeders("1", "Fallback-ZmWeb", zmptTestTag("官方")) + `</table>`
 		case req.URL.Path == "/download.php":
 			body = zmptTestTorrent(policy.GiB)
+		case req.URL.Path == "/nodeapi/iyuu/getIyuuByInfoHash":
+			body = `{"code":0,"message":"success","data":[]}`
 		default:
 			t.Fatalf("unexpected URL %s", req.URL)
 		}
@@ -317,7 +343,15 @@ func TestZmptInspectFallsBackToDetailSeedersWhenListingCountIsMissing(t *testing
 }
 
 func zmptTestDetail(id, title string) string {
-	return `<h1 id="top">` + title + `</h1><div id="kdescr">影片介绍</div><table><tr><td>基本信息 做种者: 8 下载者: 2</td></tr></table><a href="/download.php?id=` + id + `">download</a>`
+	return zmptTestDetailWithTorrent(id, title, []byte(zmptTestTorrent(policy.GiB)))
+}
+
+func zmptTestDetailWithTorrent(id, title string, torrent []byte) string {
+	meta, err := acquirefetch.ParseTorrentMeta(torrent)
+	if err != nil {
+		panic(err)
+	}
+	return `<h1 id="top">` + title + `</h1><span id="hashID">` + meta.InfoHash + `</span><div id="resultContainer"></div><div id="kdescr">影片介绍</div><table><tr><td>基本信息 做种者: 8 下载者: 2</td></tr></table><a href="/download.php?id=` + id + `">download</a>`
 }
 
 func zmptTestTorrent(size int64) string {
@@ -354,6 +388,7 @@ func TestUnknownPagesAndConflictingDuplicateEvidenceFailClosed(t *testing.T) {
 		t.Fatal("unrecognized detail granted transfer")
 	}
 }
+
 func TestCSSSubsetAndUnknownSyntax(t *testing.T) {
 	doc, _ := html.Parse(strings.NewReader(`<table class="torrents"><tr><td><a class="detail official" href="details.php?id=3">link</a></td></tr></table>`))
 	if n := len(Select(doc, `table.torrents > tbody tr a.detail[href*="id="]:not(.hidden)`)); n != 1 {

@@ -110,12 +110,15 @@ func machineRulesSchema() map[string]any {
 	props["timezone"] = map[string]any{"type": "string", "const": "Asia/Shanghai"}
 	props["schedule_day"] = map[string]any{"type": "integer", "minimum": 1, "maximum": 28}
 	props["monthly_limit"] = map[string]any{"type": "integer", "minimum": 1, "maximum": 100}
+	props["batch_size"] = map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "default": 20}
+	props["duplicate_action"] = map[string]any{"type": "string", "enum": []string{"keep", "move", "delete"}, "default": "keep", "description": "For ZmPT downloads confirmed as duplicates by IYUU. Delete removes the qB task and keeps its files."}
+	props["duplicate_directory"] = map[string]any{"type": "string", "description": "Absolute path on the downloader required for the move action."}
 	for _, key := range []string{"min_seeders", "min_leechers"} {
 		props[key] = map[string]any{"type": "integer", "minimum": 0, "maximum": 100000}
 	}
-	for _, key := range []string{"min_size_gib", "max_size_gib", "monthly_budget_gib"} {
+	for _, key := range []string{"min_size_gib", "max_size_gib"} {
 		props[key] = map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 100000}
 	}
 	props["reserve_space_gib"] = map[string]any{"type": "number", "minimum": 0, "maximum": 100000}
-	return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "description": "Partial automation rule update. Hard filters always require official source torrents, exclude restricted and episode releases and previously downloaded items, and require an affirmative target-absence check; unknown restriction, download-history or duplicate status is skipped. Candidates are ordered by complete torrent size before the configured size range and other thresholds are applied. Legacy prefer_official and target_absent_priority fields are accepted and returned for compatibility but do not override these rules. min_size_gib <= max_size_gib <= monthly_budget_gib; schedule_time HH:mm. Enabling requires existing native downloader/save path and supported source/target profiles."}
+	return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "description": "Partial automation rule update. Official releases only. Restricted releases, episodes, downloads already recorded and unknown eligibility are excluded. Smaller eligible torrents are scheduled first. ZmPT checks its cross-seed list before download and requires affirmative IYUU evidence in batches afterward. Monthly quota counts confirmed new publishes; pending work holds capacity. Per-torrent size bounds and downloader free-space checks still apply. schedule_time uses HH:mm."}
 }

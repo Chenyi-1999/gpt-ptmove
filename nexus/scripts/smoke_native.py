@@ -63,7 +63,7 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
     def request(self, method, path, body=None, token=None, headers=None, expected=200):
-        check(path.startswith("/") and "?" not in path and "#" not in path and ".." not in path,
+        check(path.startswith("/") and ("?" not in path or path == "/api/automation/tasks?active=1") and "#" not in path and ".." not in path,
               "unsafe request path")
         if self.read_only:
             check(method == "GET" or (method == "POST" and path == "/api/auth/login"),
@@ -136,9 +136,11 @@ class Smoke:
         self.checks += 1
         print("PASS " + label, flush=True)
 
-    def baseline(self, credentials):
+    def baseline(self, credentials, expected_version):
         health = self.client.request("GET", "/health")
-        check(health.get("version") == "0.3.1" and health.get("service") == "ptmove-nexus", "wrong native service/version")
+        version = health.get("version")
+        check(health.get("service") == "ptmove-nexus" and isinstance(version, str) and bool(version) and
+              (expected_version is None or version == expected_version), "wrong native service/version")
         for path in ("/api/automation/settings", "/api/site-profiles", "/api/machine-keys", "/api/machine-openapi"):
             self.client.request("GET", path, expected=401)
         self.passed("native health and administrator isolation")
@@ -156,9 +158,13 @@ class Smoke:
         check(state.get("success") is True, "settings unavailable")
         for key in ("enabled", "auto_publish", "schedule_enabled"):
             check(settings.get(key) is False, "automation must start fully disabled")
-        for key, expected in {"monthly_limit": 6, "min_size_gib": 1, "max_size_gib": 10,
-                              "monthly_budget_gib": 60, "source_site": "zmpt", "target_site": "novahd"}.items():
-            check(settings.get(key) == expected, "unexpected initial native rule defaults")
+        if not self.client.read_only:
+            for key, expected in {"monthly_limit": 6, "min_size_gib": 1, "max_size_gib": 10,
+                                  "batch_size": 20, "source_site": "zmpt", "target_site": "novahd"}.items():
+                check(settings.get(key) == expected, "unexpected initial native rule defaults")
+        check("monthly_budget_gib" not in settings, "obsolete monthly size budget still exposed")
+        active_tasks = self.admin("GET", "/api/automation/tasks?active=1")
+        check(active_tasks.get("success") is True and isinstance(active_tasks.get("tasks"), list), "active task endpoint unavailable")
         self.original_rules = copy.deepcopy(settings)
         self.initial_state = state
         self.initial_tasks = self.admin("GET", "/api/automation/tasks")
@@ -242,13 +248,13 @@ class Smoke:
         self.passed("read/write/publish independent scopes and mandatory idempotency")
         idem = uuid.uuid4().hex
         patch = {"enabled": False, "auto_publish": False, "schedule_enabled": False,
-                 "monthly_budget_gib": 61}
+                 "batch_size": 21}
         self.rules_dirty = True  # Mark before request: a lost response can still have committed.
         first = self.machine("write", "PUT", "/rules", patch, idem=idem)
         replay = self.machine("write", "PUT", "/rules", patch, idem=idem)
-        check(first == replay and first.get("settings", {}).get("monthly_budget_gib") == 61, "idempotent response differs")
-        self.machine("write", "PUT", "/rules", dict(patch, monthly_budget_gib=62), expected=409, idem=idem)
-        check(self.admin("GET", "/api/automation/settings")["settings"]["monthly_budget_gib"] == 61, "conflicting replay changed rules")
+        check(first == replay and first.get("settings", {}).get("batch_size") == 21, "idempotent response differs")
+        self.machine("write", "PUT", "/rules", dict(patch, batch_size=22), expected=409, idem=idem)
+        check(self.admin("GET", "/api/automation/settings")["settings"]["batch_size"] == 21, "conflicting replay changed rules")
         revoked = self.keys["read"]
         self.admin("DELETE", "/api/machine-keys/" + revoked["key"]["id"])
         self.machine("read", "GET", "/dashboard", expected=401)
@@ -304,6 +310,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", required=True, help="exact http://127.0.0.1:18121 or http://152.136.236.238:18121")
     parser.add_argument("--read-only", action="store_true", help="only health/login/auth and GET checks; permits port 18120")
+    parser.add_argument("--expected-version", help="require this exact version from the health endpoint")
     args = parser.parse_args(argv)
     smoke = None
     failure = None
@@ -312,7 +319,7 @@ def main(argv=None):
         client = Client(args.base, args.read_only)
         credentials = read_credentials(sys.stdin)
         smoke = Smoke(client)
-        smoke.baseline(credentials)
+        smoke.baseline(credentials, args.expected_version)
         del credentials
         if not args.read_only:
             smoke.profiles()

@@ -534,3 +534,25 @@
 - Gitee 发行 1354564 已发布。Compose 和校验文件回下载后逐字节匹配本地发布材料，完整镜像入口指向同版 GitHub 私有发行。发布证据写入 `docs/DEPLOYMENT.json`。
 - D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。核对原始 Docker tar、OCI 对象、ZIP 成员及标签 Compose；ZIP SHA-256 为 `2a91c915a04980b929a96ae593f332077ba0bd7992fcd46e3d44211902027aee`，已登记项目索引。
 - 重启后复核 152 仍健康运行 v1.0.4。自动化开关保持原设定，保留 1.0.3 回滚镜像。未重复运行实站预览，未执行真实下载、发种或操作 81。版本标签保持原提交，本条记录独立提交。
+
+## PTM-20261122-072 — 2026-11-22T23:17:10+08:00 — Codex root、seed_lookup_flow、zmpt_scanner_tests，织梦动态辅种查重
+
+- `acquire/automation/scanner.go`、`zmpt_crossseed.go` 与 `docs/API_CONTRACT.md` 将织梦扫描和下载前查重接到详情页动态的「辅种」接口。目标域名命中即跳过，成功列表未列出或接口明确返回无辅种数据时通过。未加载、超时和无法解析的响应保留待核对。官种、禁转、分集及下载记录仍先筛选。发布前继续查询目标站，其他源站沿用既有流程。
+- 从 152 用 HTTPS GET 只读核对织梦页面和动态响应。#140457 明确列出自由农场、未列出 NovaHD，返回 7 个不同站点。对保留的全零合成哈希核实了明确无辅种响应结构。NovaHD 命中、超时、未加载和发布前新增重复用隔离夹具验证。
+- `scanner_test.go`、`zmpt_crossseed_test.go` 和 `novahd_duplicate_test.go` 覆盖动态命中、已知未命中、未知结果和三阶段查重边界。修正测试夹具的字节类型和分页计数后，152 无外网 Docker 容器的 `go test ./...` 全部通过，共 26 个带测试的包。回传 gofmt 结果，`git diff --check` 通过。独立测试暂存清理命令被运行策略拦截，留存的仅为源码与测试文件。
+- 按本轮只读核验要求，改动保留于独立工作树，Git 提交、推送、生产部署和发布均未执行。未下载实际资源、发种或访问 81。
+
+## PTM-20261122-073 — 2026-11-22T23:49:29+08:00 — Codex root、iyuu_batch、batch_store、dup_qb、iyuu_batch_review，织梦分批下载与 IYUU 查重
+
+- `acquire/automation`、`migrationflow/automation_*` 和 `torrentdata/iyuu*` 接入织梦辅种预查、完整下载后的单次 IYUU 哈希批查、明确未命中才准备资料及发布。源站发布前限制和完整载荷复核继续执行。未识别结果保留等待并退避重试。新织梦运行默认每批 20 个，按剩余名额缩小批次，处理完成后重新扫描。补扫在详情读取前跳过账本已处理的条目。
+- `repository/automation_*` 持久化批次、结果、处理尝试和发布确认时间。月度体积限制取消，单种体积和磁盘空间检查继续执行。月度统计以已确认发布为准，未决上传保留名额，重复及确定失败释放名额。复核并修复扫描恢复、跨月、手动重试及关闭模块后的批次处理。
+- `downloaderclient/client.go` 与 `automation_duplicates*` 按任务标签、内容身份、路径及租约核对后处理 qB 自有下载。默认保留。移动到指定目录下的任务子目录，删除只移除 qB 记录并保留文件。提交前重查设置、在数据库登记一次性尝试，异步移动只读复核。`AutomationSettings.vue`、OpenAPI 和 `docs/API_CONTRACT.md` 同步批次、重复处理及新配额界面。
+- 152 在隔离容器执行全量 `go test ./...`，26 个有测试的包通过。测试覆盖批次等待、混合查重结果、配额并发、跨月、恢复以及 qB 操作的所有权与路径检查。前端定向 ESLint、`vue-tsc`、Vite 构建通过，Vite 报大分块提示。已同步 gofmt 和格式化后的 Vue 文件，`git diff --check` 通过。浏览器截图与交互检查的启动命令被运行策略拦截，未取得桌面或窄屏渲染证据。
+- 改动及构建验证保留在隔离环境。未执行 Git 提交、推送、生产部署或版本发行；未调用真实 IYUU 或 qB，未实际下载、移动、删除、发种或访问 81。
+
+## PTM-20261123-074 — 2026-11-23T00:23:34+08:00 — Codex root、home_progress、small_first、release_readiness，STARPT v1.0.5 小种优先及工作台进度
+
+- `processing/automation`、`acquire/automation`、`automation_repository.go` 和 OpenAPI 解除旧月度体积设置，仅忽略旧客户端上传值。织梦查询及候选排队按完整体积升序，待下载项按体积派单，保留 qB 并行能力和单种体积区间。纳入待发布的织梦动态辅种、IYUU 批查和成功次数配额。
+- `HomeAutomationProgress.vue`、`HomeView.vue`、`automation_handler.go` 和 `migrationflow/automation_*` 在工作台集中读取真实活跃任务，每 8 秒刷新。下载百分比来自 qB 的持久化快照，其他阶段显示实际状态。版本设施、前端构建产物、两份 Compose、API 合同及发行说明同步更新。
+- 152 隔离 Go 全量、Vue 类型检查、定向 ESLint、Vite 构建及原生冒烟 10 组通过。首次冒烟发现历史脚本写死 0.3.1，改为显式接收预期版本后通过。隔离应用同时返回两个进行中任务，其中模拟的 qB 真实字段为 42%，终态任务被过滤。织梦实站使用 GET 验证升序 100 条。线上首页、设置 HTML、JWT 权限和 Docker 健康均通过，浏览器渲染暂未实测。
+- 152 已部署 `ptmove-nexus:1.0.5`，镜像 `sha256:32102073c575c0d5ccced0dbe5b2530fc8f6f4ece8b7f145386228a4d031b412`，保留 v1.0.4 回滚。线上自动化未配置启用，队列无活动项。压缩镜像 656431682 字节，SHA-256 为 `1143e9e774ee2db0fa810f4ff4a53bfc24e3aef38f2323486246ebb106164f57`。本记录完成时 Git 提交、双仓推送、发行附件与历史归档待执行。未实际下载、发种或访问 81。

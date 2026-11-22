@@ -240,6 +240,91 @@ func TestNovaHDReadOnlyDuplicateCheckUsedByScanAndBothRechecks(t *testing.T) {
 	}
 }
 
+func TestZmPTWidgetPrecheckAndNovaHDPublishRecheck(t *testing.T) {
+	const sourceID = "5"
+	source := testProfile("https://zmpt.cc")
+	source.OfficialGroups = []string{"ZmWeb"}
+	target := testProfile(novaHDOrigin)
+	sourceTorrent := novaFixtureTorrent("zmpt.cc", "movie.mkv", "Zm", 7*policy.GiB)
+	targetTorrent := novaFixtureTorrent("pt.novahd.top", "movie.mkv", "Nova", 7*policy.GiB)
+	meta, err := acquirefetch.ParseTorrentMeta([]byte(sourceTorrent))
+	if err != nil {
+		t.Fatal(err)
+	}
+	widgetLookups, targetSearches := 0, 0
+	widgetResponse := `{"code":0,"message":"success","data":[]}`
+	scanner := NewScanner()
+	scanner.Client.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("inspection attempted a mutation: %s %s", req.Method, req.URL)
+		}
+		switch req.URL.Host {
+		case "zmpt.cc":
+			switch req.URL.Path {
+			case "/torrents.php":
+				if req.URL.Query().Get("tag_id") != "3" {
+					t.Fatalf("source listing was not restricted to official torrents: %s", req.URL)
+				}
+				return zmptTestResponse(`<table class="torrents">` + zmptTestRowWithSeeders(sourceID, novaFixtureSourceTitle, zmptTestTag("官方"), "8") + `</table>`), nil
+			case "/details.php":
+				return zmptTestResponse(zmptTestDetailWithTorrent(sourceID, novaFixtureSourceTitle, []byte(sourceTorrent))), nil
+			case "/download.php":
+				return zmptTestResponse(sourceTorrent), nil
+			case "/nodeapi/iyuu/getIyuuByInfoHash":
+				widgetLookups++
+				if req.URL.Query().Get("hash") != meta.InfoHash || req.Header.Get("Cookie") != "source-session" ||
+					req.Header.Get("X-Requested-With") != "XMLHttpRequest" || req.Header.Get("Referer") != "https://zmpt.cc/details.php?id="+sourceID {
+					t.Fatalf("widget lookup was not bound to the source hash and detail page: %+v", req)
+				}
+				return zmptTestResponse(widgetResponse), nil
+			}
+		case "pt.novahd.top":
+			switch req.URL.Path {
+			case "/torrents.php":
+				targetSearches++
+				if widgetLookups != 4 {
+					t.Fatalf("target search ran outside the publish recheck: widget=%d", widgetLookups)
+				}
+				return zmptTestResponse(novaFixturePage(novaFixtureQuery,
+					novaFixtureResults(novaFixtureRow("details.php?id=17", novaFixtureSourceTitle)))), nil
+			case "/details.php":
+				return zmptTestResponse(`<a href="/download.php?id=17">download</a>`), nil
+			case "/download.php":
+				return zmptTestResponse(targetTorrent), nil
+			}
+		}
+		t.Fatalf("unexpected request %s", req.URL)
+		return nil, nil
+	})
+	ctx := context.Background()
+	rows, err := scanner.Scan(ctx, source, target, "source-session", "target-session", "", policy.Defaults())
+	if err != nil || len(rows) != 1 || !rows[0].Eligible || !rows[0].DuplicateKnown || rows[0].Duplicate {
+		t.Fatalf("successful widget miss did not permit the original candidate flow: rows=%+v error=%v", rows, err)
+	}
+	if widgetLookups != 1 || targetSearches != 0 {
+		t.Fatalf("scan did not use only the source widget: widget=%d target=%d", widgetLookups, targetSearches)
+	}
+	candidate, err := scanner.Inspect(ctx, source, target, "source-session", "target-session", sourceID)
+	if err != nil || !candidate.DuplicateKnown || candidate.Duplicate || widgetLookups != 2 || targetSearches != 0 {
+		t.Fatalf("predownload check did not use the source widget: candidate=%+v error=%v widget=%d target=%d", candidate, err, widgetLookups, targetSearches)
+	}
+	widgetResponse = `{"code":-1,"message":"timeout","data":null}`
+	candidate, err = scanner.Inspect(ctx, source, target, "source-session", "target-session", sourceID)
+	if err != nil || candidate.DuplicateKnown || candidate.Duplicate || widgetLookups != 3 || targetSearches != 0 {
+		t.Fatalf("failed widget read did not leave predownload pending: known=%v duplicate=%v error=%v", candidate.DuplicateKnown, candidate.Duplicate, err)
+	}
+	widgetResponse = `{"code":0,"data":[{"url":"https://pt.novahd.top/details.php?id=17","name":"NovaHD"}]}`
+	candidate, err = scanner.Inspect(ctx, source, target, "source-session", "target-session", sourceID)
+	if err != nil || !candidate.DuplicateKnown || !candidate.Duplicate || widgetLookups != 4 || targetSearches != 0 {
+		t.Fatalf("new widget hit was missed before download: known=%v duplicate=%v error=%v", candidate.DuplicateKnown, candidate.Duplicate, err)
+	}
+	widgetResponse = `{"code":0,"data":[]}`
+	candidate, err = scanner.InspectForPublish(ctx, source, target, "source-session", "target-session", sourceID)
+	if err != nil || !candidate.DuplicateKnown || !candidate.Duplicate || targetSearches != 1 {
+		t.Fatalf("publish check failed to catch a target duplicate added after download: candidate=%+v error=%v searches=%d", candidate, err, targetSearches)
+	}
+}
+
 func novaFixtureTorrent(host, name, source string, size int64) string {
 	tracker := "https://" + host + "/announce"
 	return fmt.Sprintf("d8:announce%d:%s4:infod6:lengthi%de4:name%d:%s12:piece lengthi%de6:pieces20:xxxxxxxxxxxxxxxxxxxx7:privatei1e6:source%d:%see",

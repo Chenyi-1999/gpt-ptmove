@@ -43,6 +43,16 @@ func (s *TorrentDataService) RefreshData() map[string]any {
 	return s.refreshFromDownloaders()
 }
 
+// QueryIYUUDuplicates 读取一批种子在目标站的辅种证据。返回键为小写哈希，缺项表明证据未知。
+// 此查询使用已有的 IYUU Token，只发送哈希和站点 ID，不写入本地种子数据。
+func (s *TorrentDataService) QueryIYUUDuplicates(ctx context.Context, targetURL string, hashes []string) (map[string]bool, error) {
+	if s.cfg == nil {
+		return nil, errors.New("IYUU Token 未配置")
+	}
+	token := strings.TrimSpace(toString(s.cfg.Get()["iyuu_token"], ""))
+	return newIYUUClient().queryDuplicates(ctx, token, targetURL, hashes)
+}
+
 func (s *TorrentDataService) QueryIYUU(payload map[string]any) (map[string]any, int) {
 	if !s.iyuuRunning.CompareAndSwap(false, true) {
 		return map[string]any{"success": false, "message": "IYUU查询正在进行中，请稍后再试"}, 500

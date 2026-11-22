@@ -1,14 +1,14 @@
 {
-  "version": "1.0.4",
-  "date": "2026-11-22",
+  "version": "1.0.5",
+  "date": "2026-11-23",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.4",
-  "image_id": "sha256:9562557d072df7f27562d2752cf7f317778b0c2b7582144c1d5aee1939395013",
+  "image": "ptmove-nexus:1.0.5",
+  "image_id": "sha256:32102073c575c0d5ccced0dbe5b2530fc8f6f4ece8b7f145386228a4d031b412",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "e59f5fb5bee852ce465ded12d0e9c418b5ad6ffea2804f97ad6b1ee3249f11a4",
+  "image_archive_sha256": "1143e9e774ee2db0fa810f4ff4a53bfc24e3aef38f2323486246ebb106164f57",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -17,8 +17,7 @@
   "monthly_limit": 6,
   "min_size_gib": 1,
   "max_size_gib": 10,
-  "monthly_budget_gib": 60,
-  "go_full_tests_windows": true,
+  "go_full_tests_windows": false,
   "go_full_tests_linux_docker": true,
   "frontend_typecheck_lint_build": true,
   "fetch_auth_regressions_passed": 31,
@@ -959,5 +958,20 @@
       "version": "1.0.4"
     },
     "published_verified_at": "2026-11-22T22:49:54+08:00"
+  },
+  "starpt_v1_0_5": {
+    "docker_health": "healthy",
+    "rollback_image": "ptmove-nexus:1.0.4",
+    "rollback_image_id": "sha256:9562557d072df7f27562d2752cf7f317778b0c2b7582144c1d5aee1939395013",
+    "archive": "starpt-v1.0.5-linux-amd64.tar.gz",
+    "archive_bytes": 656431682,
+    "native_smoke_groups": 10,
+    "canary_active_tasks": 2,
+    "canary_sample_download_progress": 0.42,
+    "zmpt_readonly_ascending_rows": 100,
+    "production_automation_idle": true,
+    "tested_browser_routes": ["/", "/settings/automation"],
+    "browser_render_verified": false,
+    "git_tag": "v1.0.5"
   }
 }

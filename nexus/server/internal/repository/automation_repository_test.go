@@ -57,7 +57,7 @@ func TestAutomationQuotaConcurrentReservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if success.Load() != 5 || q.Count != 5 || q.Bytes != 50 {
+	if success.Load() != 6 || q.Count != 6 || q.Bytes != 60 || q.Published != 0 || q.Pending != 6 {
 		t.Fatalf("quota overspend or lost writes: success=%d quota=%+v", success.Load(), q)
 	}
 }

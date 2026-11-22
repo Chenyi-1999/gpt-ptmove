@@ -1106,6 +1106,7 @@ type AutomationTorrentStatus struct {
 	Hash, State, SavePath, Name string
 	ContentPath                 string
 	Progress                    float64
+	ProgressKnown               bool
 	AmountLeft, Downloaded      int64
 }
 
@@ -1180,12 +1181,13 @@ func automationStatus(c *qbClient, hash string) (AutomationTorrentStatus, error)
 	if !strings.EqualFold(toString(row["hash"], ""), hash) {
 		return AutomationTorrentStatus{}, errors.New("下载状态响应的哈希与查询不一致")
 	}
-	progress, _ := row["progress"].(float64)
+	progress, progressKnown := row["progress"].(float64)
 	return AutomationTorrentStatus{
 		Found: true, Hash: hash, State: toString(row["state"], ""),
 		SavePath: toString(row["save_path"], ""), Name: toString(row["name"], ""),
 		ContentPath: toString(row["content_path"], ""), Progress: progress,
-		AmountLeft: automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"]),
+		ProgressKnown: progressKnown && progress >= 0 && progress <= 1,
+		AmountLeft:    automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"]),
 	}, nil
 }
 
@@ -1232,7 +1234,7 @@ func automationValidate(data []byte, expected string) error {
 	}
 	return nil
 }
-func automationAdd(c *qbClient, data []byte, name, path string, paused bool) error {
+func automationAdd(c *qbClient, data []byte, name, path string, paused bool, ownershipTag string) error {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	part, err := writer.CreateFormFile("torrents", filepath.Base(name))
@@ -1244,6 +1246,11 @@ func automationAdd(c *qbClient, data []byte, name, path string, paused bool) err
 	}
 	for key, val := range map[string]string{"savepath": path, "paused": strconv.FormatBool(paused), "stopped": strconv.FormatBool(paused), "skip_checking": "false", "autoTMM": "false"} {
 		if err = writer.WriteField(key, val); err != nil {
+			return err
+		}
+	}
+	if ownershipTag != "" {
+		if err = writer.WriteField("tags", ownershipTag); err != nil {
 			return err
 		}
 	}
@@ -1277,7 +1284,8 @@ func (d Downloader) AddSourceTorrent(data []byte, fileName, savePath, expectedHa
 	if status.Found {
 		return ErrAutomationSourceExists
 	}
-	return automationAdd(c, data, fileName, savePath, false)
+	taskID, _ := strings.CutSuffix(filepath.Base(fileName), ".torrent")
+	return automationAdd(c, data, fileName, savePath, false, automationSourceOwnershipTag(taskID))
 }
 
 // ErrAutomationSourceExists 表示准备提交前发现源种已存在，未向下载器提交添加请求。
@@ -1318,7 +1326,7 @@ func (d Downloader) EnsureTargetSeeding(data []byte, fileName, savePath, expecte
 		return errors.New("目标hash位于其他保存目录，禁止修改现有任务")
 	}
 	if !status.Found {
-		if err = automationAdd(c, data, fileName, savePath, true); err != nil {
+		if err = automationAdd(c, data, fileName, savePath, true, ""); err != nil {
 			return err
 		}
 		_, err = c.PostForm("torrents/recheck", url.Values{"hashes": {expectedHash}})

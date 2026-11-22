@@ -47,6 +47,10 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 	if s.authorizedTask(task, snapshot) != nil {
 		return
 	}
+	if task.State == repository.AutomationStateDuplicateCleanup {
+		s.finishBatchDuplicate(task, snapshot)
+		return
+	}
 	if task.State == repository.AutomationStateWaitingMedia && s.now().UnixMilli() < task.MediaRetryAt {
 		return
 	}
@@ -63,6 +67,14 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		d = native.WithEffectGuard(func() error { return s.authorizedTask(task, snapshot) })
 	}
 	if task.State == "reserved" {
+		if task.BatchCheck && task.Month != policy.Month(s.now()) {
+			s.failTask(task, "本批已跨月，未提交新下载", false)
+			return
+		}
+		if task.BatchCheck && !s.iyuuConfigured() {
+			s.failTask(task, "IYUU 令牌未配置，未提交新下载", false)
+			return
+		}
 		if err = s.checkTaskDownloadHistory(ctx, task); err != nil {
 			s.failTask(task, err.Error()+"，未提交新下载", false)
 			return
@@ -182,6 +194,11 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 			s.failTask(task, "源下载保存目录改变", false)
 			return
 		}
+		if status.ProgressKnown && (task.DownloadProgress == nil || *task.DownloadProgress != status.Progress) {
+			if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"download_progress": status.Progress}, s.now()); err != nil {
+				return
+			}
+		}
 		if status.Progress < 1 || status.AmountLeft != 0 {
 			return
 		}
@@ -190,6 +207,12 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		}
 		complete, err := d.TorrentFilesComplete(task.InfoHash)
 		if err != nil || !complete {
+			return
+		}
+		if task.BatchCheck {
+			_ = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{
+				"state": repository.AutomationStateWaitingBatch, "message": "文件已完整，等待本批下载结束后统一用 IYUU 查重",
+			}, s.now())
 			return
 		}
 		if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{"state": "preparing", "message": "完整文件完成，交给原生资料处理"}, s.now()); err != nil {
@@ -228,6 +251,12 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		task.State = "ready"
 	}
 	if task.State == "ready" {
+		if task.BatchCheck {
+			pending, err := s.repo.BatchCleanupPending(task.RunID, s.now())
+			if err != nil || pending || task.BatchCheckedAt <= 0 || task.BatchDuplicate {
+				return
+			}
+		}
 		v, err := s.settings(s.repo)
 		if err != nil || !v.Enabled || !v.AutoPublish {
 			return

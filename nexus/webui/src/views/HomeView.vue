@@ -43,9 +43,13 @@
           <dt><Monitor aria-hidden="true" /> 启用下载器</dt>
           <dd>{{ downloaderInfo === null ? '—' : enabledCount }}</dd>
           <dd class="home-metric__caption">
-            {{ downloaderInfo === null
-              ? downloaderError ? '读取失败' : '等待读取'
-              : '共 ' + downloaderInfo.length + ' 个下载器' }}
+            {{
+              downloaderInfo === null
+                ? downloaderError
+                  ? '读取失败'
+                  : '等待读取'
+                : '共 ' + downloaderInfo.length + ' 个下载器'
+            }}
           </dd>
         </div>
       </dl>
@@ -53,6 +57,8 @@
       <HomeSpeedPanel class="star-home__speed" />
 
       <div class="star-home__panels">
+        <HomeAutomationProgress />
+
         <section class="home-card home-panel" aria-labelledby="home-traffic-title">
           <div class="home-panel__heading">
             <div>
@@ -84,7 +90,13 @@
               ref="chartHost"
               class="home-chart"
               role="img"
-              :aria-label="currentRangeLabel + '流量柱状图，上传 ' + formatBytes(uploadTotal) + '，下载 ' + formatBytes(downloadTotal)"
+              :aria-label="
+                currentRangeLabel +
+                '流量柱状图，上传 ' +
+                formatBytes(uploadTotal) +
+                '，下载 ' +
+                formatBytes(downloadTotal)
+              "
             />
           </template>
           <div v-else class="home-chart home-empty" role="status">
@@ -114,7 +126,6 @@
                 </tbody>
               </table>
             </details>
-
           </div>
         </section>
 
@@ -153,7 +164,10 @@
                 </div>
                 <span
                   class="home-downloader__status"
-                  :class="{ 'home-downloader__status--enabled': downloader.enabled && activeStatuses.includes(downloader.status) }"
+                  :class="{
+                    'home-downloader__status--enabled':
+                      downloader.enabled && activeStatuses.includes(downloader.status),
+                  }"
                 >
                   {{ downloader.enabled ? downloader.status || '状态未知' : '已禁用' }}
                 </span>
@@ -188,6 +202,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import HomeSpeedPanel from '@/components/HomeSpeedPanel.vue'
+import HomeAutomationProgress from '@/components/HomeAutomationProgress.vue'
 import {
   ArrowRight,
   Bottom,
@@ -243,7 +258,9 @@ const ranges = [
 
 const activeStatuses = ['已连接', '已配置']
 const range = ref<(typeof ranges)[number]['value']>(ranges[0].value)
-const currentRangeLabel = computed(() => range.value === 'yesterday' ? ranges[1].label : ranges[0].label)
+const currentRangeLabel = computed(() =>
+  range.value === 'yesterday' ? ranges[1].label : ranges[0].label,
+)
 const downloaderInfo = ref<DownloaderInfo[] | null>(null)
 const traffic = ref<TrafficPoint[]>([])
 const downloaderBusy = ref(true)
@@ -252,9 +269,13 @@ const downloaderError = ref(false)
 const trafficError = ref(false)
 const chartHost = ref<HTMLElement | null>(null)
 
-const enabledCount = computed(() => downloaderInfo.value?.filter((item) => item.enabled).length ?? 0)
+const enabledCount = computed(
+  () => downloaderInfo.value?.filter((item) => item.enabled).length ?? 0,
+)
 const uploadTotal = computed(() => traffic.value.reduce((sum, point) => sum + point.uploaded, 0))
-const downloadTotal = computed(() => traffic.value.reduce((sum, point) => sum + point.downloaded, 0))
+const downloadTotal = computed(() =>
+  traffic.value.reduce((sum, point) => sum + point.downloaded, 0),
+)
 
 let downloaderRequest: AbortController | undefined
 let trafficRequest: AbortController | undefined
@@ -292,7 +313,10 @@ function toTrafficPoints(data: TrafficResponse): TrafficPoint[] {
   const points = data.labels.map((label) => ({ label, uploaded: 0, downloaded: 0 }))
   for (const id of ids) {
     const dataset = data.datasets[id]
-    if (dataset?.uploaded?.length !== points.length || dataset?.downloaded?.length !== points.length) {
+    if (
+      dataset?.uploaded?.length !== points.length ||
+      dataset?.downloaded?.length !== points.length
+    ) {
       throw new Error('Invalid traffic dataset')
     }
     points.forEach((point, index) => {
@@ -397,7 +421,11 @@ watch(
         data: points.map((point) => point.label),
         axisTick: { show: false },
         axisLine: { lineStyle: { color: color('border') } },
-        axisLabel: { color: color('muted'), hideOverlap: true, formatter: (label: string) => label.slice(11, 16) || label },
+        axisLabel: {
+          color: color('muted'),
+          hideOverlap: true,
+          formatter: (label: string) => label.slice(11, 16) || label,
+        },
       },
       yAxis: {
         type: 'value',
@@ -456,8 +484,8 @@ onBeforeUnmount(() => {
   padding: clamp(20px, 3.2vw, 42px) max(16px, env(safe-area-inset-right, 0px))
     max(34px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   color: var(--star-data-ink);
-  background: radial-gradient(ellipse at 82% -18%, #30234a 0%, transparent 52%),
-    var(--star-data-canvas);
+  background:
+    radial-gradient(ellipse at 82% -18%, #30234a 0%, transparent 52%), var(--star-data-canvas);
 }
 
 .star-home__content {

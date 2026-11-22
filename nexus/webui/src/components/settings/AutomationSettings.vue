@@ -58,7 +58,7 @@
         <el-form-item label="执行时间"
           ><el-time-picker v-model="form.schedule_time" format="HH:mm" value-format="HH:mm"
         /></el-form-item>
-        <el-form-item label="月度任务数上限"
+        <el-form-item label="每月成功发种数上限"
           ><el-input-number v-model="form.monthly_limit" :min="1" :max="100"
         /></el-form-item>
         <el-form-item label="单种体积范围 (GiB)"
@@ -66,9 +66,23 @@
             <el-input-number v-model="form.min_size_gib" :min="0.1" :precision="1" /><span>至</span
             ><el-input-number v-model="form.max_size_gib" :min="0.1" :precision="1" /></div
         ></el-form-item>
-        <el-form-item label="月度体积预算 (GiB)"
-          ><el-input-number v-model="form.monthly_budget_gib" :min="0.1" :precision="1"
-        /></el-form-item>
+        <template v-if="isZmptSource">
+          <el-form-item label="每批下载数量">
+            <el-input-number v-model="form.batch_size" :min="1" :max="100" />
+            <span class="hint">本批下载完成后统一用 IYUU 查重，名额不足时按剩余数量下载。</span>
+          </el-form-item>
+          <el-form-item label="IYUU 确认重复时">
+            <el-select v-model="form.duplicate_action">
+              <el-option label="保留下载" value="keep" />
+              <el-option label="移到指定目录" value="move" />
+              <el-option label="删除 qB 任务，保留文件" value="delete" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="form.duplicate_action === 'move'" label="重复种子目录">
+            <el-input v-model="form.duplicate_directory" placeholder="下载器内的绝对路径" />
+            <span class="hint">qB 会将每个重复下载移到该目录下的独立子目录。</span>
+          </el-form-item>
+        </template>
         <el-form-item label="最少做种人数"
           ><el-input-number v-model="form.min_seeders" :min="0"
         /></el-form-item>
@@ -101,7 +115,10 @@
         <ul>
           <li>源站只选官方种子，并按完整种子体积排序后匹配大小范围。</li>
           <li>禁转、限制转载、分集标签或已下载的资源会跳过。</li>
-          <li>下载和发布前核对目标站。已有对应种子会跳过，结果不明时等待核对。</li>
+          <li v-if="isZmptSource">
+            下载前检查织梦「辅种」栏，下载完成后按批用 IYUU 复查。需要在 IYUU 设置中配置令牌。
+          </li>
+          <li v-else>下载和发布前核对目标站。已有对应种子会跳过，结果不明时等待核对。</li>
         </ul>
         <p>这些条件由服务端强制执行，不能在页面或旧版 API 字段中关闭。</p>
       </div>
@@ -169,8 +186,7 @@
           <el-button size="small" :loading="refreshingRecords" @click="refreshRecords"
             >刷新记录</el-button
           >
-        </div>
-      </template
+        </div> </template
       ><el-tabs
         ><el-tab-pane label="下载任务"
           ><el-table :data="tasks" empty-text="暂无任务"
@@ -190,11 +206,7 @@
               label="操作"
               width="230"
               ><template #default="s"
-                ><el-button
-                  v-if="canCancel(s.row)"
-                  link
-                  type="danger"
-                  @click="act(s.row, 'cancel')"
+                ><el-button v-if="canCancel(s.row)" link type="danger" @click="act(s.row, 'cancel')"
                   >取消</el-button
                 ><el-button v-if="canRetry(s.row)" link @click="act(s.row, 'retry')">{{
                   s.row.state === 'waiting_target' ? '重新核对' : '重试'
@@ -225,7 +237,7 @@
 import axios from 'axios'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-type Site = { id: string; name: string }
+type Site = { id: string; name: string; baseURL: string }
 type Candidate = {
   id: string
   title: string
@@ -252,16 +264,16 @@ type StatusBadge = {
 type Row = Record<string, unknown>
 const candidateStatus = (candidate: Candidate): StatusBadge => {
   if (candidate.eligible) return { label: '可处理', type: 'success' }
-  if (candidate.duplicate_known && candidate.duplicate)
-    return { label: '目标已存在', type: 'info' }
-  if (candidate.reasons?.includes('目标查重未知'))
-    return { label: '查重待核对', type: 'warning' }
+  if (candidate.duplicate_known && candidate.duplicate) return { label: '目标已存在', type: 'info' }
+  if (candidate.reasons?.includes('目标查重未知')) return { label: '查重待核对', type: 'warning' }
   return { label: '跳过', type: 'info' }
 }
 const taskBadges: Record<string, StatusBadge> = {
   reserved: { label: '待下载', type: 'info' },
   downloading: { label: '下载中', type: 'primary' },
   preparing: { label: '准备资料', type: 'primary' },
+  waiting_batch: { label: '等待 IYUU 批量查重', type: 'warning' },
+  duplicate_cleanup: { label: '处理重复下载', type: 'info' },
   waiting_media: { label: '待补资料', type: 'warning' },
   waiting_target: { label: '查重待核对', type: 'warning' },
   ready: { label: '资料已齐', type: 'info' },
@@ -281,6 +293,7 @@ const taskStatus = (task: AutomationTask): StatusBadge =>
 const cancellableStates = new Set([
   'reserved',
   'downloading',
+  'waiting_batch',
   'preparing',
   'waiting_media',
   'waiting_target',
@@ -317,9 +330,11 @@ const form = reactive({
   schedule_time: '02:00',
   timezone: 'Asia/Shanghai',
   monthly_limit: 6,
+  batch_size: 20,
+  duplicate_action: 'keep',
+  duplicate_directory: '',
   min_size_gib: 1,
   max_size_gib: 10,
-  monthly_budget_gib: 60,
   min_seeders: 3,
   prefer_official: true,
   target_absent_priority: true,
@@ -330,6 +345,16 @@ const form = reactive({
 })
 const minLeechers = ref(0),
   reserveSpace = ref(0)
+const isZmptSource = computed(() => {
+  const source = sites.value.find((site) => site.id === form.source_site)
+  if (!source?.baseURL) return form.source_site === 'zmpt'
+  try {
+    const url = new URL(source.baseURL)
+    return url.protocol === 'https:' && url.host === 'zmpt.cc'
+  } catch {
+    return false
+  }
+})
 const formatSize = (value: unknown) => {
   const bytes = Number(value)
   if (!Number.isFinite(bytes) || bytes <= 0) return '未知'
@@ -340,7 +365,7 @@ const formatSize = (value: unknown) => {
 }
 const quotaLabel = computed(
   () =>
-    `本月 ${quota.value.count ?? 0} / ${form.monthly_limit} 项 · ${quota.value.bytes ? (Number(quota.value.bytes) / 1024 ** 3).toFixed(1) : '0.0'} GiB`,
+    `本月已发布 ${quota.value.published ?? 0} / ${form.monthly_limit} · 占用名额 ${quota.value.pending ?? 0}`,
 )
 const load = async () => {
   loading.value = true
@@ -362,6 +387,7 @@ const load = async () => {
     sites.value = (p.data.sites || []).map((x: Record<string, unknown>) => ({
       id: String(x.id ?? ''),
       name: String(x.name ?? x.id ?? ''),
+      baseURL: String(x.base_url ?? ''),
     }))
     downloaders.value = (d.data.downloaders || []).map((x: Record<string, unknown>) => ({
       id: String(x.id ?? ''),
@@ -405,11 +431,11 @@ const save = async () => {
     return ElMessage.warning('请选择不同的源站和目标站')
   if (form.enabled && (!form.downloader_id || !form.save_path.trim()))
     return ElMessage.warning('启用模块前请选择下载器并填写保存目录')
-  if (form.min_size_gib <= 0 || form.max_size_gib <= 0 || form.monthly_budget_gib <= 0)
-    return ElMessage.warning('体积范围与月度预算必须大于零')
+  if (form.min_size_gib <= 0 || form.max_size_gib <= 0)
+    return ElMessage.warning('单种体积范围必须大于零')
   if (form.min_size_gib > form.max_size_gib) return ElMessage.warning('最小体积不能大于最大体积')
-  if (form.max_size_gib > form.monthly_budget_gib)
-    return ElMessage.warning('最大种子体积不能超过月度体积预算')
+  if (isZmptSource.value && form.duplicate_action === 'move' && !form.duplicate_directory.trim())
+    return ElMessage.warning('请填写下载器内的重复种子目录')
   saving.value = true
   try {
     await axios.put('/api/automation/settings', payload())
@@ -468,7 +494,11 @@ const act = async (task: AutomationTask, action: 'cancel' | 'retry') => {
   try {
     await axios.post(`/api/automation/tasks/${String(task.id ?? '')}/${action}`)
     ElMessage.success(
-      action === 'cancel' ? '已取消' : task.state === 'waiting_target' ? '已请求核对' : '已请求重试',
+      action === 'cancel'
+        ? '已取消'
+        : task.state === 'waiting_target'
+          ? '已请求核对'
+          : '已请求重试',
     )
     await refreshRecords()
   } catch (e) {

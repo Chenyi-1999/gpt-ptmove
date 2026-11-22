@@ -33,10 +33,6 @@ func (s *AutomationService) processRuns(ctx context.Context, current policy.Sett
 
 // scanRun 冻结路由、只读候选扫描和原子预留分离，API 幂等事务不会持有网络请求。
 func (s *AutomationService) scanRun(ctx context.Context, run repository.AutomationRun) {
-	if run.Execute && run.Month != policy.Month(s.now()) {
-		_ = s.repo.FinishRunLeased(run, "failed", "配额月份已改变，请重新登记扫描", "[]", 0, s.now())
-		return
-	}
 	var snapshot automationRunSnapshot
 	if json.Unmarshal([]byte(run.Snapshot), &snapshot) != nil {
 		_ = s.repo.FinishRunLeased(run, "failed", "扫描快照损坏", "[]", 0, s.now())
@@ -46,9 +42,46 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 		_ = s.repo.FinishRunLeased(run, "failed", err.Error(), "[]", 0, s.now())
 		return
 	}
-	rows, _, err := s.scan(ctx, snapshot.Route.Settings)
+	batchRoute := usesIYUUBatches(snapshot.Route)
+	batch := run.Execute && batchRoute
+	expired := run.Execute && run.Month != policy.Month(s.now())
+	prior := 0
+	var excludedIDs map[string]bool
+	if batchRoute {
+		var err error
+		prior, err = s.repo.ReservedForCurrentBatch(run)
+		if err != nil {
+			return
+		}
+		if prior >= snapshot.Route.Settings.BatchSize || (prior > 0 && (!batch || expired || !s.iyuuConfigured())) {
+			_ = s.repo.FinishRunLeased(run, "batch_active", "本批已预留，恢复下载和 IYUU 查重", run.CandidatesJSON, run.Selected+prior, s.now())
+			return
+		}
+	}
+	if batch {
+		if !s.iyuuConfigured() {
+			_ = s.repo.FinishRunLeased(run, "failed", "IYUU 令牌未配置，未开始下载", "[]", run.Selected, s.now())
+			return
+		}
+		var err error
+		excludedIDs, err = s.repo.BatchExcludedSourceIDs(snapshot.Route.Source.ID, snapshot.Route.Target.ID, run.Month)
+		if err != nil {
+			return
+		}
+	}
+	if expired {
+		_ = s.repo.FinishRunLeased(run, "completed", "本月计划已结束", run.CandidatesJSON, run.Selected, s.now())
+		return
+	}
+	rows, _, err := s.scan(ctx, snapshot.Route.Settings, excludedIDs)
 	if err != nil {
-		_ = s.repo.FinishRunLeased(run, "failed", err.Error(), "[]", 0, s.now())
+		state := "failed"
+		message := err.Error()
+		if batch && prior > 0 {
+			state = "batch_active"
+			message = "候选补扫失败，继续核对已预留的本批任务"
+		}
+		_ = s.repo.FinishRunLeased(run, state, message, "[]", run.Selected+prior, s.now())
 		return
 	}
 	if err = s.validateFrozen(snapshot.Route); err != nil {
@@ -59,7 +92,7 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 	for _, id := range snapshot.SelectedIDs {
 		selected[id] = true
 	}
-	count := 0
+	count := prior
 	message := "只读扫描完成，没有预留或下载"
 	state := "completed"
 	if run.Execute {
@@ -74,11 +107,11 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 			if !c.Eligible || (len(selected) > 0 && !selected[c.ID]) {
 				continue
 			}
-			task := repository.AutomationTask{ID: automationID("auto"), RunID: run.ID, Month: run.Month, Source: snapshot.Route.Source.ID, Target: snapshot.Route.Target.ID, SourceID: c.ID, Title: c.Title, InfoHash: c.InfoHash, Size: c.Size, Seeders: c.Seeders, Official: c.Official, Snapshot: string(raw), DownloaderID: snapshot.Route.Settings.DownloaderID, SavePath: snapshot.Route.Settings.SavePath, State: "reserved", Explicit: run.Explicit, CreatedAt: s.now().UnixMilli(), UpdatedAt: s.now().UnixMilli()}
-			err = s.repo.ReserveForRun(&task, snapshot.Route.Settings.MonthlyLimit, int64(snapshot.Route.Settings.MonthlyBudgetGiB*float64(policy.GiB)), run.ID, run.LeaseToken, s.now())
+			task := repository.AutomationTask{ID: automationID("auto"), RunID: run.ID, Month: run.Month, Source: snapshot.Route.Source.ID, Target: snapshot.Route.Target.ID, SourceID: c.ID, Title: c.Title, InfoHash: c.InfoHash, Size: c.Size, Seeders: c.Seeders, Official: c.Official, Snapshot: string(raw), DownloaderID: snapshot.Route.Settings.DownloaderID, SavePath: snapshot.Route.Settings.SavePath, State: "reserved", Explicit: run.Explicit, CreatedAt: s.now().UnixMilli(), UpdatedAt: s.now().UnixMilli(), BatchCheck: batch}
+			err = s.repo.ReserveForRun(&task, snapshot.Route.Settings.MonthlyLimit, 0, run.ID, run.LeaseToken, s.now())
 			if err != nil {
 				if errors.Is(err, repository.ErrAutomationQuota) {
-					message = "扫描完成，本月预留次数或预算已用完"
+					message = "扫描结束，本月发布名额已满或已预留"
 					break
 				}
 				if errors.Is(err, repository.ErrAutomationDuplicate) {
@@ -95,11 +128,21 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 				break
 			}
 			count++
+			if batch && count >= snapshot.Route.Settings.BatchSize {
+				break
+			}
 		}
 		if message == "只读扫描完成，没有预留或下载" {
-			message = "扫描完成，合格候选已预留"
+			message = "扫描范围内暂无符合规则且可新增的候选"
+			if count > 0 {
+				message = "扫描完成，合格候选已预留"
+			}
+		}
+		if batch && count > 0 {
+			state = "batch_active"
+			message = "本批候选已预留，等待下载与 IYUU 批量查重"
 		}
 	}
 	raw, _ := json.Marshal(rows)
-	_ = s.repo.FinishRunLeased(run, state, message, string(raw), count, s.now())
+	_ = s.repo.FinishRunLeased(run, state, message, string(raw), run.Selected+count, s.now())
 }
