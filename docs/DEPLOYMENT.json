@@ -972,6 +972,58 @@
     "production_automation_idle": true,
     "tested_browser_routes": ["/", "/settings/automation"],
     "browser_render_verified": false,
-    "git_tag": "v1.0.5"
+    "git_tag": "v1.0.5",
+    "source_commit": "b8073dbc074dd7574afb6d869f2df67ebf60e002",
+    "github_release": {
+      "id": 454581652,
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.5",
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "digest": "sha256:5786b1655808e47dad41ad9a4f6a73ad158956a1fdfec9dc9d1e2891eb4768c1",
+          "id": 779677326
+        },
+        {
+          "name": "starpt-v1.0.5-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "digest": "sha256:357ef7cf866d9c6579b02b9493926ecb2dc613cb963458f5ee64a485f34532f6",
+          "id": 779677327
+        },
+        {
+          "name": "starpt-v1.0.5-linux-amd64.tar.gz",
+          "size": 656431682,
+          "digest": "sha256:1143e9e774ee2db0fa810f4ff4a53bfc24e3aef38f2323486246ebb106164f57",
+          "id": 779720442
+        }
+      ],
+      "published_at": "2026-11-22T16:43:50Z"
+    },
+    "gitee_release": {
+      "id": 1355081,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.5",
+      "assets": [
+        {
+          "id": 3793984,
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "sha256": "5786b1655808e47dad41ad9a4f6a73ad158956a1fdfec9dc9d1e2891eb4768c1"
+        },
+        {
+          "id": 3793985,
+          "name": "starpt-v1.0.5-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "sha256": "357ef7cf866d9c6579b02b9493926ecb2dc613cb963458f5ee64a485f34532f6"
+        }
+      ],
+      "full_image": "Same private GitHub release"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-23_004125__历史发布__STARPT-v1.0.5.zip",
+      "bytes": 673490566,
+      "sha256": "94c8a8592eeec144c5b49c391eed42627e4cbfd5b63b2f4c3ff13013620c5a26",
+      "oci_blobs_verified": 56
+    },
+    "published_verified_at": "2026-11-23T00:45:52+08:00"
   }
 }
