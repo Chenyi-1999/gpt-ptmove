@@ -3,6 +3,8 @@ package migrationflow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"time"
 
 	"github.com/pt-nexus/server/internal/repository"
+	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
+	"github.com/pt-nexus/server/internal/service/downloaderclient"
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
 	"gorm.io/gorm"
@@ -24,6 +28,80 @@ func automationNativeFixture(t *testing.T) (*AutomationService, *MigrateService,
 	a.migrate = m
 	m.InitPublishQueue(repository.NewPublishQueueRepository(store), nil)
 	return a, m, db
+}
+
+// TestAutomationQueueRechecksOfficialAndTargetAfterOwnDownload 验证只忽略本次任务产生的已下载标记。
+// 最新官种资格和明确目标缺失仍必须满足，预检不会启动实际发布。
+func TestAutomationQueueRechecksOfficialAndTargetAfterOwnDownload(t *testing.T) {
+	raw := []byte("d8:announce35:https://source.example.com/announce4:infod6:lengthi1073741824e4:name9:video.mkv12:piece lengthi1073741824e6:pieces20:xxxxxxxxxxxxxxxxxxxx7:privatei1eee")
+	meta, err := acquirefetch.ParseTorrentMeta(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []struct {
+		name       string
+		title      string
+		target     string
+		wantReason string
+	}{
+		{name: "same task own download", title: "Movie-GROUP", target: "<p>没有找到相关种子</p>"},
+		{name: "official status no longer verified", title: "Movie-OTHER", target: "<p>没有找到相关种子</p>", wantReason: "官种"},
+		{name: "target acquired matching item", title: "Movie-GROUP", target: `<a href="/details.php?id=2">Movie-GROUP</a>`, wantReason: "目标已有种子"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			a, m, db := automationNativeFixture(t)
+			task := automationDownloadTask(t, a, db)
+			task.InfoHash = meta.InfoHash
+			path := filepath.Join(t.TempDir(), "source.torrent")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			automationReviewSeed(t, db, task, "none", 3)
+			automationReviewSettings(t, a)
+			queue := &repository.PublishQueueTask{Trigger: "automation", Status: "running", UploadDataJSON: "{}"}
+			if err := db.Create(queue).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Model(&task).Updates(map[string]any{
+				"state": "queued_publish", "queue_id": queue.ID, "info_hash": task.InfoHash, "torrent_path": path,
+			}).Error; err != nil {
+				t.Fatal(err)
+			}
+			fake := &automationFakeDownloader{
+				status:   downloaderclient.AutomationTorrentStatus{Found: true, Progress: 1, SavePath: task.SavePath},
+				complete: true,
+			}
+			a.downloaderHook = func(string) (automationDownloader, error) { return fake, nil }
+			a.scanner.Client.Transport = automationTransport(func(req *http.Request) (*http.Response, error) {
+				if req.Method != http.MethodGet {
+					t.Fatalf("preflight attempted external write: %s", req.Method)
+				}
+				body := ""
+				switch {
+				case req.URL.Host == "target.example.com":
+					body = scenario.target
+				case req.URL.Path == "/details.php":
+					body = "<h1>" + scenario.title + `</h1><span class="tag">已下载</span><div id="kdescr">description</div><table>基本信息 做种者: 5 下载者: 2</table><a href="/download.php?id=1">download</a>`
+				case req.URL.Path == "/download.php":
+					body = string(raw)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			ctx := publishworkflow.Context{SiteName: "zmpt", TorrentID: task.SourceID, Hash: task.InfoHash, OriginalTorrentPath: path}
+			err := m.prepareAutomationQueue(*queue, ctx)
+			if scenario.wantReason == "" {
+				if err != nil {
+					t.Fatalf("own download blocked preflight: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), scenario.wantReason) {
+				t.Fatalf("preflight wanted rejection %q but got %v", scenario.wantReason, err)
+			}
+			row, err := a.repo.Task(task.ID)
+			if err != nil || row.State != "queued_publish" || row.PublishAttempted || fake.adds != 0 {
+				t.Fatalf("read-only preflight mutated state or downloader: %+v, %v", row, err)
+			}
+		})
+	}
 }
 
 // TestNativeManualPublishCannotBypassAutomationEvidence 验证手动触发标记和站点昵称不能绕过自动发布账本。

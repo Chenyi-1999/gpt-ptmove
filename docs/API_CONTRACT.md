@@ -1,4 +1,6 @@
-# PTMove v0.2 API contract
+# PTMove v0.2 legacy API contract
+
+This section documents the legacy Python service only. The native Go STARPT automation API has different rule fields and is documented below; do not use the legacy `official_policy` behavior to configure native STARPT.
 
 v0.2.0 adds JSON site profiles, frozen routes/rules, schema2 worker claims and the scoped AI API; see SITE_PROFILES.md and AI_API.md. v0.1.1 added encrypted secret `qb_api_key`. It takes precedence over qB username/password and uses the official qB 5.2+/WebAPI 2.14.1+ Bearer API mode, never auth/login/logout. NAS workers must now use execution_schema=2; legacy claims return409.
 
@@ -75,3 +77,13 @@ Frontend agent owns `ptmove/static/*` only. Root owns worker/adapters, packaging
 ## 转种准备中的 MediaInfo
 
 `POST /api/migrate/prepare_seed_info` 首先沿用草稿的完整媒体报告。报告缺失时，尝试从原简介或缓存简介的 `[quote]` 读取唯一的结构化 MediaInfo。识别成功后规范分行，补齐缺失的 `General` 标题，使用现有媒体校验规则，并在准备日志显示「MediaInfo 从简介提取」。无法确认引用时，使用已配置的飞牛媒体代理。禁转与分集限制继续由转种准备流程执行。
+
+## Native STARPT automation hard filters
+
+This section describes the native Go service and its authenticated `/api/v1` machine API. It supersedes the legacy policy descriptions above for native STARPT automation.
+
+- Source candidates must be official releases. For ZmPT, query the official tag (`tag_id=3`) within the configured size bounds and request descending torrent-size order (`sort=5&type=desc`); the adapter must still verify each returned result and apply the rule's exact size and seeder/leech thresholds.
+- Never select restricted/no-cross-seed releases, episode-tagged releases, or items already downloaded by this account. A failed or unknown restriction, episode, or download-history check fails closed.
+- The target site must affirmatively confirm that the corresponding torrent is absent. Existing torrents, search errors, and unknown duplicate status are all skipped.
+- `prefer_official` and `target_absent_priority` remain readable and writable for old clients. They are deprecated, returned for compatibility, and have no effect on the hard filters above.
+- Candidate preview exposes eligibility and skip reasons. Candidate `size` is the complete torrent size in bytes; clients should display it in a human-readable unit. A UI toggle or an API patch cannot weaken these checks.

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -58,6 +59,75 @@ func TestAutomationQuotaConcurrentReservation(t *testing.T) {
 	}
 	if success.Load() != 5 || q.Count != 5 || q.Bytes != 50 {
 		t.Fatalf("quota overspend or lost writes: success=%d quota=%+v", success.Load(), q)
+	}
+}
+
+// TestAutomationDownloadHistoryAcrossRoutesAndMonths 验证同源记录和同哈希记录跨月跨目标排除，拒绝不会扣减新月份配额。
+func TestAutomationDownloadHistoryAcrossRoutesAndMonths(t *testing.T) {
+	r := automationTestRepo(t)
+	old := automationTestTask("original")
+	old.InfoHash = strings.Repeat("a", 40)
+	old.State = "failed"
+	old.DownloadAttempted = true
+	if err := r.Reserve(&old, 6, 60); err != nil {
+		t.Fatal(err)
+	}
+	seen, err := r.HasDownloadHistory(old.Source, old.SourceID, old.InfoHash, old.ID)
+	if err != nil || seen {
+		t.Fatalf("owned task counted as previous history: %v, %v", seen, err)
+	}
+	for _, sameHash := range []bool{false, true} {
+		next := automationTestTask(fmt.Sprintf("new-%t", sameHash))
+		next.Month = "2026-11"
+		next.Target = "other-target"
+		if sameHash {
+			next.Source = "different-source"
+			next.InfoHash = strings.ToUpper(old.InfoHash)
+		} else {
+			next.SourceID = old.SourceID
+		}
+		seen, err := r.HasDownloadHistory(next.Source, next.SourceID, next.InfoHash, "")
+		if err != nil || !seen {
+			t.Fatalf("previous history bid=%t: %v, %v", sameHash, seen, err)
+		}
+		if err = r.Reserve(&next, 6, 60); !errors.Is(err, ErrAutomationDuplicate) {
+			t.Fatalf("history accepted bid=%t: %v", sameHash, err)
+		}
+		quota, err := r.Quota(next.Month)
+		if err != nil || quota.Count != 0 || quota.Bytes != 0 {
+			t.Fatalf("duplicate changed quota: %+v, %v", quota, err)
+		}
+	}
+}
+
+// TestAutomationConcurrentRoutesReserveOneSource 确保同源同哈希并行预留不同目标时只有一项获得配额。
+func TestAutomationConcurrentRoutesReserveOneSource(t *testing.T) {
+	r := automationTestRepo(t)
+	var selected atomic.Int32
+	var duplicates atomic.Int32
+	var group sync.WaitGroup
+	for _, target := range []string{"target-a", "target-b"} {
+		group.Add(1)
+		go func(target string) {
+			defer group.Done()
+			task := automationTestTask(target)
+			task.Target = target
+			task.SourceID = "same-source-id"
+			task.InfoHash = strings.Repeat("b", 40)
+			switch err := r.Reserve(&task, 6, 60); {
+			case err == nil:
+				selected.Add(1)
+			case errors.Is(err, ErrAutomationDuplicate):
+				duplicates.Add(1)
+			default:
+				t.Errorf("reserve: %v", err)
+			}
+		}(target)
+	}
+	group.Wait()
+	quota, err := r.Quota("2026-10")
+	if err != nil || selected.Load() != 1 || duplicates.Load() != 1 || quota.Count != 1 {
+		t.Fatalf("same source selected=%d duplicates=%d quota=%+v err=%v", selected.Load(), duplicates.Load(), quota, err)
 	}
 }
 func TestAutomationLeaseFencingAndOnlyUntouchedRefund(t *testing.T) {

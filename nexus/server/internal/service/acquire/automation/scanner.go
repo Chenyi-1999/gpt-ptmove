@@ -3,7 +3,6 @@ package automation
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -67,80 +66,68 @@ func ProfileFrom(value any) (Profile, error) {
 
 // Scan 从 RSS 或列表扫描候选，并逐一读取详情、目标查重与完整种子元数据。
 func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie, targetCookie, rss string, settings policy.Settings) ([]policy.Candidate, error) {
-	var ids []string
-	if rss != "" {
-		safeRSS, rssErr := sameOrigin(source.BaseURL, rss)
-		if rssErr != nil {
-			return nil, rssErr
-		}
-		body, err := s.get(ctx, safeRSS, sourceCookie, 4<<20)
-		if err != nil {
-			return nil, err
-		}
-		var feed struct {
-			Channel struct {
-				Items []struct {
-					Link      string `xml:"link"`
-					GUID      string `xml:"guid"`
-					Enclosure struct {
-						URL string `xml:"url,attr"`
-					} `xml:"enclosure"`
-				} `xml:"item"`
-			} `xml:"channel"`
-		}
-		if xml.Unmarshal(body, &feed) != nil {
-			return nil, errors.New("RSS 格式无效")
-		}
-		for _, item := range feed.Channel.Items {
-			for _, link := range []string{item.Link, item.GUID, item.Enclosure.URL} {
-				if id := torrentID(link); id != "" {
-					ids = append(ids, id)
-					break
-				}
-			}
-		}
-	} else {
-		listing, err := Endpoint(source, source.Paths.Listing, "", "", "")
-		if err != nil {
-			return nil, err
-		}
-		body, err := s.get(ctx, listing, sourceCookie, 4<<20)
-		if err != nil {
-			return nil, err
-		}
-		doc, err := html.Parse(strings.NewReader(string(body)))
-		if err != nil {
-			return nil, errors.New("源站列表无法解析")
-		}
-		selector := source.Selectors.DetailLink
-		if selector == "" {
-			return nil, errors.New("源站未配置详情链接选择器")
-		}
-		for _, n := range Select(doc, selector) {
-			if id := torrentID(attr(n, "href")); id != "" {
-				ids = append(ids, id)
-			}
-		}
+	base, zmpt := zmptListing(source)
+	// 默认保持 50 条详情请求的上限，较大的月度配置允许读取更多筛选后的条目。
+	detailLimit := 50
+	if zmpt {
+		detailLimit = min(200, max(detailLimit, settings.MonthlyLimit*2))
 	}
 	seen := map[string]bool{}
 	rows := []policy.Candidate{}
-	for _, id := range ids {
-		if len(rows) >= 50 {
-			break
+	inspected, listedSkips := 0, 0
+	consume := func(entries []sourceListingEntry) {
+		for _, entry := range entries {
+			if ctx.Err() != nil || inspected >= detailLimit {
+				break
+			}
+			if seen[entry.id] {
+				continue
+			}
+			seen[entry.id] = true
+			if zmpt && (!entry.flags.official || entry.flags.restricted || entry.flags.episode || entry.flags.downloaded) {
+				if listedSkips < 50 {
+					c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: -1, Leechers: -1}
+					applySourceEvidence(&c, entry.flags)
+					rows = append(rows, policy.Evaluate(c, settings))
+					listedSkips++
+				}
+				continue
+			}
+			inspected++
+			c, err := s.inspect(ctx, source, target, sourceCookie, targetCookie, entry, false, false)
+			if err != nil {
+				c.Reasons = []string{"详情或查重读取失败"}
+				rows = append(rows, c)
+				continue
+			}
+			rows = append(rows, policy.Evaluate(c, settings))
 		}
-		if seen[id] {
-			continue
+	}
+	if zmpt {
+		for page := 0; page < zmptListingPageLimit && inspected < detailLimit; page++ {
+			doc, err := s.readListing(ctx, zmptListingURL(base, settings, page), sourceCookie)
+			if err != nil {
+				return nil, err
+			}
+			entries := zmptListingEntries(doc, source)
+			if len(entries) == 0 {
+				break
+			}
+			before := len(seen)
+			consume(entries)
+			if len(seen) == before {
+				break
+			}
 		}
-		seen[id] = true
-		c, err := s.Inspect(ctx, source, target, sourceCookie, targetCookie, id)
+	} else {
+		entries, err := s.genericSourceEntries(ctx, source, sourceCookie, rss)
 		if err != nil {
-			c.ID = id
-			c.Reasons = []string{"详情或查重读取失败"}
-			c.Eligible = false
-			rows = append(rows, c)
-			continue
+			return nil, err
 		}
-		rows = append(rows, policy.Evaluate(c, settings))
+		consume(entries)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	policy.Rank(rows, settings)
 	return rows, nil
@@ -148,16 +135,48 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 
 // Inspect 读取详情中的明确权限、做种数和完整 torrent。未知结构保持拒绝。
 func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie, id string) (policy.Candidate, error) {
-	c := policy.Candidate{ID: id, Seeders: -1, Leechers: -1}
-	doc, detail, err := s.sourceDetail(ctx, source, sourceCookie, id)
+	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, true, false)
+}
+
+// InspectForPublish 在任务自己的完整下载之后复核源站与目标站，保留已下载标记给调用方。
+// 它允许已跟踪任务读取完整证据，仍按相同的官种、分集和禁转规则拒绝候选。
+func (s *Scanner) InspectForPublish(ctx context.Context, source, target Profile, sourceCookie, targetCookie, id string) (policy.Candidate, error) {
+	return s.inspect(ctx, source, target, sourceCookie, targetCookie, sourceListingEntry{id: id}, true, true)
+}
+
+func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCookie, targetCookie string, entry sourceListingEntry, recheckListing, ownDownload bool) (policy.Candidate, error) {
+	c := policy.Candidate{ID: entry.id, Title: entry.title, Seeders: -1, Leechers: -1}
+	doc, detail, err := s.sourceDetail(ctx, source, sourceCookie, entry.id)
 	c.DetailURL = detail
 	if err != nil {
 		return c, err
 	}
-	if nodes := Select(doc, source.Selectors.Title); len(nodes) > 0 {
-		c.Title = strings.TrimSpace(text(nodes[0]))
+	listing, zmpt := zmptListing(source)
+	titles := Select(doc, source.Selectors.Title)
+	if zmpt {
+		if headings := Select(doc, "h1#top"); len(headings) > 0 {
+			titles = headings
+		}
+	}
+	if len(titles) > 0 {
+		title := strings.TrimSpace(text(titles[0]))
+		if zmpt {
+			title = zmptTitle(titles[0])
+		}
+		if title != "" {
+			c.Title = title
+		}
 	}
 	c.RestrictionsKnown, c.Allowed = Restrictions(doc, source)
+	applySourceEvidence(&c, entry.flags)
+	applySourceEvidence(&c, detailSourceEvidence(doc, source, zmpt))
+	if zmpt && recheckListing && c.RestrictionsKnown && c.Allowed && !c.Episode {
+		row, rowErr := s.recheckZmptListingEntry(ctx, listing, source, sourceCookie, entry.id, c.Title)
+		if rowErr != nil {
+			return c, rowErr
+		}
+		applySourceEvidence(&c, row.flags)
+	}
 	seedSelector := source.Selectors.Seeders
 	if seedSelector == "" {
 		seedSelector = source.Selectors.Peers
@@ -181,13 +200,22 @@ func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCoo
 	if source.Selectors.Leechers == "" && nativeLeechers >= 0 {
 		c.Leechers = nativeLeechers
 	}
-	c.Official = len(Select(doc, source.Selectors.Official)) > 0
-	for _, group := range source.OfficialGroups {
-		if strings.HasSuffix(strings.ToLower(strings.TrimSpace(c.Title)), "-"+strings.ToLower(group)) {
-			c.Official = true
+	if !zmpt {
+		c.Official = c.Official || len(Select(doc, source.Selectors.Official)) > 0
+		for _, group := range source.OfficialGroups {
+			if strings.HasSuffix(strings.ToLower(c.Title), "-"+strings.ToLower(strings.TrimSpace(group))) {
+				c.Official = true
+			}
 		}
 	}
-	data, meta, err := s.sourceTorrent(ctx, source, sourceCookie, id, doc)
+	checked := c
+	if ownDownload {
+		checked.PreviouslyDownloaded = false
+	}
+	if len(policy.SourceRejection(checked)) > 0 {
+		return c, nil
+	}
+	data, meta, err := s.sourceTorrent(ctx, source, sourceCookie, entry.id, doc)
 	if err != nil {
 		return c, err
 	}
@@ -197,7 +225,7 @@ func (s *Scanner) Inspect(ctx context.Context, source, target Profile, sourceCoo
 	if c.Title == "" {
 		c.Title = meta.Name
 	}
-	search, err := Endpoint(target, target.Paths.Search, id, c.Title, c.InfoHash)
+	search, err := Endpoint(target, target.Paths.Search, entry.id, c.Title, c.InfoHash)
 	if err != nil {
 		return c, err
 	}

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "date": "2026-11-22",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.1",
-  "image_id": "sha256:a344ecd710505f813620508cced50ecf30af62bc018c179ba1486f8d19025003",
+  "image": "ptmove-nexus:1.0.2",
+  "image_id": "sha256:5fe0394dd12434bc04afd554cfe4ecbfcd4058914341140dcc1c579dec5351f1",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0",
+  "image_archive_sha256": "0d325567f2cd4fd725bc58093b99b6b6f9d4e2f637ef9f489c16e7fc3f735edc",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -642,5 +642,40 @@
       "sha256": "ee4b1d9b7239f1bcd2264fc3ccc14d75558e3563617ed721ca383adbdd72ee0d"
     },
     "published_verified_at": "2026-11-22T12:23:37+08:00"
+  },
+  "release_v1_0_2": {
+    "image": "ptmove-nexus:1.0.2",
+    "image_id": "sha256:5fe0394dd12434bc04afd554cfe4ecbfcd4058914341140dcc1c579dec5351f1",
+    "rollback_image": "ptmove-nexus:1.0.1",
+    "health": "healthy",
+    "production_index_sha256": "0351eb3234c780c648372f8d4dc01a8e8ff0cc833d50a07a7f1ffcf5c6d19c54",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "automation_runs": 0,
+      "published_edit_attempts": 2
+    },
+    "version": "1.0.2",
+    "archive": "starpt-v1.0.2-linux-amd64.tar.gz",
+    "archive_bytes": 600401955,
+    "archive_sha256": "0d325567f2cd4fd725bc58093b99b6b6f9d4e2f637ef9f489c16e7fc3f735edc",
+    "compose": "compose.starpt.yaml",
+    "compose_sha256": "956bb2a973a23dff096aa3319391e770102ba2876d9597028e5ddcc5c71881d0",
+    "compose_isolated_verified": true,
+    "go_full_tests": true,
+    "frontend_typecheck_lint_build": true,
+    "browser_fixture_widths": [
+      1440,
+      390
+    ],
+    "tracker_observed_account_progress": [
+      "inactivity 100%",
+      "seeding 100%"
+    ],
+    "synthetic_preview_and_upload_guard_tests": true,
+    "real_torrent_download_or_publish_test": false,
+    "verified_at": "2026-11-22T13:03:54+08:00",
+    "published": false
   }
 }

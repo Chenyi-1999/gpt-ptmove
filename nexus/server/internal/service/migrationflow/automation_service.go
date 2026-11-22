@@ -203,7 +203,82 @@ func (s *AutomationService) scan(ctx context.Context, v policy.Settings) ([]poli
 		return nil, snapshot, errors.New("源站订阅配置不可用")
 	}
 	rows, err := s.scanner.Scan(ctx, sp, tp, sourceCookie, targetCookie, rss, v)
+	if err == nil {
+		s.excludePreviouslyDownloaded(ctx, source.ID, rows, v)
+	}
 	return rows, snapshot, err
+}
+
+// excludePreviouslyDownloaded 只读核对合格候选的自动化账本与已配置下载器。
+// 现有或正在下载的载荷被排除，未知历史不得入队。相同哈希只查询一次下载器。
+func (s *AutomationService) excludePreviouslyDownloaded(ctx context.Context, source string, rows []policy.Candidate, settings policy.Settings) {
+	repo := s.repo.WithContext(ctx)
+	var reader automationDownloader
+	var readerErr error
+	readerResolved := false
+	type downloadLookup struct {
+		found bool
+		err   error
+	}
+	queried := make(map[string]downloadLookup)
+	for index := range rows {
+		candidate := &rows[index]
+		if !candidate.Eligible {
+			continue
+		}
+		seen, err := repo.HasDownloadHistory(source, candidate.ID, candidate.InfoHash, "")
+		if err != nil {
+			candidate.Eligible = false
+			candidate.Reasons = append(candidate.Reasons, "自动下载历史读取失败，无法排除已下载")
+			continue
+		}
+		if !seen && settings.DownloaderID != "" {
+			if !readerResolved {
+				reader, readerErr = s.downloader(settings.DownloaderID)
+				if reader == nil && readerErr == nil {
+					readerErr = errors.New("下载器不可用")
+				}
+				readerResolved = true
+			}
+			hash := strings.ToLower(candidate.InfoHash)
+			lookup, ok := queried[hash]
+			if !ok {
+				lookup.err = readerErr
+				if lookup.err == nil {
+					lookup.err = ctx.Err()
+				}
+				if lookup.err == nil {
+					status, statusErr := reader.TorrentStatus(hash)
+					lookup.found, lookup.err = status.Found, statusErr
+				}
+				queried[hash] = lookup
+			}
+			if lookup.err != nil {
+				candidate.Eligible = false
+				candidate.Reasons = append(candidate.Reasons, "下载器状态未知，无法排除已下载")
+				continue
+			}
+			seen = lookup.found
+		}
+		if seen {
+			candidate.PreviouslyDownloaded = true
+			*candidate = policy.Evaluate(*candidate, settings)
+		}
+	}
+	policy.Rank(rows, settings)
+}
+
+// checkTaskDownloadHistory 为待执行任务复核其他任务的下载记录。
+// 已拥有的本任务记录不视为重复。此检查只读，不接触下载器或目标站。
+func (s *AutomationService) checkTaskDownloadHistory(ctx context.Context, task repository.AutomationTask) error {
+	seen, err := s.repo.WithContext(ctx).HasDownloadHistory(task.Source, task.SourceID, task.InfoHash, task.ID)
+	if err != nil {
+		return errors.New("自动下载历史读取失败")
+	}
+	if seen {
+		return errors.New("已有其他自动下载记录")
+	}
+	return nil
 }
 
 // Preview 只读取站点详情、查重和 torrent 元数据，不预留、不落盘、不加种、不上传。

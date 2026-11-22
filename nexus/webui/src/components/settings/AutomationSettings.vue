@@ -83,12 +83,6 @@
             >仅在保存目录与 qBittorrent 默认目录一致时可验证；其他路径按未知处理。</span
           ></el-form-item
         >
-        <el-form-item label="官方组策略"
-          ><el-switch v-model="form.prefer_official" active-text="优先官方组"
-        /></el-form-item>
-        <el-form-item label="目标缺失偏好"
-          ><el-switch v-model="form.target_absent_priority" active-text="优先目标站尚无种子"
-        /></el-form-item>
         <el-form-item label="自动发布"
           ><el-switch
             v-model="form.auto_publish"
@@ -99,6 +93,18 @@
           ></el-form-item
         >
       </el-form>
+      <div class="policy-summary" role="note" aria-label="固定筛选规则">
+        <div class="policy-summary__heading">
+          <strong>固定筛选规则</strong>
+          <el-tag type="success" effect="plain">必须全部满足</el-tag>
+        </div>
+        <ul>
+          <li>源站只选官方种子，并按完整种子体积排序后匹配大小范围。</li>
+          <li>禁转、限制转载、分集标签或已下载的资源会跳过。</li>
+          <li>目标站必须确认不存在对应种子；查重失败或结果未知时跳过。</li>
+        </ul>
+        <p>这些条件由服务端强制执行，不能在页面或旧版 API 字段中关闭。</p>
+      </div>
       <div class="actions">
         <el-button type="primary" :loading="saving" @click="save">保存规则</el-button
         ><el-button :loading="previewing" @click="preview">预览候选</el-button
@@ -107,7 +113,7 @@
         >
       </div>
       <el-alert
-        title="发布策略：此规则不自动发布。目标限制未知或重复检查未知时，服务端应拒绝执行；请在任务详情中确认状态。"
+        title="发布策略：是否自动发布仍由上方开关控制。固定筛选规则不因该开关或兼容字段改变；任一条件未知时服务端会跳过候选。"
         type="warning"
         :closable="false"
         show-icon
@@ -126,15 +132,26 @@
           >
         </div></template
       ><el-table :data="candidates" @selection-change="(rows: Candidate[]) => (selected = rows)"
-        ><el-table-column type="selection" width="48" /><el-table-column
-          prop="title"
-          label="候选"
-          min-width="180"
-        /><el-table-column prop="size" label="大小" width="90" /><el-table-column
-          prop="seeders"
-          label="做种"
-          width="80"
-        /><el-table-column label="资格" width="100"
+        ><el-table-column
+          type="selection"
+          width="48"
+          :selectable="(row: Candidate) => row.eligible"
+        /><el-table-column label="候选" min-width="220"
+          ><template #default="s">
+            <div class="candidate-title">{{ s.row.title }}</div>
+            <div class="candidate-badges">
+              <el-tag v-if="s.row.official" size="small" type="success" effect="plain">官方</el-tag>
+              <el-tag v-if="s.row.episode" size="small" type="warning" effect="plain">分集</el-tag>
+              <el-tag v-if="s.row.previously_downloaded" size="small" type="info" effect="plain"
+                >已下载</el-tag
+              >
+            </div>
+          </template></el-table-column
+        ><el-table-column label="大小" width="100"
+          ><template #default="s">{{ formatSize(s.row.size) }}</template></el-table-column
+        ><el-table-column prop="seeders" label="做种" width="80" /><el-table-column
+          label="资格"
+          width="100"
           ><template #default="s"
             ><el-tag :type="s.row.eligible ? 'success' : 'danger'">{{
               s.row.eligible ? '可处理' : '跳过'
@@ -191,6 +208,9 @@ type Candidate = {
   title: string
   size: number
   seeders: number
+  official?: boolean
+  episode?: boolean
+  previously_downloaded?: boolean
   eligible: boolean
   reasons: string[]
 }
@@ -228,6 +248,14 @@ const form = reactive({
 })
 const minLeechers = ref(0),
   reserveSpace = ref(0)
+const formatSize = (value: unknown) => {
+  const bytes = Number(value)
+  if (!Number.isFinite(bytes) || bytes <= 0) return '未知'
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const amount = bytes / 1024 ** index
+  return `${amount.toFixed(index >= 3 ? 2 : 1)} ${units[index]}`
+}
 const quotaLabel = computed(
   () =>
     `本月 ${quota.value.count ?? 0} / ${form.monthly_limit} 项 · ${quota.value.bytes ? (Number(quota.value.bytes) / 1024 ** 3).toFixed(1) : '0.0'} GiB`,
@@ -442,6 +470,43 @@ onMounted(load)
 .actions > .el-button,
 .card-head > .el-button {
   margin-left: 0;
+}
+
+.policy-summary {
+  margin: 2px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-fill-color-lighter);
+  color: var(--el-text-color-regular);
+  line-height: 1.6;
+}
+
+.policy-summary__heading,
+.candidate-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.policy-summary ul {
+  margin: 10px 0 6px;
+  padding-left: 20px;
+}
+
+.policy-summary p {
+  margin: 0;
+  color: var(--star-muted);
+  font-size: 0.8125rem;
+}
+
+.candidate-title {
+  overflow-wrap: anywhere;
+}
+
+.candidate-badges {
+  margin-top: 5px;
 }
 
 @media (max-width: 600px) {

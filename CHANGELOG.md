@@ -492,3 +492,10 @@
 - v1.0.1 的代码、41 个经验证的 Web 文件和 Compose 已推送到 Gitee 与 GitHub。标签解引用均指向 1ddedde0526814553fa67435200621150bc063fc。GitHub 私有发行的三个附件已发布并核对大小与 SHA-256。完整镜像 581373136 字节，SHA-256 8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.1
 - Gitee 发行为 1351914，Compose 和 SHA-256 文件已上传并回下载核对。完整镜像超过 Gitee 单附件上限，仓库历史附件约 1.01 GB。发行页链接同版本 GitHub 私有发行中的完整镜像，保留历史附件。https://gitee.com/star1999/starpt/releases/tag/v1.0.1
 - D 盘 ZIP 包含同一标签源码、可独立装载的完整 Linux AMD64 镜像、Compose、恢复说明和校验清单。ZIP SHA-256 ee4b1d9b7239f1bcd2264fc3ccc14d75558e3563617ed721ca383adbdd72ee0d，验证了 OCI 摘要、ZIP 成员哈希及 Compose 与标签源码的字节一致，档案已索引。未重新发种或访问 81。版本标签固定，发行记录另提交并推送。
+
+## PTM-20261122-066 — 2026-11-22T13:03:54+08:00 — Codex root、automation_policy_inventory、automation_source_filters、automation_download_history、automation_rules_ui_contract，自动化官种和历史下载硬性过滤
+
+- acquire/automation 与 processing/automation 实施官种门槛与禁转、分集、已下载排除。织梦筛选 `tag_id=3`，按 `sort=5&type=desc` 排序，并用站内整数体积区间和做种/下载人数缩小范围。逐条核对官方标签、完整载荷字节和目标查重，合格行体积降序。同一登录账号的灰色 inactivity 100% 和绿色 seeding 100% 均由侧栏只读核对。更正后的实样本使用页面证据验证，未写入个人种子编号。
+- migrationflow、automation_repository 与 downloaderclient 核对跨月和跨目标的自动任务历史、qB 哈希、查重和租约。读取失败拒绝执行，下载前和发布前重新核验，隔离回归覆盖本任务自己的完整下载、目标新增重复、同路径已存在、并发预留和无副作用预览。
+- AutomationSettings.vue、机器 OpenAPI 和 API 文档展示固定筛选规则、跳过原因与禁选。旧偏好键兼容读取，不改变规则。初期人工补录草稿已撤销。152 Go 全量、Vue 类型检查、ESLint、Vite 和本机部署脚本 5 项测试通过。首轮一个测试文案预期已修正；最终 1440/390 像素隔离浏览器预览通过。
+- 152 以空目录验证独立 Compose，生产 ptmove-nexus:1.0.2 健康，版本及入口摘要核对通过，回滚 ptmove-nexus:1.0.1，发种和自动化计数无变化。同步 41 个 Web 文件、README、版本发布说明和部署记录。152 完整镜像 600401955 字节，SHA-256 0d325567f2cd4fd725bc58093b99b6b6f9d4e2f637ef9f489c16e7fc3f735edc。组装提交时双仓发布、附件和 D 盘归档待完成。未操作 81、未实际下载资源或发种。

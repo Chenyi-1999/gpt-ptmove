@@ -26,8 +26,8 @@ type Settings struct {
 	MinSeeders           int     `json:"min_seeders"`
 	MinLeechers          int     `json:"min_leechers"`
 	ReserveSpaceGiB      float64 `json:"reserve_space_gib"`
-	PreferOfficial       bool    `json:"prefer_official"`
-	TargetAbsentPriority bool    `json:"target_absent_priority"`
+	PreferOfficial       bool    `json:"prefer_official"`        // 兼容旧客户端；官种资格始终验证。
+	TargetAbsentPriority bool    `json:"target_absent_priority"` // 兼容旧客户端；目标查重始终验证。
 	SourceSite           string  `json:"source_site"`
 	TargetSite           string  `json:"target_site"`
 	DownloaderID         string  `json:"downloader_id"`
@@ -36,21 +36,23 @@ type Settings struct {
 
 // Candidate 为只读扫描结果；种子字节只在内存处理，不向 API 导出。
 type Candidate struct {
-	ID                string   `json:"id"`
-	Title             string   `json:"title"`
-	Size              int64    `json:"size"`
-	InfoHash          string   `json:"info_hash"`
-	Seeders           int      `json:"seeders"`
-	Leechers          int      `json:"leechers"`
-	Official          bool     `json:"official"`
-	RestrictionsKnown bool     `json:"restrictions_known"`
-	Allowed           bool     `json:"allowed"`
-	DuplicateKnown    bool     `json:"duplicate_known"`
-	Duplicate         bool     `json:"duplicate"`
-	Eligible          bool     `json:"eligible"`
-	Reasons           []string `json:"reasons"`
-	Torrent           []byte   `json:"-"`
-	DetailURL         string   `json:"-"`
+	ID                   string   `json:"id"`
+	Title                string   `json:"title"`
+	Size                 int64    `json:"size"`
+	InfoHash             string   `json:"info_hash"`
+	Seeders              int      `json:"seeders"`
+	Leechers             int      `json:"leechers"`
+	Official             bool     `json:"official"`
+	Episode              bool     `json:"episode"`
+	PreviouslyDownloaded bool     `json:"previously_downloaded"`
+	RestrictionsKnown    bool     `json:"restrictions_known"`
+	Allowed              bool     `json:"allowed"`
+	DuplicateKnown       bool     `json:"duplicate_known"`
+	Duplicate            bool     `json:"duplicate"`
+	Eligible             bool     `json:"eligible"`
+	Reasons              []string `json:"reasons"`
+	Torrent              []byte   `json:"-"`
+	DetailURL            string   `json:"-"`
 }
 
 // Defaults 返回关闭执行和调度的首装配置。
@@ -122,13 +124,34 @@ func Validate(s Settings) error {
 	return nil
 }
 
-// Evaluate 对候选执行闭合失败策略，未知禁转或重复检查永不合格。
-func Evaluate(c Candidate, s Settings) Candidate {
-	c.Reasons = []string{}
+// SourceRejection 返回可在读取种子元数据前确定的源站排除原因。
+// 返回空列表时仍需核验完整体积、做种情况和目标站查重，未确认官方身份的候选不通过。
+func SourceRejection(c Candidate) []string {
+	reasons := []string{}
+	if !c.Official {
+		reasons = append(reasons, "未确认源站官种")
+	}
 	if !c.RestrictionsKnown {
-		c.Reasons = append(c.Reasons, "禁转检查未知")
+		reasons = append(reasons, "禁转检查未知")
 	} else if !c.Allowed {
-		c.Reasons = append(c.Reasons, "源站禁止或限制转载")
+		reasons = append(reasons, "源站禁止或限制转载")
+	}
+	if c.Episode {
+		reasons = append(reasons, "源站标记为分集")
+	}
+	if c.PreviouslyDownloaded {
+		reasons = append(reasons, "源种子已下载或正在下载")
+	}
+	return reasons
+}
+
+// Evaluate 校验源站资格、目标缺失和完整种子信息，任一条件不满足则拒绝。
+func Evaluate(c Candidate, s Settings) Candidate {
+	c.Reasons = SourceRejection(c)
+	if len(c.Reasons) > 0 && len(c.Torrent) == 0 {
+		// 源站已确定排除，且读取器未访问种子下载或目标查重地址。
+		c.Eligible = false
+		return c
 	}
 	if !c.DuplicateKnown {
 		c.Reasons = append(c.Reasons, "目标查重未知")
@@ -151,18 +174,15 @@ func Evaluate(c Candidate, s Settings) Candidate {
 	return c
 }
 
-// Rank 优先合格、目标缺失与官方制作组，随后按做种数排序。
-func Rank(rows []Candidate, s Settings) {
+// Rank 将合格条目按完整体积降序排列，同体积优先当前做种数较多的条目。
+func Rank(rows []Candidate, _ Settings) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
 		if a.Eligible != b.Eligible {
 			return a.Eligible
 		}
-		if s.TargetAbsentPriority && a.Duplicate != b.Duplicate {
-			return !a.Duplicate
-		}
-		if s.PreferOfficial && a.Official != b.Official {
-			return a.Official
+		if a.Size != b.Size {
+			return a.Size > b.Size
 		}
 		return a.Seeders > b.Seeders
 	})

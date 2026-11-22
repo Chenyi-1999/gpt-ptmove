@@ -64,7 +64,8 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 	state := "completed"
 	if run.Execute {
 		raw, _ := json.Marshal(snapshot.Route)
-		for _, c := range rows {
+		for index := range rows {
+			c := &rows[index]
 			if ctx.Err() != nil {
 				state = "failed"
 				message = "扫描时间耗尽，已有预留保持不变"
@@ -81,6 +82,8 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 					break
 				}
 				if errors.Is(err, repository.ErrAutomationDuplicate) {
+					c.Eligible = false
+					c.Reasons = append(c.Reasons, "源种子已有下载记录或已被其他自动任务预留")
 					continue
 				}
 				if errors.Is(err, repository.ErrAutomationFence) {

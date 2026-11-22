@@ -92,6 +92,12 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if _, err = s.automationSeedForPublish(task, snapshot); err != nil {
 		return err
 	}
+	if !task.DownloadAttempted {
+		return errors.New("未确认本任务发起下载，已停止自动发布")
+	}
+	if err = a.checkTaskDownloadHistory(context.Background(), task); err != nil {
+		return errors.New(err.Error() + "，已停止自动发布")
+	}
 	sp, err := acquireautomation.ProfileFrom(snapshot.Source)
 	if err != nil {
 		return errors.New("源站配置不可用，无法确认转种权限")
@@ -129,7 +135,7 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	candidate, err := a.scanner.Inspect(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
+	candidate, err := a.scanner.InspectForPublish(ctx, sp, tp, sourceCookie, targetCookie, task.SourceID)
 	if candidate.RestrictionsKnown && !candidate.Allowed {
 		return errors.New("源站标记禁转或限转，已停止发布")
 	}
@@ -139,9 +145,14 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if !candidate.RestrictionsKnown {
 		return errors.New("无法确认源站转种权限，已停止发布")
 	}
+	// 本任务的完整下载已核实，源站因此显示已下载是预期状态。
+	candidate.PreviouslyDownloaded = false
 	candidate = policy.Evaluate(candidate, snapshot.Settings)
-	if !candidate.Eligible || candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {
-		return errors.New("发布前权限、查重或载荷检查未通过")
+	if !candidate.Eligible {
+		return errors.New("发布前候选已不符合规则：" + strings.Join(candidate.Reasons, "；"))
+	}
+	if candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {
+		return errors.New("发布前候选完整载荷与预留时不一致")
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package automation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -28,6 +29,7 @@ func testProfile(base string) Profile {
 }
 func TestReadOnlyScanMetadataAndExplicitEmptyEvidence(t *testing.T) {
 	source := testProfile("https://source.example.com")
+	source.OfficialGroups = []string{"GROUP"}
 	target := testProfile("https://target.example.com")
 	requests := 0
 	s := NewScanner()
@@ -66,6 +68,185 @@ func TestReadOnlyScanMetadataAndExplicitEmptyEvidence(t *testing.T) {
 			t.Fatalf("preview leaked internal data %s", secret)
 		}
 	}
+}
+
+func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
+	source := testProfile("https://zmpt.cc")
+	source.OfficialGroups = []string{"ZmWeb"}
+	source.AnnounceHosts = []string{"zmpt.cc"}
+	target := testProfile("https://target.example.com")
+	settings := policy.Defaults()
+	settings.MinSizeGiB, settings.MaxSizeGiB = 6.25, 6.75
+	settings.MonthlyLimit, settings.MinLeechers = 60, 1
+	official := zmptTestTag("官方")
+	inspectedTitles := map[string]string{"500": "New smaller release", "501": "New larger release", "502": "Out of Exact Bounds", "503": "Already on Target"}
+	var requests []string
+	s := NewScanner()
+	s.Client.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.Host+req.URL.RequestURI())
+		if req.Method != http.MethodGet {
+			t.Fatalf("preview performed mutation %s", req.Method)
+		}
+		id := req.URL.Query().Get("id")
+		var body string
+		switch {
+		case req.URL.Host == "target.example.com":
+			if req.URL.Query().Get("search") == "Already on Target" {
+				body = `<a href="details.php?id=99">existing</a>`
+			} else {
+				body = `<p>没有找到相关种子</p>`
+			}
+		case req.URL.Path == "/torrents.php":
+			q := req.URL.Query()
+			for key, want := range map[string]string{"tag_id": "3", "sort": "5", "type": "desc", "size_begin": "6", "size_end": "7", "seeders_begin": "3", "leechers_begin": "1", "incldead": "1"} {
+				if q.Get(key) != want {
+					t.Errorf("listing query %s = %q, want %q", key, q.Get(key), want)
+				}
+			}
+			var rows strings.Builder
+			switch q.Get("page") {
+			case "0":
+				rows.WriteString(zmptTestRow("1", "Pinned-ZmWeb", `<div>官方</div>`))
+				rows.WriteString(zmptTestRow("2", "Restricted", official+zmptTestTag("禁转")))
+				rows.WriteString(zmptTestRow("3", "Single Episode", official+zmptTestTag("分集")))
+				rows.WriteString(zmptTestRow("4", "Previously downloaded and removed from client", official+zmptTestBar("inactivity 100%")))
+				for n := 10; n < 65; n++ {
+					rows.WriteString(zmptTestRow(fmt.Sprint(n), "Previous download", official+zmptTestBar("seeding 100%")))
+				}
+			case "1":
+				rows.WriteString(zmptTestRow("500", "New smaller release", official+`<img title="审核通过" style="color: green">`))
+				rows.WriteString(zmptTestRow("501", "New larger release", official))
+				rows.WriteString(zmptTestRow("502", "Out of Exact Bounds", official))
+				rows.WriteString(zmptTestRow("503", "Already on Target", official))
+			}
+			body = `<a href="torrents.php?tag_id=3">官方</a><table class="torrents">` + rows.String() + `</table>`
+		case req.URL.Path == "/details.php" && id >= "500" && id <= "503":
+			body = zmptTestDetail(id, inspectedTitles[id])
+		case req.URL.Path == "/download.php" && id >= "500" && id <= "503":
+			size := map[string]int64{"500": 13 * policy.GiB / 2, "501": 53 * policy.GiB / 8, "502": 55 * policy.GiB / 8, "503": 13 * policy.GiB / 2}[id]
+			body = zmptTestTorrent(size)
+		default:
+			t.Fatalf("read excluded or unexpected URL %s", req.URL)
+		}
+		return zmptTestResponse(body), nil
+	})
+	rows, err := s.Scan(context.Background(), source, target, "source-cookie-fixture", "target-cookie-fixture", "https://zmpt.cc/rss.php", settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 54 || !rows[0].Eligible || rows[0].ID != "501" || !rows[1].Eligible || rows[1].ID != "500" {
+		t.Fatalf("expected both eligible rows in size order after the skipped first page, got %d rows, first %#v", len(rows), rows[:min(2, len(rows))])
+	}
+	byID := map[string]policy.Candidate{}
+	for _, row := range rows {
+		byID[row.ID] = row
+	}
+	if byID["1"].Official || byID["1"].Eligible || !byID["2"].RestrictionsKnown || byID["2"].Allowed || !byID["3"].Episode || !byID["4"].PreviouslyDownloaded || !byID["10"].PreviouslyDownloaded || byID["502"].Eligible || !byID["503"].Duplicate || byID["503"].Eligible {
+		t.Fatalf("ineligible rows bypassed: %+v", byID)
+	}
+	if n := len(requests); n != 15 {
+		t.Fatalf("visited %d pages/details/torrents/target searches, want 15: %v", n, requests)
+	}
+}
+
+func TestZmptRereadsAccountProgressAtExecutionAndPublish(t *testing.T) {
+	source := testProfile("https://zmpt.cc")
+	target := testProfile("https://target.example.com")
+	var progress = "inactivity 0%"
+	var matchID = "500"
+	var detailsTitle = "Synthetic ZmPT Release-ZmWeb"
+	var seenSearch string
+	torrentReads, targetReads := 0, 0
+	s := NewScanner()
+	s.Client.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
+		var body string
+		switch {
+		case req.URL.Host == "target.example.com":
+			targetReads++
+			body = `<p>没有找到相关种子</p>`
+		case req.URL.Path == "/details.php":
+			body = `<h1>Unrelated header</h1>` + zmptTestDetail("500", detailsTitle+`<span>[ 免费 ] 剩余时间： 1天</span>`)
+		case req.URL.Path == "/torrents.php":
+			seenSearch = req.URL.Query().Get("search")
+			if req.URL.Query().Get("tag_id") != "3" {
+				t.Fatal("live verification failed to restrict to official results")
+			}
+			body = `<table class="torrents">` + zmptTestRow(matchID, detailsTitle, zmptTestTag("官方")+zmptTestBar(progress)) + `</table>`
+		case req.URL.Path == "/download.php":
+			torrentReads++
+			body = zmptTestTorrent(policy.GiB)
+		default:
+			t.Fatalf("unexpected URL %s", req.URL)
+		}
+		return zmptTestResponse(body), nil
+	})
+	ctx := context.Background()
+	c, err := s.Inspect(ctx, source, target, "source-cookie-fixture", "target-cookie-fixture", "500")
+	if err != nil || !c.Official || !c.PreviouslyDownloaded || len(c.Torrent) != 0 || seenSearch != detailsTitle || torrentReads != 0 || targetReads != 0 {
+		t.Fatalf("new download did not yield to previous account activity: %+v, %v (%d,%d), search=%q", c, err, torrentReads, targetReads, seenSearch)
+	}
+	progress = "leeching 35.50%"
+	c, err = s.InspectForPublish(ctx, source, target, "source-cookie-fixture", "target-cookie-fixture", "500")
+	if err != nil || !c.PreviouslyDownloaded || len(c.Torrent) == 0 || !c.DuplicateKnown || c.Duplicate || torrentReads != 1 || targetReads != 1 {
+		t.Fatalf("own download could not refresh full publish evidence: %+v, %v (%d,%d)", c, err, torrentReads, targetReads)
+	}
+	matchID = "501"
+	if _, err := s.Inspect(ctx, source, target, "source-cookie-fixture", "target-cookie-fixture", "500"); err == nil || torrentReads != 1 || targetReads != 1 {
+		t.Fatal("same-title different source ID was accepted as download history evidence")
+	}
+}
+
+func TestGenericOfficialBadgeIsBoundToDetailTagRow(t *testing.T) {
+	source := testProfile("https://source.example.com")
+	source.Selectors.Tags = ".tag"
+	for _, test := range []struct {
+		name     string
+		body     string
+		official bool
+	}{
+		{"navigation badge", `<nav><a class="tag" href="torrents.php?tag_id=3">官方</a></nav>`, false},
+		{"description imitation", `<div id="kdescr"><table><tr><td class="rowhead">标签</td><td><span class="tag">官方</span></td></tr></table></div>`, false},
+		{"filter form row", `<form><table><tr><th>Tags</th><td><span class="tag">官方</span></td></tr></table></form>`, false},
+		{"detail tag row", `<table><tr><td class="rowhead">标签：</td><td><span class="tag">官方</span></td></tr></table>`, true},
+		{"unclassed stock badge", `<table><tr><th>Tags</th><td>` + zmptTestTag("官方") + `</td></tr></table>`, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			doc, err := html.Parse(strings.NewReader(test.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := detailSourceEvidence(doc, source, false).official; got != test.official {
+				t.Fatalf("official evidence = %v, want %v", got, test.official)
+			}
+		})
+	}
+}
+
+func zmptTestTag(label string) string {
+	return `<span style="background-color:blue;color:white;border-radius:2px;" title="标签">` + label + `</span>`
+}
+
+func zmptTestBar(title string) string {
+	status, width, _ := strings.Cut(title, " ")
+	color := map[string]string{"seeding": "green", "inactivity": "#aaa", "leeching": "blue"}[status]
+	return `<div style="padding: 1px;margin-top: 2px;border: 1px solid #838383" title="` + title + `"><div style="width: ` + width + `;background-color: ` + color + `;height: 2px"></div></div>`
+}
+
+func zmptTestRow(id, title, badges string) string {
+	return `<tr><td class="rowfollow"><table class="torrentname"><tr><td class="embedded"><a href="details.php?id=` + id + `&amp;hit=1"><b>` + title + `</b></a>` + badges + `</td></tr></table></td><td>999</td></tr>`
+}
+
+func zmptTestDetail(id, title string) string {
+	return `<h1 id="top">` + title + `</h1><div id="kdescr">影片介绍</div><table><tr><td>基本信息 做种者: 8 下载者: 2</td></tr></table><a href="/download.php?id=` + id + `">download</a>`
+}
+
+func zmptTestTorrent(size int64) string {
+	tracker := "https://zmpt.cc/announce"
+	return fmt.Sprintf("d8:announce%d:%s4:infod6:lengthi%de4:name4:test12:piece lengthi%de6:pieces20:xxxxxxxxxxxxxxxxxxxx7:privatei1eee", len(tracker), tracker, size, size)
+}
+
+func zmptTestResponse(body string) *http.Response {
+	return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}
 }
 func TestGlobalRestrictionOverridesCustomAllow(t *testing.T) {
 	p := testProfile("https://source.example.com")

@@ -102,6 +102,8 @@ func machineRulesSchema() map[string]any {
 	for _, key := range []string{"enabled", "auto_publish", "schedule_enabled", "prefer_official", "target_absent_priority"} {
 		props[key] = map[string]any{"type": "boolean"}
 	}
+	props["prefer_official"] = map[string]any{"type": "boolean", "deprecated": true, "description": "Legacy compatibility field. Official torrents are always required; this value is accepted and returned but cannot change filtering."}
+	props["target_absent_priority"] = map[string]any{"type": "boolean", "deprecated": true, "description": "Legacy compatibility field. The target must be affirmatively confirmed to lack the torrent; unknown duplicate checks are skipped regardless of this value."}
 	for _, key := range []string{"source_site", "target_site", "downloader_id", "save_path", "schedule_time"} {
 		props[key] = map[string]any{"type": "string"}
 	}
@@ -115,5 +117,5 @@ func machineRulesSchema() map[string]any {
 		props[key] = map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 100000}
 	}
 	props["reserve_space_gib"] = map[string]any{"type": "number", "minimum": 0, "maximum": 100000}
-	return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "description": "Partial automation rule update. min_size_gib <= max_size_gib <= monthly_budget_gib; schedule_time HH:mm. Enabling requires existing native downloader/save path and supported source/target profiles."}
+	return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "description": "Partial automation rule update. Hard filters always require official source torrents, exclude restricted and episode releases and previously downloaded items, and require an affirmative target-absence check; unknown restriction, download-history or duplicate status is skipped. Candidates are ordered by complete torrent size before the configured size range and other thresholds are applied. Legacy prefer_official and target_absent_priority fields are accepted and returned for compatibility but do not override these rules. min_size_gib <= max_size_gib <= monthly_budget_gib; schedule_time HH:mm. Enabling requires existing native downloader/save path and supported source/target profiles."}
 }

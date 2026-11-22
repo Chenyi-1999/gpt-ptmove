@@ -1170,21 +1170,23 @@ func automationStatus(c *qbClient, hash string) (AutomationTorrentStatus, error)
 		return AutomationTorrentStatus{}, errors.New("读取下载状态失败")
 	}
 	var rows []map[string]any
-	if json.Unmarshal(body, &rows) != nil {
+	if json.Unmarshal(body, &rows) != nil || rows == nil || len(rows) > 1 {
 		return AutomationTorrentStatus{}, errors.New("下载状态响应无效")
 	}
-	for _, row := range rows {
-		if strings.EqualFold(toString(row["hash"], ""), hash) {
-			progress, _ := row["progress"].(float64)
-			return AutomationTorrentStatus{
-				Found: true, Hash: hash, State: toString(row["state"], ""),
-				SavePath: toString(row["save_path"], ""), Name: toString(row["name"], ""),
-				ContentPath: toString(row["content_path"], ""), Progress: progress,
-				AmountLeft: automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"]),
-			}, nil
-		}
+	if len(rows) == 0 {
+		return AutomationTorrentStatus{}, nil
 	}
-	return AutomationTorrentStatus{}, nil
+	row := rows[0]
+	if !strings.EqualFold(toString(row["hash"], ""), hash) {
+		return AutomationTorrentStatus{}, errors.New("下载状态响应的哈希与查询不一致")
+	}
+	progress, _ := row["progress"].(float64)
+	return AutomationTorrentStatus{
+		Found: true, Hash: hash, State: toString(row["state"], ""),
+		SavePath: toString(row["save_path"], ""), Name: toString(row["name"], ""),
+		ContentPath: toString(row["content_path"], ""), Progress: progress,
+		AmountLeft: automationAmountLeft(row), Downloaded: toInt64Any(row["downloaded"]),
+	}, nil
 }
 
 // TorrentFilesComplete 确认每个文件均选择且完整；空列表或未知字段返回false。
@@ -1259,7 +1261,7 @@ func automationAdd(c *qbClient, data []byte, name, path string, paused bool) err
 }
 
 // AddSourceTorrent 按已验证hash添加源站私有种子，强制实际下载和校验。
-// 若hash已存在则不重复添加；加种响应未知时返回错误，调用者需查询hash恢复。
+// 若哈希已存在则返回 ErrAutomationSourceExists；加种响应未知时调用者需查询哈希恢复。
 func (d Downloader) AddSourceTorrent(data []byte, fileName, savePath, expectedHash string) error {
 	if err := automationValidate(data, expectedHash); err != nil {
 		return err
@@ -1273,10 +1275,13 @@ func (d Downloader) AddSourceTorrent(data []byte, fileName, savePath, expectedHa
 		return err
 	}
 	if status.Found {
-		return nil
+		return ErrAutomationSourceExists
 	}
 	return automationAdd(c, data, fileName, savePath, false)
 }
+
+// ErrAutomationSourceExists 表示准备提交前发现源种已存在，未向下载器提交添加请求。
+var ErrAutomationSourceExists = errors.New("源种子已存在于下载器")
 
 // Trackers 读取Tracker状态供上层按目标站精确域名确认做种，不修改任何Tracker。
 func (d Downloader) Trackers(hash string) ([]AutomationTracker, error) {

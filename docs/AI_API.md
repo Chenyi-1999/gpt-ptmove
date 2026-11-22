@@ -30,6 +30,8 @@ curl -X POST "$PTMOVE_URL/api/v1/sites/import" \
 
 `site-import.json`格式为`{"profile": <站点对象>, "update": false}`。站点凭据使用`PUT /sites/{id}/credentials`，只提供需要修改的cookie/rss_url字段。规则使用`GET /rules`后修改完整对象再`PUT /rules`，包含source_site/target_site；启用规则需要publish权限。
 
+原生自动化对候选实施固定筛选：源站只取官种，禁转、分集和已下载资源跳过；目标站只有在查重明确确认不存在时才可入选。筛选状态不明或查询失败会跳过候选。旧字段`prefer_official`、`target_absent_priority`仍可读写以兼容旧客户端，但已弃用且不能改变这些规则。检查候选时应读取服务端资格和跳过原因，不要依据标题自行推断可执行。
+
 常用流程：
 
 1. `GET /dashboard`、`GET /sites`和`GET /rules`检查连接、额度和当前路线。

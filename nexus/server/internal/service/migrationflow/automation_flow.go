@@ -59,6 +59,10 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		d = native.WithEffectGuard(func() error { return s.authorizedTask(task, snapshot) })
 	}
 	if task.State == "reserved" {
+		if err = s.checkTaskDownloadHistory(ctx, task); err != nil {
+			s.failTask(task, err.Error()+"，未提交新下载", false)
+			return
+		}
 		sp, _ := acquireautomation.ProfileFrom(snapshot.Source)
 		tp, _ := acquireautomation.ProfileFrom(snapshot.Target)
 		sourceCookie, err := s.profiles.Cookie(task.Source)
@@ -78,7 +82,11 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		}
 		candidate = policy.Evaluate(candidate, snapshot.Settings)
 		if !candidate.Eligible || candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {
-			s.failTask(task, "候选权限、重复状态或完整载荷发生改变", false)
+			message := "候选完整载荷与预留时不一致"
+			if !candidate.Eligible {
+				message = "下载前候选已不符合规则：" + strings.Join(candidate.Reasons, "；")
+			}
+			s.failTask(task, message, false)
 			return
 		}
 		if s.authorizedTask(task, snapshot) != nil {
@@ -93,8 +101,22 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 			s.failTask(task, "下载器状态未知，未提交新下载", false)
 			return
 		}
-		if status.Found && !sameAutomationSavePath(status.SavePath, task.SavePath) {
-			s.failTask(task, "相同种子已存在其他目录，停止自动操作", false)
+		if status.Found {
+			s.failTask(task, "相同种子已存在于下载器，未提交新下载", false)
+			return
+		}
+		if snapshot.Settings.ReserveSpaceGiB > 0 {
+			free, spaceErr := d.FreeSpace(task.SavePath)
+			if spaceErr != nil || free < task.Size+int64(snapshot.Settings.ReserveSpaceGiB*float64(policy.GiB)) {
+				s.failTask(task, "目录可用空间未知或不足，未提交下载", false)
+				return
+			}
+		}
+		if s.authorizedTask(task, snapshot) != nil {
+			return
+		}
+		if err = s.checkTaskDownloadHistory(ctx, task); err != nil {
+			s.failTask(task, err.Error()+"，未提交新下载", false)
 			return
 		}
 		dir := filepath.Join(config.ResolveRuntimePaths().DataDir, "automation", "torrents")
@@ -112,31 +134,23 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		}
 		task.State = "downloading"
 		task.TorrentPath = torrentPath
-		if !status.Found {
+		if s.authorizedTask(task, snapshot) != nil {
+			return
+		}
+		if err = d.AddSourceTorrent(candidate.Torrent, task.ID+".torrent", task.SavePath, task.InfoHash); err != nil {
+			if errors.Is(err, downloaderclient.ErrAutomationSourceExists) {
+				s.failTask(task, "相同种子在提交前已存在于下载器，未提交新下载", false)
+				return
+			}
 			if s.authorizedTask(task, snapshot) != nil {
 				return
 			}
-			if snapshot.Settings.ReserveSpaceGiB > 0 {
-				free, spaceErr := d.FreeSpace(task.SavePath)
-				if spaceErr != nil || free < task.Size+int64(snapshot.Settings.ReserveSpaceGiB*float64(policy.GiB)) {
-					s.failTask(task, "目录可用空间未知或不足，未提交下载", false)
-					return
-				}
-			}
-			if s.authorizedTask(task, snapshot) != nil {
+			confirmed, queryErr := d.TorrentStatus(task.InfoHash)
+			if queryErr == nil && confirmed.Found && sameAutomationSavePath(confirmed.SavePath, task.SavePath) {
 				return
 			}
-			if err = d.AddSourceTorrent(candidate.Torrent, task.ID+".torrent", task.SavePath, task.InfoHash); err != nil {
-				if s.authorizedTask(task, snapshot) != nil {
-					return
-				}
-				confirmed, queryErr := d.TorrentStatus(task.InfoHash)
-				if queryErr == nil && confirmed.Found && sameAutomationSavePath(confirmed.SavePath, task.SavePath) {
-					return
-				}
-				s.failTask(task, "源种子添加结果未知，按哈希核对未确认，禁止盲目重加", true)
-				return
-			}
+			s.failTask(task, "源种子添加结果未知，按哈希核对未确认，禁止盲目重加", true)
+			return
 		}
 	}
 	if task.State == "downloading" {

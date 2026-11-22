@@ -3,6 +3,7 @@ package migrationflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -55,8 +56,12 @@ func automationFixture(t *testing.T) (*AutomationService, *gorm.DB) {
 	}
 	return service, db
 }
-func automationFakePages(t *testing.T, s *AutomationService) *int {
+func automationFakePages(t *testing.T, s *AutomationService, titles ...string) *int {
 	t.Helper()
+	title := "Movie-GROUP"
+	if len(titles) > 0 {
+		title = titles[0]
+	}
 	calls := new(int)
 	s.scanner.Client.Transport = automationTransport(func(req *http.Request) (*http.Response, error) {
 		*calls++
@@ -68,7 +73,7 @@ func automationFakePages(t *testing.T, s *AutomationService) *int {
 		case req.URL.Host == "target.example.com":
 			body = "<p>没有找到相关种子</p>"
 		case req.URL.Path == "/details.php":
-			body = `<h1>Movie-GROUP</h1><div id="kdescr">description</div><table>基本信息 做种者: 5 下载者: 2</table><a href="/download.php?id=1">download</a>`
+			body = "<h1>" + title + `</h1><div id="kdescr">description</div><table>基本信息 做种者: 5 下载者: 2</table><a href="/download.php?id=1">download</a>`
 		case req.URL.Path == "/download.php":
 			body = "d8:announce35:https://source.example.com/announce4:infod6:lengthi1073741824e4:name4:test12:piece lengthi1073741824e6:pieces20:xxxxxxxxxxxxxxxxxxxx7:privatei1eee"
 		default:
@@ -97,6 +102,60 @@ func TestAutomationPreviewHasNoDurableOrDownloaderEffects(t *testing.T) {
 		if count != 0 {
 			t.Fatalf("preview persisted %T: %d", model, count)
 		}
+	}
+}
+
+// TestAutomationPreviewSkipsPriorDownloads 验证历史、下载器已存在及状态未知都无法入选，预览只读取下载器状态。
+func TestAutomationPreviewSkipsPriorDownloads(t *testing.T) {
+	for _, scenario := range []struct {
+		name        string
+		history     bool
+		active      bool
+		statusError error
+		wantQueries int
+		wantReason  string
+	}{
+		{name: "past route", history: true, wantReason: "下载"},
+		{name: "same path in qB", active: true, wantQueries: 1, wantReason: "下载"},
+		{name: "qB unreachable", statusError: errors.New("fixture failure"), wantQueries: 1, wantReason: "下载器状态未知"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			s, db := automationFixture(t)
+			automationFakePages(t, s)
+			if scenario.history {
+				history := repository.AutomationTask{
+					ID: "prior", Source: "zmpt", SourceID: "1", Target: "other",
+					Month: "2025-11", State: "failed", DownloadAttempted: true,
+				}
+				if err := db.Create(&history).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			fake := &automationFakeDownloader{
+				status:    downloaderclient.AutomationTorrentStatus{Found: scenario.active, SavePath: "/nas/data"},
+				statusErr: scenario.statusError,
+			}
+			s.downloaderHook = func(string) (automationDownloader, error) { return fake, nil }
+			result, status := s.Preview(context.Background(), map[string]any{"downloader_id": "qb", "save_path": "/nas/data"})
+			candidates, ok := result["candidates"].([]policy.Candidate)
+			if status != 200 || !ok || len(candidates) != 1 {
+				t.Fatalf("preview status=%d candidates=%v", status, result)
+			}
+			row := candidates[0]
+			if row.Eligible || row.PreviouslyDownloaded != (scenario.history || scenario.active) ||
+				!strings.Contains(strings.Join(row.Reasons, " "), scenario.wantReason) {
+				t.Fatalf("candidate not rejected as expected: %+v", row)
+			}
+			if fake.calls != scenario.wantQueries || fake.adds != 0 {
+				t.Fatalf("unexpected downloader usage: %+v", fake)
+			}
+			for _, model := range []any{&repository.AutomationQuota{}, &repository.AutomationRun{}, &repository.PublishQueueTask{}} {
+				var count int64
+				if err := db.Model(model).Count(&count).Error; err != nil || count != 0 {
+					t.Fatalf("preview wrote %T: %d, %v", model, count, err)
+				}
+			}
+		})
 	}
 }
 func TestAutomationRunIsDurableIntentWithoutNetworkInsideMachineTransaction(t *testing.T) {
@@ -135,14 +194,16 @@ func TestAutomationRunIsDurableIntentWithoutNetworkInsideMachineTransaction(t *t
 }
 
 type automationFakeDownloader struct {
-	status   downloaderclient.AutomationTorrentStatus
-	complete bool
-	calls    int
+	status    downloaderclient.AutomationTorrentStatus
+	statusErr error
+	complete  bool
+	calls     int
+	adds      int
 }
 
 func (f *automationFakeDownloader) TorrentStatus(string) (downloaderclient.AutomationTorrentStatus, error) {
 	f.calls++
-	return f.status, nil
+	return f.status, f.statusErr
 }
 func (f *automationFakeDownloader) TorrentFilesComplete(string) (bool, error) {
 	f.calls++
@@ -154,6 +215,7 @@ func (f *automationFakeDownloader) Trackers(string) ([]downloaderclient.Automati
 }
 func (f *automationFakeDownloader) AddSourceTorrent([]byte, string, string, string) error {
 	f.calls++
+	f.adds++
 	return nil
 }
 func (f *automationFakeDownloader) EnsureTargetSeeding([]byte, string, string, string) error {
@@ -179,6 +241,46 @@ func automationDownloadTask(t *testing.T, s *AutomationService, db *gorm.DB) rep
 		t.Fatal(err)
 	}
 	return task
+}
+
+// TestAutomationReservedRechecksBeforeAdding 防止已存在的同目录种子或已不符合官种规则的旧预留继续下载。
+func TestAutomationReservedRechecksBeforeAdding(t *testing.T) {
+	for _, scenario := range []struct {
+		name        string
+		title       string
+		wantReason  string
+		wantQueries int
+	}{
+		{name: "same path in qB", title: "Movie-GROUP", wantReason: "相同种子已存在于下载器", wantQueries: 1},
+		{name: "source not official", title: "Movie-OTHER", wantReason: "未确认源站官种", wantQueries: 0},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			s, db := automationFixture(t)
+			automationFakePages(t, s)
+			preview, status := s.Preview(context.Background(), nil)
+			candidates, ok := preview["candidates"].([]policy.Candidate)
+			if status != 200 || !ok || len(candidates) != 1 || !candidates[0].Eligible {
+				t.Fatalf("fixture failed preview: %v", preview)
+			}
+			task := automationDownloadTask(t, s, db)
+			if err := db.Model(&repository.AutomationTask{}).Where("id = ?", task.ID).Updates(map[string]any{
+				"state": "reserved", "download_attempted": false, "info_hash": candidates[0].InfoHash,
+			}).Error; err != nil {
+				t.Fatal(err)
+			}
+			automationFakePages(t, s, scenario.title)
+			fake := &automationFakeDownloader{status: downloaderclient.AutomationTorrentStatus{Found: true, SavePath: task.SavePath}}
+			s.downloaderHook = func(string) (automationDownloader, error) { return fake, nil }
+			s.Tick(context.Background())
+			row, err := s.repo.Task(task.ID)
+			if err != nil || row.State != "failed" || !strings.Contains(row.Message, scenario.wantReason) || row.DownloadAttempted {
+				t.Fatalf("reserved task not rejected before download: %+v, %v", row, err)
+			}
+			if fake.calls != scenario.wantQueries || fake.adds != 0 {
+				t.Fatalf("unexpected downloader usage: %+v", fake)
+			}
+		})
+	}
 }
 func TestAutomationPartialFilesNeverEnterNativePreparation(t *testing.T) {
 	s, db := automationFixture(t)

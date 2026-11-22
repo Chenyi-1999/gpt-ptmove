@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,7 +13,7 @@ import (
 var (
 	ErrAutomationFence     = errors.New("自动任务租约或状态已改变")
 	ErrAutomationQuota     = errors.New("本月次数或流量预算不足")
-	ErrAutomationDuplicate = errors.New("该源种子已预留、已发布或结果待核对")
+	ErrAutomationDuplicate = errors.New("该源种子已预留、已下载、已发布或结果待核对")
 )
 
 // AutomationSettingsRecord 保存模块设置；凭据仍由原生站点和下载器配置管理。
@@ -131,16 +132,37 @@ func (r *AutomationRepository) FinishRun(id, status, message string, selected in
 	return r.db.Model(&AutomationRun{}).Where("id = ?", id).Updates(map[string]any{"status": status, "message": message, "selected": selected, "finished_at": now.UnixMilli()}).Error
 }
 
+// automationDownloadStates 包含已开始下载或已进入其后阶段的旧任务，兼容缺少下载标记的记录。
+var automationDownloadStates = []string{
+	"downloading", "preparing", "ready", "queued_publish", "publishing",
+	"published", "seeding", "succeeded", "reconciling", "needs_review",
+}
+
+// automationSourceIdentity 按同源标识或规范化信息哈希匹配载荷，不受目标站或月份影响。
+func automationSourceIdentity(db *gorm.DB, source, sourceID, hash string) *gorm.DB {
+	query := db.Model(&AutomationTask{})
+	if hash == "" {
+		return query.Where("source = ? AND source_id = ?", source, sourceID)
+	}
+	return query.Where("((source = ? AND source_id = ?) OR LOWER(info_hash) = ?)", source, sourceID, strings.ToLower(hash))
+}
+
+// HasDownloadHistory 检查同一载荷的自动下载历史。重查已有任务时可排除任务自身。
+// 无记录返回 false；查询失败交由上层拒绝执行。此查询不更改任务或配额。
+func (r *AutomationRepository) HasDownloadHistory(source, sourceID, hash, exceptTaskID string) (bool, error) {
+	query := automationSourceIdentity(r.db, source, sourceID, hash).
+		Where("(download_attempted = ? OR publish_attempted = ? OR state IN ?)", true, true, automationDownloadStates)
+	if exceptTaskID != "" {
+		query = query.Where("id <> ?", exceptTaskID)
+	}
+	var existing int64
+	err := query.Count(&existing).Error
+	return existing > 0, err
+}
+
 // Reserve 在同一事务内创建任务并条件扣减月度次数与字节预算。
 func (r *AutomationRepository) Reserve(task *AutomationTask, maxCount int, maxBytes int64) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		var n int64
-		if err := tx.Model(&AutomationTask{}).Where("source = ? AND target = ? AND (source_id = ? OR info_hash = ?) AND (month = ? OR publish_attempted = ? OR state IN ?)", task.Source, task.Target, task.SourceID, task.InfoHash, task.Month, true, []string{"published", "seeding", "succeeded", "needs_review"}).Count(&n).Error; err != nil {
-			return err
-		}
-		if n > 0 {
-			return ErrAutomationDuplicate
-		}
 		if task.Size <= 0 || task.Size > maxBytes || maxCount <= 0 {
 			return ErrAutomationQuota
 		}
@@ -153,6 +175,18 @@ func (r *AutomationRepository) Reserve(task *AutomationTask, maxCount int, maxBy
 		}
 		if updated.RowsAffected != 1 {
 			return ErrAutomationQuota
+		}
+		// 在当月配额行串行化写入后重读，命中时回滚本次配额扣减。
+		var duplicate AutomationTask
+		err := automationSourceIdentity(tx, task.Source, task.SourceID, task.InfoHash).
+			Where("(download_attempted = ? OR publish_attempted = ? OR state IN ? OR state = ? OR (source = ? AND target = ? AND month = ?))",
+				true, true, automationDownloadStates, "reserved", task.Source, task.Target, task.Month).
+			Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").Take(&duplicate).Error
+		if err == nil {
+			return ErrAutomationDuplicate
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 		return tx.Create(task).Error
 	})
