@@ -1,6 +1,6 @@
 services:
   ptmove-nexus:
-    image: ${PTMOVE_IMAGE:-ptmove-nexus:1.0.0}
+    image: ${PTMOVE_IMAGE:-ptmove-nexus:1.0.1}
     build:
       context: .
       dockerfile: Dockerfile.ptmove

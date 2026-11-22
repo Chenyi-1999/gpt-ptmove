@@ -25,6 +25,7 @@ func (s *Service) GetSpeedData() (map[string]any, error) {
 	return result, nil
 }
 
+// GetRecentSpeedData 返回近期每秒速率，优先使用未落库及刚落库的采样。
 func (s *Service) GetRecentSpeedData(seconds int) (map[string]any, error) {
 	if seconds <= 0 {
 		seconds = 60
@@ -34,6 +35,11 @@ func (s *Service) GetRecentSpeedData(seconds int) (map[string]any, error) {
 	rows, err := s.repo.QuerySpeedAverages(start, end, "%H:%M:%S")
 	if err != nil {
 		return nil, err
+	}
+	// 跨日查询按时分秒聚合历史平均值，保留其原有统计口径。
+	if s.recentSpeedSamples != nil && seconds < int(24*time.Hour/time.Second) {
+		// 响应每秒、每下载器仅保留一个值，后加入的内存样本覆盖同一值。
+		rows = append(rows, s.recentSpeedSamples(start, end)...)
 	}
 	return s.buildSpeedResponse(rows), nil
 }
@@ -121,10 +127,10 @@ func (s *Service) buildSpeedResponse(rows []repository.SpeedRow) map[string]any 
 			id := toString(downloader["id"], "")
 			entry, exists := byTime[label][id]
 			if !exists {
-				speeds[id] = map[string]any{"ul_speed": 0, "dl_speed": 0}
+				speeds[id] = map[string]any{"ul_speed": 0, "dl_speed": 0, "sampled": false}
 				continue
 			}
-			speeds[id] = map[string]any{"ul_speed": entry["ul_speed"], "dl_speed": entry["dl_speed"]}
+			speeds[id] = map[string]any{"ul_speed": entry["ul_speed"], "dl_speed": entry["dl_speed"], "sampled": true}
 		}
 		datasets = append(datasets, map[string]any{"time": label, "speeds": speeds})
 	}

@@ -467,3 +467,22 @@
 - 源码、已验证的 84 个 Web 构建产物与 Compose 均包含在 162ebf2a16ae476dc2c0bda27df981fa9c2fb515。Gitee 和 GitHub 的 v1.0.0 标签解引用指向同一提交。GitHub 私有仓库发行已正式发布，三个附件状态及 SHA-256 索引均已核对。完整 Linux AMD64 镜像 543336327 字节，SHA-256 8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.0
 - Gitee 使用 canonical 仓库 star1999/starpt，发行 ID 1351271。Compose 与镜像校验文件回下载后逐字节匹配。仓库附件余量不足以镜像完整文件，发行正文链接同版本 GitHub 私有发行；保留所有旧附件。https://gitee.com/star1999/starpt/releases/tag/v1.0.0
 - D 盘历史发布 ZIP 包含标签源码、完整镜像、Compose、恢复说明、校验清单。SHA-256 6d685f8763c8478155671ed6518ad142e83d62730a3661590c9d06c9699ddb3a，以 OCI 摘要链、各成员哈希及 ZIP CRC 验证并更新 INDEX.jsonl。镜像复用 152 已验收 UI，独立 Compose 与线上版本接口通过。此发行记录另行提交，版本标签固定。未发种或访问 81。
+
+## PTM-20261122-062 — 2026-11-22T11:45:15+08:00 — Codex root、speed_inventory、speed_live_backend、speed_panel，工作台实时速度
+
+- HomeView.vue 和 HomeSpeedPanel.vue 将速率图接回工作台。显示所选下载器的上传和下载速度以及近 60 秒趋势，右上角可切换下载器。可见时每 2 秒刷新，切换时使用所选下载器的数据，离开时停止。保留流量总量和趋势卡片。
+- internal/bootstrap/app.go、internal/service/stats_service.go、internal/service/stats/{types,speed}.go 和 internal/service/tracker/{tracker,tracker_test}.go 复用采集线程最近 120 秒的内存样本。现有近期速率接口合并数据库和内存，同秒同下载器以内存优先。sampled 区分失采和实测零速率。保留已有采集设置和批量写库行为。
+- 152 离线构建通过 Go 两项速率回归及全量测试、Vue 类型检查、目标文件 ESLint 和 Vite 构建。以 1440/390 像素浏览器测试两台模拟下载器、切换、跨午夜、失败恢复、退出停止和空态。连续请求间隔为 2015、1986、2003 毫秒。Vite 仍有包体积提示。
+- 152 部署 ptmove-nexus:1.0.0-speed.1，镜像 sha256:c3ffda1d6350296205994d4c324d3f52f5b8917b8424986e3e41836679d54796，回滚镜像 ptmove-nexus:1.0.0。线上健康和公开入口摘要核对通过。匿名速率接口返回 401，实际下载器速率未做登录核对。发布、队列、自动化和编辑计数无变化。同步 docs/DEPLOYMENT.json 与 41 个 Web 产物。本轮未重新发种、访问 81、提交、推送或发布新版本。
+
+## PTM-20261122-063 — 2026-11-22T12:01:06+08:00 — Codex root、speed_dropdown_review，工作台下载器下拉框
+
+- HomeSpeedPanel.vue 用站内 Element Plus 下拉框替换浏览器原生 select，沿用 STARPT 深色主题。菜单锚定控件，单下载器时可展开查看，空列表时禁用。切换与 2 秒速率轮询继续使用原组件逻辑。
+- 152 离线 Vue 类型检查、目标 ESLint 和 Vite 构建通过。隔离 Edge 浏览器验证 1440/390/320 像素暗色菜单、触屏切换、选中后速率刷新、键盘关闭以及单项与空态。移动端使用浏览器触控模拟，未检查实体设备。
+- 152 部署 ptmove-nexus:1.0.0-speed.2，镜像 sha256:1efe48eb62f7298825847bd822c28a1776a873d31e463329e86907ab1e074917，回滚镜像 ptmove-nexus:1.0.0-speed.1。线上健康、公开入口摘要和发布计数核对通过。复用前版服务端二进制，同步 docs/DEPLOYMENT.json 和 Web 构建产物。未重新发种、访问 81、提交、推送或创建 Git 发行。
+
+## PTM-20261122-064 — 2026-11-22T12:08:42+08:00 — Codex root、v101_metadata、v101_artifact_review、gitee_v101_preflight，STARPT 1.0.1 发行准备
+
+- 将工作台实时速度和下载器深色选择器纳入正式发行。nexus/VERSION、Go 版本与更新记录、镜像标签、Compose 和部署脚本测试版本统一为 1.0.1。保留已验收的 41 个 Web 构建文件。README 和 docs/RELEASE-v1.0.1.md 提供该版安装入口。根目录和 nexus 的 AGENTS.md 记录后续验证通过后自动提交和双仓发布的授权。
+- 152 通过 Go 全量测试、速率和版本接口检查。部署脚本本机测试 5 项通过。独立 Compose 使用空数据目录，已核对健康、版本和 Web 入口摘要。线上部署 ptmove-nexus:1.0.1，镜像 sha256:a344ecd710505f813620508cced50ecf30af62bc018c179ba1486f8d19025003，回滚 ptmove-nexus:1.0.0-speed.2，健康和发布相关计数核对通过。
+- 152 已导出完整 Linux AMD64 镜像 starpt-v1.0.1-linux-amd64.tar.gz，581373136 字节，SHA-256 8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0。组装提交时，双仓推送、附件传输和历史归档待完成。Gitee 单个附件受平台限制，现有附件约 1.01 GB，计划保留历史并在 Gitee 提供 Compose、校验文件和 GitHub 完整镜像入口。未重新发种或访问 81。

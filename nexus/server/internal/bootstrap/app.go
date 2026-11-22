@@ -60,8 +60,8 @@ func NewApp() (*App, error) {
 		logx.Warnf("背景图", "初始化默认背景失败 err=%v", err)
 	}
 	statsRepo := repository.NewStatsRepository(store)
-	statsService := service.NewStatsService(statsRepo, cfgManager)
 	trackerService := service.NewTrackerService(statsRepo, cfgManager)
+	statsService := service.NewStatsService(statsRepo, cfgManager, trackerService.RecentSpeedSamples)
 	trackerService.Start()
 	torrentDataRepo := repository.NewTorrentDataRepository(store)
 	torrentDataService := service.NewTorrentDataService(torrentDataRepo, cfgManager)

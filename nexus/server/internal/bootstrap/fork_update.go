@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.0"
+const forkVersion = "1.0.1"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,14 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-22",
+				"changes": []string{
+					"工作台显示近 60 秒的上传和下载速度，每 2 秒刷新",
+					"实时速度卡片支持切换下载器，使用站内统一的深色下拉框",
+				},
+			},
+			{
+				"version": "1.0.0",
 				"date":    "2026-11-22",
 				"changes": []string{
 					"转种准备自动识别简介中的 MediaInfo，并在缺失时交由下载器补全",

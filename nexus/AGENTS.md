@@ -68,6 +68,8 @@ Go 服务（版本见各自 `go.mod`）：
 
 ## 提交与 PR 指南
 
+- STARPT 后续代码变更按仓库根目录 `AGENTS.md` 的授权自动提交并发布。验证通过后可从隔离工作区提交，并快进更新目标远端分支，无需另行确认提交标题或合并选项。发布条件和当次用户限制以根目录指南为准。
+
 - ✅ 分支 / Worktree 策略（用于每次会话的代码修改，使用 `worktree-lite` skill）：
   - 只要任务需要对仓库代码进行**写入/修改**（新增/改动/删除受 Git 跟踪的文件），默认将 base repo 视为只读；状态变更操作在独立 worktree 内执行。
   - 写入前创建新 worktree：使用 `worktree-lite` skill 执行 `init --topic "<问题摘要>"`。
@@ -87,6 +89,6 @@ Go 服务（版本见各自 `go.mod`）：
 - ⚠️ Git 安全约束：千万不要触碰任何 Git 回滚/提交/改写历史/批量还原工作区的操作（例如 `git reset` / `git restore` / `git checkout -- .` / `git revert` / `git commit` / `git merge` / `git rebase` / `git cherry-pick` 等），除非用户在当前对话中明确要求。
 - ✅ 允许使用只读方式查看之前代码的修改内容与历史（例如 `git status` / `git diff` / `git log` / `git show` / `git blame`）。
 - Git 历史提交信息过去常用极简数字（例如 `7`）；没有强制规范，建议使用简短且能说明范围的描述。
-- 仅当用户明确要求“提交”时：若改动了 `webui/`、`batch/`、`updater/` 或 `proxy/`，需要一并提交构建产物（`webui/dist/`、`batch/batch`、`updater/updater`、`proxy/pt-nexus-box-proxy`）；`pre-commit` hook 可自动化。
-- 仅当用户明确要求“提交”且 `CHANGELOG.json` 有变更时：运行 `python sync_changelog.py` 同步更新 `readme.md` 与 `wiki/docs/index.md`（只读查看不受影响）。
+- 执行已授权的提交时，若改动了 `webui/`、`batch/`、`updater/` 或 `proxy/`，一并提交对应构建产物（`webui/dist/`、`batch/batch`、`updater/updater`、`proxy/pt-nexus-box-proxy`）。
+- 执行已授权的提交且 `CHANGELOG.json` 有变更时，运行 `python sync_changelog.py` 同步更新 `readme.md` 与 `wiki/docs/index.md`。
 - PR 需说明变更范围、配置影响；如涉及 UI，附截图。

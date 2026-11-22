@@ -50,6 +50,8 @@
         </div>
       </dl>
 
+      <HomeSpeedPanel class="star-home__speed" />
+
       <div class="star-home__panels">
         <section class="home-card home-panel" aria-labelledby="home-traffic-title">
           <div class="home-panel__heading">
@@ -185,6 +187,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
+import HomeSpeedPanel from '@/components/HomeSpeedPanel.vue'
 import {
   ArrowRight,
   Bottom,
@@ -584,6 +587,10 @@ onBeforeUnmount(() => {
 
 .star-home .star-home__summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.star-home__speed {
   margin-bottom: 14px;
 }
 

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "date": "2026-11-22",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.0",
-  "image_id": "sha256:1c166c1ec5ac61805c90f90217d159a157aa3b2f3090514b8b405f18475bdcac",
+  "image": "ptmove-nexus:1.0.1",
+  "image_id": "sha256:a344ecd710505f813620508cced50ecf30af62bc018c179ba1486f8d19025003",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "8cd7616e6fce00b05858111a145fb4c4ca1409e12497f3bdb8223d10a1e148ac",
+  "image_archive_sha256": "8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -502,5 +502,85 @@
       "sha256": "6d685f8763c8478155671ed6518ad142e83d62730a3661590c9d06c9699ddb3a"
     },
     "published": true
+  },
+  "home_speed_dashboard": {
+    "image": "ptmove-nexus:1.0.0-speed.1",
+    "image_id": "sha256:c3ffda1d6350296205994d4c324d3f52f5b8917b8424986e3e41836679d54796",
+    "rollback_image": "ptmove-nexus:1.0.0",
+    "health": "healthy",
+    "production_index_sha256": "6989b9d6ad69300ca60eef57a685e26a878cc411091d276dbaef65d5675abed7",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "route": "GET /api/recent_speed_data?seconds=60",
+    "refresh_ms": 2000,
+    "history_seconds": 60,
+    "go_full_tests": true,
+    "frontend_typecheck_lint_build": true,
+    "browser_fixture_widths": [
+      1440,
+      390
+    ],
+    "browser_fixture_downloaders": 2,
+    "browser_poll_intervals_ms": [
+      2015,
+      1986,
+      2003
+    ],
+    "production_public_index_verified": true,
+    "production_unauthenticated_speed_status": 401,
+    "production_authenticated_speed_test": false,
+    "verified_at": "2026-11-22T11:45:15+08:00"
+  },
+  "home_speed_downloader_select": {
+    "image": "ptmove-nexus:1.0.0-speed.2",
+    "image_id": "sha256:1efe48eb62f7298825847bd822c28a1776a873d31e463329e86907ab1e074917",
+    "rollback_image": "ptmove-nexus:1.0.0-speed.1",
+    "health": "healthy",
+    "production_index_sha256": "4ea55573c34b957e55948725b90fba2829428088666a8acdfa2e6fb1b4dcdaef",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "frontend_typecheck_lint_build": true,
+    "browser_fixture_widths": [
+      1440,
+      390,
+      320
+    ],
+    "browser_touch_and_keyboard": true,
+    "browser_single_and_empty_states": true,
+    "production_public_index_verified": true,
+    "verified_at": "2026-11-22T12:01:06+08:00"
+  },
+  "release_v1_0_1": {
+    "image": "ptmove-nexus:1.0.1",
+    "image_id": "sha256:a344ecd710505f813620508cced50ecf30af62bc018c179ba1486f8d19025003",
+    "rollback_image": "ptmove-nexus:1.0.0-speed.2",
+    "health": "healthy",
+    "production_index_sha256": "4ea55573c34b957e55948725b90fba2829428088666a8acdfa2e6fb1b4dcdaef",
+    "counts": {
+      "publish_logs": 7,
+      "publish_queue_tasks": 0,
+      "automation_tasks": 0,
+      "published_edit_attempts": 2
+    },
+    "version": "1.0.1",
+    "archive": "starpt-v1.0.1-linux-amd64.tar.gz",
+    "archive_bytes": 581373136,
+    "archive_sha256": "8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0",
+    "compose": "compose.starpt.yaml",
+    "compose_sha256": "434bfd6b96086e9e144cf2a55b2b55a99ec5c88899b45403f10e76cbf5c86766",
+    "compose_isolated_verified": true,
+    "go_full_tests": true,
+    "tested_frontend_assets_reused": 41,
+    "local_deployment_script_tests": 5,
+    "verified_at": "2026-11-22T12:08:42+08:00",
+    "published": false
   }
 }

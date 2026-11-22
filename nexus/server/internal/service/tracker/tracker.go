@@ -18,6 +18,7 @@ const (
 	defaultAggregationIntervalSec = 21600
 	defaultRetentionHours         = 48
 	defaultFlushPeriodSec         = 60
+	recentSpeedWindowSeconds      = 120
 )
 
 type downloaderConfig struct {
@@ -33,6 +34,11 @@ type downloaderConfig struct {
 	ProxyToken     string
 	ProxyMediaOnly bool
 	ProxyPort      int
+}
+
+type speedBucket struct {
+	second time.Time
+	rows   map[string]repository.SpeedRow
 }
 
 // Service 负责周期性采集下载器速度与累计流量，并批量写入 traffic_stats。
@@ -51,6 +57,7 @@ type Service struct {
 	stateMu          sync.Mutex
 	started          bool
 	trafficBuffer    []repository.TrafficStatRecord
+	recentSpeeds     [recentSpeedWindowSeconds]speedBucket
 	lastCumulative   map[string]repository.CumulativeSnapshot
 	lastFlushTime    time.Time
 	aggregationCount int
@@ -217,6 +224,10 @@ func (s *Service) collectTrafficRecords() []repository.TrafficStatRecord {
 			continue
 		}
 
+		uploadSpeed := nonNegative(stats.UploadSpeed)
+		downloadSpeed := nonNegative(stats.DownloadSpeed)
+		s.recordRecentSpeed(currentTime, downloader.ID, uploadSpeed, downloadSpeed)
+
 		totalUpload := nonNegative(stats.TotalUpload)
 		totalDownload := nonNegative(stats.TotalDownload)
 		if totalUpload == 0 && totalDownload == 0 {
@@ -239,8 +250,8 @@ func (s *Service) collectTrafficRecords() []repository.TrafficStatRecord {
 			DownloaderID:         downloader.ID,
 			Uploaded:             0,
 			Downloaded:           0,
-			UploadSpeed:          nonNegative(stats.UploadSpeed),
-			DownloadSpeed:        nonNegative(stats.DownloadSpeed),
+			UploadSpeed:          uploadSpeed,
+			DownloadSpeed:        downloadSpeed,
 			CumulativeUploaded:   totalUpload,
 			CumulativeDownloaded: totalDownload,
 		})
@@ -286,6 +297,51 @@ func (s *Service) shouldAcceptCumulative(downloaderID string, currentUL, current
 		CumulativeDownloaded: currentDL,
 	}
 	return true
+}
+
+// recordRecentSpeed 按秒替换同一下载器的速率，与累计流量校验和批量写库相互独立。
+func (s *Service) recordRecentSpeed(at time.Time, downloaderID string, uploadSpeed, downloadSpeed int64) {
+	second := at.Truncate(time.Second)
+	index := uint64(second.Unix()) % recentSpeedWindowSeconds
+
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	bucket := &s.recentSpeeds[index]
+	if !bucket.second.Equal(second) {
+		bucket.second = second
+		if bucket.rows == nil {
+			bucket.rows = make(map[string]repository.SpeedRow)
+		} else {
+			clear(bucket.rows)
+		}
+	}
+	bucket.rows[downloaderID] = repository.SpeedRow{
+		TimeGroup:    second.Format(time.TimeOnly),
+		DownloaderID: downloaderID,
+		ULSpeed:      float64(uploadSpeed),
+		DLSpeed:      float64(downloadSpeed),
+	}
+}
+
+// RecentSpeedSamples 返回指定时间段内的速率快照，采样窗口独立于写库批次。
+func (s *Service) RecentSpeedSamples(start, end time.Time) []repository.SpeedRow {
+	oldest := end.Add(-recentSpeedWindowSeconds * time.Second)
+	if start.Before(oldest) {
+		start = oldest
+	}
+
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	rows := make([]repository.SpeedRow, 0)
+	for _, bucket := range s.recentSpeeds {
+		if bucket.second.Before(start) || !bucket.second.Before(end) {
+			continue
+		}
+		for _, row := range bucket.rows {
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 func (s *Service) appendRecords(records []repository.TrafficStatRecord) {
