@@ -486,3 +486,9 @@
 - 将工作台实时速度和下载器深色选择器纳入正式发行。nexus/VERSION、Go 版本与更新记录、镜像标签、Compose 和部署脚本测试版本统一为 1.0.1。保留已验收的 41 个 Web 构建文件。README 和 docs/RELEASE-v1.0.1.md 提供该版安装入口。根目录和 nexus 的 AGENTS.md 记录后续验证通过后自动提交和双仓发布的授权。
 - 152 通过 Go 全量测试、速率和版本接口检查。部署脚本本机测试 5 项通过。独立 Compose 使用空数据目录，已核对健康、版本和 Web 入口摘要。线上部署 ptmove-nexus:1.0.1，镜像 sha256:a344ecd710505f813620508cced50ecf30af62bc018c179ba1486f8d19025003，回滚 ptmove-nexus:1.0.0-speed.2，健康和发布相关计数核对通过。
 - 152 已导出完整 Linux AMD64 镜像 starpt-v1.0.1-linux-amd64.tar.gz，581373136 字节，SHA-256 8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0。组装提交时，双仓推送、附件传输和历史归档待完成。Gitee 单个附件受平台限制，现有附件约 1.01 GB，计划保留历史并在 Gitee 提供 Compose、校验文件和 GitHub 完整镜像入口。未重新发种或访问 81。
+
+## PTM-20261122-065 — 2026-11-22T12:23:37+08:00 — Codex root，STARPT 1.0.1 双仓发布与归档
+
+- v1.0.1 的代码、41 个经验证的 Web 文件和 Compose 已推送到 Gitee 与 GitHub。标签解引用均指向 1ddedde0526814553fa67435200621150bc063fc。GitHub 私有发行的三个附件已发布并核对大小与 SHA-256。完整镜像 581373136 字节，SHA-256 8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0。https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.1
+- Gitee 发行为 1351914，Compose 和 SHA-256 文件已上传并回下载核对。完整镜像超过 Gitee 单附件上限，仓库历史附件约 1.01 GB。发行页链接同版本 GitHub 私有发行中的完整镜像，保留历史附件。https://gitee.com/star1999/starpt/releases/tag/v1.0.1
+- D 盘 ZIP 包含同一标签源码、可独立装载的完整 Linux AMD64 镜像、Compose、恢复说明和校验清单。ZIP SHA-256 ee4b1d9b7239f1bcd2264fc3ccc14d75558e3563617ed721ca383adbdd72ee0d，验证了 OCI 摘要、ZIP 成员哈希及 Compose 与标签源码的字节一致，档案已索引。未重新发种或访问 81。版本标签固定，发行记录另提交并推送。

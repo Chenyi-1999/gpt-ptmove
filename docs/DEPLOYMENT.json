@@ -581,6 +581,66 @@
     "tested_frontend_assets_reused": 41,
     "local_deployment_script_tests": 5,
     "verified_at": "2026-11-22T12:08:42+08:00",
-    "published": false
+    "published": true,
+    "source_commit": "1ddedde0526814553fa67435200621150bc063fc",
+    "git_tag": "v1.0.1",
+    "oci_validation": {
+      "config_digest": "sha256:039140ecc98804b79830e381e7abd7032fa74068c2579f5bb7dedba8b4340f0c",
+      "docker_layers": 40,
+      "oci_blobs_verified": 46,
+      "oci_manifests_checked": 3
+    },
+    "github": {
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "state": "uploaded",
+          "digest": "sha256:434bfd6b96086e9e144cf2a55b2b55a99ec5c88899b45403f10e76cbf5c86766"
+        },
+        {
+          "name": "starpt-v1.0.1-linux-amd64.tar.gz",
+          "size": 581373136,
+          "state": "uploaded",
+          "digest": "sha256:8206e95d634488b75940a9cdcc2e806146ec7da743c9e5227f92713f41ca75d0"
+        },
+        {
+          "name": "starpt-v1.0.1-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "state": "uploaded",
+          "digest": "sha256:b2627e749efb970ce48022c6d745249bdeedce05d185cb0308f7f7b5759d26e6"
+        }
+      ],
+      "private": true,
+      "tag": "v1.0.1",
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.1",
+      "publishedAt": "2026-11-22T04:23:17Z"
+    },
+    "gitee": {
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.1",
+      "release_id": 1351914,
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "id": 3786589,
+          "size": 498,
+          "sha256": "434bfd6b96086e9e144cf2a55b2b55a99ec5c88899b45403f10e76cbf5c86766"
+        },
+        {
+          "name": "starpt-v1.0.1-linux-amd64.tar.gz.sha256",
+          "id": 3786590,
+          "size": 99,
+          "sha256": "b2627e749efb970ce48022c6d745249bdeedce05d185cb0308f7f7b5759d26e6"
+        }
+      ],
+      "image_asset": null,
+      "image_distribution": "Complete image linked from the private GitHub release due to Gitee single-attachment and repository limits"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-22_122240__历史发布__STARPT-v1.0.1.zip",
+      "bytes": 598333181,
+      "sha256": "ee4b1d9b7239f1bcd2264fc3ccc14d75558e3563617ed721ca383adbdd72ee0d"
+    },
+    "published_verified_at": "2026-11-22T12:23:37+08:00"
   }
 }
