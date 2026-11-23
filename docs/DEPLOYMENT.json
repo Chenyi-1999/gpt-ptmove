@@ -1235,6 +1235,58 @@
     "image_archive_bytes": 754253557,
     "docker_export_sha256": "c5f7ddf4a8fb2c0e4707de4c99610041b181eefabaed7e95aa015492736ec00c",
     "reused_oci_blobs": 57,
-    "verified_at": "2026-11-23T13:06:39+08:00"
+    "verified_at": "2026-11-23T13:06:39+08:00",
+    "source_commit": "98ed25889e4f36c11394278b551d4880879badd7",
+    "github_release": {
+      "id": 455009684,
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.8",
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "digest": "sha256:213147124a5ca7504f62913e627908437a04b2272465d2267ecf17d15d0fd98a",
+          "id": 781613798
+        },
+        {
+          "name": "starpt-v1.0.8-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "digest": "sha256:9688ad6a3e26ce268628d5ffab0c1696b4a58e6f41937c9f260445f43cd57b9e",
+          "id": 781613792
+        },
+        {
+          "name": "starpt-v1.0.8-linux-amd64.tar.gz",
+          "size": 754253557,
+          "digest": "sha256:d8974cc348e7b539cd60ca09b1dee1a3ed9d137ce79973cdbcaff2246593724f",
+          "id": 781614133
+        }
+      ],
+      "published_at": "2026-11-23T05:10:47Z"
+    },
+    "gitee_release": {
+      "id": 1356643,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.8",
+      "assets": [
+        {
+          "id": 3798369,
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "sha256": "213147124a5ca7504f62913e627908437a04b2272465d2267ecf17d15d0fd98a"
+        },
+        {
+          "id": 3798371,
+          "name": "starpt-v1.0.8-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "sha256": "9688ad6a3e26ce268628d5ffab0c1696b4a58e6f41937c9f260445f43cd57b9e"
+        }
+      ],
+      "full_image": "Same private GitHub release"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-23_130726__历史发布__STARPT-v1.0.8.zip",
+      "bytes": 771357774,
+      "sha256": "74ae8cf8374b9f633cfc8df42de73c9df1511d496df65e7a2e9c4ac3517d6354",
+      "oci_blobs_verified": 65
+    },
+    "published_verified_at": "2026-11-23T13:11:04+08:00"
   }
 }
