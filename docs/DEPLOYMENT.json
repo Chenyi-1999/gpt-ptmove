@@ -1,14 +1,14 @@
 {
-  "version": "1.0.8",
+  "version": "1.0.9",
   "date": "2026-11-23",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.8",
-  "image_id": "sha256:72ce906675fc6d2645204816c8d979934442cacda08c74b125743e2308bdeded",
+  "image": "ptmove-nexus:1.0.9",
+  "image_id": "sha256:d7cf67d783bf07b78171eceb2297f574930bcc20cbcebde999d66f9706463170",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "d8974cc348e7b539cd60ca09b1dee1a3ed9d137ce79973cdbcaff2246593724f",
+  "image_archive_sha256": "6bd74930a232760202d55761ef20fb8d04431e82e53e04993eee41a5b0c9db85",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -1288,5 +1288,40 @@
       "oci_blobs_verified": 65
     },
     "published_verified_at": "2026-11-23T13:11:04+08:00"
+  },
+  "starpt_v1_0_9": {
+    "version": "1.0.9",
+    "image_id": "sha256:d7cf67d783bf07b78171eceb2297f574930bcc20cbcebde999d66f9706463170",
+    "rollback_image_id": "sha256:72ce906675fc6d2645204816c8d979934442cacda08c74b125743e2308bdeded",
+    "healthy": true,
+    "native_smoke_groups": 10,
+    "preview_persistence": true,
+    "automation_asset": "AutomationSettings-DLE1o8I3.js",
+    "automation_asset_sha256": "930f96c4b683aaf2da5e0be59fe503464541a09024cf3cbb9e30301cf12f2c1d",
+    "automation_idle": true,
+    "tag": "v1.0.9",
+    "go_test_all": true,
+    "frontend_lint_typecheck_build": true,
+    "preview_sqlite_reopen": true,
+    "isolated_container_replacement_verified": true,
+    "machine_preview_readonly_verified": true,
+    "preview_route_profile_guard": true,
+    "browser_fixture": {
+      "browser_fixture": true,
+      "fixture_widths": [
+        1440,
+        390
+      ],
+      "reload_restored": true,
+      "restored_without_selection": true,
+      "page_load_scan_requests": 0,
+      "failed_scan_preserved": true,
+      "successful_empty_restored": true
+    },
+    "archive": "starpt-v1.0.9-linux-amd64.tar.gz",
+    "image_archive_bytes": 774503140,
+    "docker_export_sha256": "c2e6a2f71f0cf15bc14f6a11d8138d8617eab360ff63cbc14834f23b24fbaa61",
+    "reused_oci_blobs": 60,
+    "verified_at": "2026-11-23T17:57:58+08:00"
   }
 }

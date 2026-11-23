@@ -98,6 +98,8 @@ This section describes the native Go service and its authenticated `/api/v1` mac
 
 `GET /api/migrate/task_monitor` 汇总候选预览、截图、媒体报告、批量获取、下载、发布、BDInfo 和自动化处理。首页和任务抽屉共用列表。候选预览在正在处理的条目与最终可选数量之间分别报告，短期操作结果保留至多 30 分钟和最近 60 条。当前飞牛 HTTPS 客户端回传整批截图结果，本机截图可以报告实际截取和上传的进度。
 
+Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近一份候选预览，并返回毫秒时间戳 `previewed_at` 和 `preview_saved`。若更早开始的请求在较新的成功快照之后完成，返回其即时结果与 `preview_saved:false`。`GET /api/automation/preview` 返回 `{success:true,preview:null|{candidates,settings,previewed_at,source_digest?,target_digest?}}`。空结果也是一次成功预览，失败或中断保留之前的成功结果。快照只保存展示资料与站点配置摘要，不登记运行、不占月度额度。带选中候选的 `POST /api/automation/runs` 可以附加 `preview_source_site` 与 `preview_target_site` 绑定站点标识，并附加 `preview_source_digest` 与 `preview_target_digest` 绑定预览时的站点配置。标识或配置已变更时返回 409。入队依然按当前规则复查。机器 API 的预览按原有只读协议返回即时结果。
+
 `POST /api/migrate/refresh_mediainfo_async` 传入 `fill_missing: true` 时只为当前草稿返回报告，先复用完整报告或从简介提取，再尝试下载器与本地分析。此模式只返回结果供草稿回填。缺少 BDInfo 的蓝光原盘仍可使用原有的 MediaInfo「重新获取」入口。
 
 `POST /api/migrate/maintenance/media_fill` 使用 Web 管理员认证。请求体为 `{"seeds":[{"hash":"…","torrent_id":"…","site_name":"…","downloader_id":"…"}]}`，下载器标识可选。每批最多 100 条，重复标识合并。返回 202 和 `task_id`、`task_key`、`total`，用 `task_key` 从任务监控匹配本次批次。同一时间只运行一批，重复提交返回 409。

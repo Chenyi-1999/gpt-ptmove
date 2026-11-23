@@ -71,6 +71,7 @@
 | `internal/repository/sites_sync.go` | 从 `sites_data.json` 同步站点元数据 |
 | `internal/repository/migrate_repository.go` | 迁移相关查询与写入 |
 | `internal/repository/maintenance_media_repository.go` | 以字段快照保护维护截图和媒体报告写入 |
+| `internal/repository/automation_preview.go` | 最近成功预览的单行版本保护与读写 |
 | `internal/repository/torrent_repository.go` | 种子基础查询、路径列表等 |
 | `internal/repository/torrent_data_repository.go` | 种子详情查询、缓存站点查询 |
 | `internal/repository/torrent_sync_repository.go` | 下载器同步写库相关 |
@@ -182,6 +183,7 @@
 | `internal/service/migrationflow/task_monitor.go` | 聚合批量抓取/发布/BDInfo/发布队列任务快照 |
 | `internal/service/migrationflow/maintenance_media_batch.go` | 批量维护任务去重、串行执行和进度汇总 |
 | `internal/service/migrationflow/maintenance_media_seed.go` | 核对所选记录的缺项与视频归属，独立采集和保存 |
+| `internal/service/migrationflow/automation_preview.go` | 扫描候选并生成不含凭据的网页预览快照 |
 | `internal/service/migrationflow/bdinfo_status.go` | BDInfo 状态/列表查询入口 |
 | `internal/service/migrationflow/bdinfo_callbacks.go` | BDInfo 回调接入入口 |
 | `internal/service/migrationflow/bdinfo_task_ops.go` | BDInfo 任务启动/重启/清理 |

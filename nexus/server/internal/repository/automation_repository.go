@@ -116,7 +116,7 @@ func NewAutomationRepository(store *Store) (*AutomationRepository, error) {
 		return nil, errors.New("自动化数据库未初始化")
 	}
 	r := &AutomationRepository{db: store.DB}
-	if err := r.db.AutoMigrate(&AutomationSettingsRecord{}, &AutomationRun{}, &AutomationQuota{}, &AutomationTask{}); err != nil {
+	if err := r.db.AutoMigrate(&AutomationSettingsRecord{}, &AutomationRun{}, &AutomationQuota{}, &AutomationTask{}, &AutomationPreviewRecord{}); err != nil {
 		return nil, err
 	}
 	return r, nil

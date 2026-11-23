@@ -136,22 +136,47 @@
         show-icon
       />
     </el-card>
-    <el-card v-if="candidates.length" shadow="never" class="panel"
+    <el-card v-if="hasPreview" shadow="never" class="panel"
       ><template #header
         ><div class="card-head">
           <strong>候选预览</strong
           ><el-button
             size="small"
-            :disabled="!selected.length"
+            :disabled="!selected.length || previewSitesMismatch || running"
             :loading="running"
             @click="enqueueSelected"
             >将选中项目加入队列</el-button
           >
         </div></template
-      ><el-table :data="candidates" @selection-change="(rows: Candidate[]) => (selected = rows)"
+      >
+      <div class="preview-meta">
+        最近成功预览：{{ formatPreviewTime(previewedAt) }} · 入队按已保存规则复核
+      </div>
+      <el-alert
+        v-if="previewRulesChanged"
+        title="当前部分筛选规则与预览时不同，候选仅供参考；加入队列时服务端仍会按当前规则复核。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-alert
+        v-if="previewSitesMismatch"
+        title="候选预览的源站或目标站与当前已保存站点不同。请保存规则并重新预览后再加入队列。"
+        type="error"
+        :closable="false"
+        show-icon
+      />
+      <el-empty v-if="!candidates.length" description="上次成功预览没有符合条件的候选" />
+      <el-table
+        v-else
+        :key="previewedAt ?? 'unknown'"
+        row-key="id"
+        :data="candidates"
+        @selection-change="(rows: Candidate[]) => (selected = rows)"
         ><el-table-column
           type="selection"
           width="48"
+          reserve-selection
           :selectable="(row: Candidate) => row.eligible"
         /><el-table-column label="候选" min-width="220"
           ><template #default="s">
@@ -262,6 +287,13 @@ type Candidate = {
   eligible: boolean
   reasons: string[]
 }
+type PreviewSnapshot = {
+  candidates: Candidate[]
+  settings?: Record<string, unknown>
+  previewed_at?: number
+  source_digest?: string | null
+  target_digest?: string | null
+}
 type AutomationTask = {
   id: string
   state: string
@@ -339,10 +371,18 @@ const loading = ref(false),
   sites = ref<Site[]>([]),
   downloaders = ref<{ id: string; name: string }[]>([]),
   candidates = ref<Candidate[]>([]),
+  hasPreview = ref(false),
+  previewedAt = ref<number | null>(null),
+  previewSettings = ref<Record<string, unknown> | null>(null),
+  previewSourceDigest = ref<string | null | undefined>(undefined),
+  previewTargetDigest = ref<string | null | undefined>(undefined),
+  savedSourceSite = ref(''),
+  savedTargetSite = ref(''),
   selected = ref<Candidate[]>([]),
   tasks = ref<AutomationTask[]>([]),
   runs = ref<Row[]>([]),
   quota = ref<Record<string, unknown>>({})
+let previewRequestId = 0
 const form = reactive({
   enabled: false,
   auto_publish: false,
@@ -384,6 +424,67 @@ const formatSize = (value: unknown) => {
   const amount = bytes / 1024 ** index
   return `${amount.toFixed(index >= 3 ? 2 : 1)} ${units[index]}`
 }
+const formatPreviewTime = (value: number | null) => {
+  if (!value || !Number.isFinite(value)) return '时间未知'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+const previewSnapshotKey = (preview: PreviewSnapshot) =>
+  JSON.stringify({
+    candidates: preview.candidates,
+    settings: preview.settings ?? null,
+    source_digest: preview.source_digest,
+    target_digest: preview.target_digest,
+  })
+const applyPreview = (preview: PreviewSnapshot | null) => {
+  hasPreview.value = preview !== null
+  candidates.value = preview?.candidates || []
+  previewedAt.value = preview?.previewed_at || null
+  previewSettings.value = preview?.settings || null
+  previewSourceDigest.value = preview?.source_digest
+  previewTargetDigest.value = preview?.target_digest
+  selected.value = []
+}
+const restorePreview = async (allowDuringPreview = false) => {
+  if (previewing.value && !allowDuringPreview) return false
+  const requestId = ++previewRequestId
+  try {
+    const response = await axios.get('/api/automation/preview')
+    if (requestId !== previewRequestId || response.data?.success !== true) return false
+    const preview = response.data.preview
+    if (preview === null) {
+      applyPreview(null)
+      return true
+    }
+    if (!preview || !Array.isArray(preview.candidates)) return false
+    const previewTime = Number(preview.previewed_at) || undefined
+    const snapshot: PreviewSnapshot = {
+      candidates: preview.candidates,
+      settings: preview.settings,
+      previewed_at: previewTime,
+      source_digest: preview.source_digest,
+      target_digest: preview.target_digest,
+    }
+    if (
+      hasPreview.value &&
+      previewTime !== undefined &&
+      previewTime === previewedAt.value &&
+      previewSnapshotKey(snapshot) ===
+        previewSnapshotKey({
+          candidates: candidates.value,
+          settings: previewSettings.value ?? undefined,
+          previewed_at: previewedAt.value ?? undefined,
+          source_digest: previewSourceDigest.value,
+          target_digest: previewTargetDigest.value,
+        })
+    )
+      return true
+    applyPreview(snapshot)
+    return true
+  } catch {
+    // A failed refresh keeps the last successfully loaded preview visible.
+    return false
+  }
+}
 const quotaLabel = computed(
   () =>
     `本月已发布 ${quota.value.published ?? 0} / ${form.monthly_limit} · 占用名额 ${quota.value.pending ?? 0}`,
@@ -391,6 +492,7 @@ const quotaLabel = computed(
 const load = async () => {
   loading.value = true
   error.value = ''
+  void restorePreview()
   try {
     const [s, t, r, p, d] = await Promise.all([
       axios.get('/api/automation/settings'),
@@ -400,6 +502,8 @@ const load = async () => {
       axios.get('/api/settings'),
     ])
     Object.assign(form, s.data.settings || {})
+    savedSourceSite.value = String(s.data.settings?.source_site ?? '')
+    savedTargetSite.value = String(s.data.settings?.target_site ?? '')
     minLeechers.value = s.data.settings?.min_leechers ?? 0
     reserveSpace.value = s.data.settings?.reserve_space_gib ?? 0
     quota.value = s.data.quota || {}
@@ -432,6 +536,7 @@ const refreshRecords = async () => {
     tasks.value = t.data.tasks || []
     runs.value = r.data.runs || []
     quota.value = t.data.quota || quota.value
+    void restorePreview()
   } catch (e) {
     ElMessage.error(
       axios.isAxiosError(e)
@@ -446,6 +551,33 @@ const payload = () => ({
   ...form,
   min_leechers: minLeechers.value,
   reserve_space_gib: reserveSpace.value,
+})
+const previewRulesChanged = computed(() => {
+  const previous = previewSettings.value
+  if (!previous) return false
+  const current = {
+    source_site: form.source_site,
+    target_site: form.target_site,
+    min_size_gib: form.min_size_gib,
+    max_size_gib: form.max_size_gib,
+    min_seeders: form.min_seeders,
+    min_leechers: minLeechers.value,
+    monthly_limit: form.monthly_limit,
+    downloader_id: form.downloader_id,
+  }
+  return Object.entries(current).some(([key, value]) => {
+    const oldValue = previous[key]
+    if (oldValue === undefined || oldValue === null) return false
+    return String(oldValue) !== String(value)
+  })
+})
+const previewSitesMismatch = computed(() => {
+  const previous = previewSettings.value
+  if (!previous?.source_site || !previous?.target_site) return true
+  return (
+    String(previous.source_site) !== savedSourceSite.value ||
+    String(previous.target_site) !== savedTargetSite.value
+  )
 })
 const save = async () => {
   if (!form.source_site || !form.target_site || form.source_site === form.target_site)
@@ -474,10 +606,30 @@ const save = async () => {
 }
 const preview = async () => {
   previewing.value = true
+  const requestId = ++previewRequestId
   try {
     const r = await axios.post('/api/automation/preview', payload())
-    candidates.value = r.data.candidates || []
-    ElMessage.success(`预览完成，共 ${candidates.value.length} 个候选`)
+    if (requestId !== previewRequestId) return
+    if (r.data?.success === false || !Array.isArray(r.data?.candidates))
+      throw new Error(r.data?.message || '预览结果无效')
+    if (r.data.preview_saved === false) {
+      const restored = await restorePreview(true)
+      ElMessage.info(
+        restored
+          ? '预览已完成，但有更新的结果先保存；已加载最新保存的候选。'
+          : '预览已完成，但没有保存为最新结果；保留当前显示的候选。',
+      )
+      return
+    }
+    const rows = r.data.candidates
+    applyPreview({
+      candidates: rows,
+      settings: r.data.settings,
+      previewed_at: Number(r.data.previewed_at) || Date.now(),
+      source_digest: r.data.source_digest,
+      target_digest: r.data.target_digest,
+    })
+    ElMessage.success(`预览完成，共 ${rows.length} 个候选`)
   } catch (e) {
     ElMessage.error(
       axios.isAxiosError(e)
@@ -488,12 +640,29 @@ const preview = async () => {
     previewing.value = false
   }
 }
-const runRequest = async (ids?: string[]) => {
+const runRequest = async (
+  ids?: string[],
+  previewSites?: {
+    source_site: string
+    target_site: string
+    source_digest?: string | null
+    target_digest?: string | null
+  },
+) => {
   running.value = true
   try {
     const r = await axios.post(
       '/api/automation/runs',
-      ids ? { selected_ids: ids, enqueue: true } : {},
+      ids
+        ? {
+            selected_ids: ids,
+            enqueue: true,
+            preview_source_site: previewSites?.source_site,
+            preview_target_site: previewSites?.target_site,
+            preview_source_digest: previewSites?.source_digest,
+            preview_target_digest: previewSites?.target_digest,
+          }
+        : {},
     )
     tasks.value = [...(r.data.tasks || []), ...tasks.value]
     runs.value = [r.data.run, ...runs.value].filter(Boolean)
@@ -510,7 +679,20 @@ const runRequest = async (ids?: string[]) => {
   }
 }
 const run = () => runRequest()
-const enqueueSelected = () => runRequest(selected.value.map((x) => x.id))
+const enqueueSelected = () => {
+  const snapshotSettings = previewSettings.value
+  if (running.value || !selected.value.length || previewSitesMismatch.value || !snapshotSettings)
+    return
+  return runRequest(
+    selected.value.map((x) => x.id),
+    {
+      source_site: String(snapshotSettings.source_site),
+      target_site: String(snapshotSettings.target_site),
+      source_digest: previewSourceDigest.value,
+      target_digest: previewTargetDigest.value,
+    },
+  )
+}
 const act = async (task: AutomationTask, action: 'cancel' | 'retry') => {
   try {
     await axios.post(`/api/automation/tasks/${String(task.id ?? '')}/${action}`)

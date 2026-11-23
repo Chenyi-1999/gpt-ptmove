@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pt-nexus/server/internal/config"
@@ -22,7 +23,7 @@ import (
 )
 
 // AutomationService 编排可选自动下载和原生转种；设置、任务和发布证据均持久化。
-// 不变量：预览只读；配额原子预留；上传仅一次；关闭执行不改变用户已有种子。
+// 不变量：预览不改变执行状态；配额原子预留；上传仅一次；关闭执行不改变用户已有种子。
 type AutomationService struct {
 	repo           *repository.AutomationRepository
 	cfg            *config.Manager
@@ -34,6 +35,7 @@ type AutomationService struct {
 	iyuuLookup     func(context.Context, string, []string) (map[string]bool, error)
 	mu             sync.Mutex
 	start          sync.Once
+	previewStarted atomic.Int64
 }
 type automationSnapshot struct {
 	Settings policy.Settings     `json:"settings"`
@@ -296,33 +298,6 @@ func (s *AutomationService) checkTaskDownloadHistory(ctx context.Context, task r
 	return nil
 }
 
-// Preview 只读取站点详情、查重和 torrent 元数据，不预留、不落盘、不加种、不上传。
-func (s *AutomationService) Preview(ctx context.Context, body map[string]any) (map[string]any, int) {
-	task := s.migrate.observeTask("candidate_preview", "获取预览候选", "/settings/automation")
-	defer task.finish(false, "预览未完成", "")
-	v, err := s.settings(s.repo.WithContext(ctx))
-	if err != nil {
-		return automationError(errors.New("配置读取失败"), 500)
-	}
-	if patch, ok := body["settings"].(map[string]any); ok {
-		v, err = policy.MergeSettings(v, patch)
-	} else if len(body) > 0 {
-		v, err = policy.MergeSettings(v, body)
-	}
-	if err != nil {
-		return automationError(err, 400)
-	}
-	rows, snapshot, err := s.scan(ctx, v, task)
-	if err != nil {
-		if ctx.Err() != nil {
-			task.finish(false, "预览已中断", "")
-		}
-		return automationError(err, 400)
-	}
-	task.finish(true, "预览完成", candidateResultProgress(rows))
-	return map[string]any{"success": true, "candidates": rows, "settings": v, "source_digest": snapshot.Source.Digest, "target_digest": snapshot.Target.Digest}, 200
-}
-
 // Run 仅登记冻结的扫描意图；网络扫描与原子配额预留均由后台执行。
 func (s *AutomationService) Run(ctx context.Context, body map[string]any) (map[string]any, int) {
 	return s.run(ctx, body, false)
@@ -350,6 +325,31 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 	if ids, ok := body["selected_ids"].([]string); ok {
 		selected = append(selected, ids...)
 	}
+	var previewSourceDigest, previewTargetDigest string
+	if len(selected) > 0 {
+		rawSource, hasSource := body["preview_source_site"]
+		rawTarget, hasTarget := body["preview_target_site"]
+		if hasSource || hasTarget {
+			source, validSource := rawSource.(string)
+			target, validTarget := rawTarget.(string)
+			if !validSource || !validTarget || strings.TrimSpace(source) == "" || strings.TrimSpace(target) == "" {
+				return automationError(errors.New("需要同时提供预览的源站和目标站"), 400)
+			}
+			if source != v.SourceSite || target != v.TargetSite {
+				return automationError(errors.New("已保存的源站或目标站与候选预览不一致，请重新预览"), 409)
+			}
+		}
+		rawSourceDigest, hasSourceDigest := body["preview_source_digest"]
+		rawTargetDigest, hasTargetDigest := body["preview_target_digest"]
+		if hasSourceDigest || hasTargetDigest {
+			var validSourceDigest, validTargetDigest bool
+			previewSourceDigest, validSourceDigest = rawSourceDigest.(string)
+			previewTargetDigest, validTargetDigest = rawTargetDigest.(string)
+			if !validSourceDigest || !validTargetDigest || strings.TrimSpace(previewSourceDigest) == "" || strings.TrimSpace(previewTargetDigest) == "" {
+				return automationError(errors.New("需要同时提供预览的源站和目标站声明摘要"), 400)
+			}
+		}
+	}
 	explicit := len(selected) > 0 || body["enqueue"] == true
 	execute := v.Enabled || explicit
 	if execute {
@@ -363,6 +363,9 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 	source, target, err := s.resolveContext(ctx, v)
 	if err != nil {
 		return automationError(err, 400)
+	}
+	if previewSourceDigest != "" && (source.Digest != previewSourceDigest || target.Digest != previewTargetDigest) {
+		return automationError(errors.New("站点声明已改变，请重新预览后再加入队列"), 409)
 	}
 	if execute && usesIYUUBatches(automationSnapshot{Settings: v, Source: *source}) && !s.iyuuConfigured() {
 		return automationError(errors.New("请先在 IYUU 设置中配置令牌，再运行织梦自动下载"), 400)

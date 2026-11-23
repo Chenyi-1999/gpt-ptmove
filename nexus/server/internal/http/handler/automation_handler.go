@@ -19,10 +19,11 @@ func NewAutomationHandler(service *migrationflow.AutomationService) *AutomationH
 	return &AutomationHandler{service: service}
 }
 
-// RegisterRoutes 注册模块管理、只读预览和显式任务操作。
+// RegisterRoutes 注册模块管理、网页预览和显式任务操作。
 func (h *AutomationHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.GET("/settings", h.GetSettings)
 	g.PUT("/settings", h.UpdateSettings)
+	g.GET("/preview", h.LatestPreview)
 	g.POST("/preview", h.Preview)
 	g.POST("/runs", h.Run)
 	g.GET("/runs", h.ListRuns)
@@ -62,13 +63,21 @@ func (h *AutomationHandler) UpdateSettings(c *gin.Context) {
 	c.JSON(status, result)
 }
 
-// Preview 只读取候选，不产生下载、队列或配额副作用。
+// LatestPreview 返回最近成功的候选快照，避免代理保存管理员响应。
+func (h *AutomationHandler) LatestPreview(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	result, status := h.service.LatestWebPreview(c.Request.Context())
+	c.JSON(status, result)
+}
+
+// Preview 保存网页候选快照，不产生下载、队列或配额副作用。
 func (h *AutomationHandler) Preview(c *gin.Context) {
 	body, ok := automationBody(c)
 	if !ok {
 		return
 	}
-	result, status := h.service.Preview(c.Request.Context(), body)
+	c.Header("Cache-Control", "no-store")
+	result, status := h.service.WebPreview(c.Request.Context(), body)
 	c.JSON(status, result)
 }
 
