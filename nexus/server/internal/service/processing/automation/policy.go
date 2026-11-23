@@ -55,7 +55,7 @@ type Candidate struct {
 	Eligible             bool     `json:"eligible"`
 	Reasons              []string `json:"reasons"`
 	Torrent              []byte   `json:"-"`
-	DetailURL            string   `json:"-"`
+	DetailURL            string   `json:"detail_url,omitempty"`
 }
 
 // Defaults 返回关闭执行和调度的首装配置。

@@ -563,3 +563,9 @@
 - Gitee 发行 1355081 提供 Compose 和校验文件，已重新下载并逐字节比对，完整镜像入口指向同版本 GitHub 私有发行。
 - `docs/DEPLOYMENT.json` 已记录附件和归档证据。D 盘历史 ZIP 含标签源码、完整镜像、Compose、校验和恢复说明。核验 56 个 OCI 对象和 ZIP 内容，归档 SHA-256 为 `94c8a8592eeec144c5b49c391eed42627e4cbfd5b63b2f4c3ff13013620c5a26`，已更新项目归档索引。
 - 152 健康返回 v1.0.5，发布记录独立提交，v1.0.5 标签继续指向上述发布源码提交。未执行真实下载、发种或操作 81。
+
+## PTM-20261123-076 — 2026-11-23T08:27:29+08:00 — Codex root、preview_detail_ui、image_delta_bundle，STARPT v1.0.6 候选源站详情入口
+
+- `scanner.go`、`source_restriction.go`、`policy.go` 和 `AutomationSettings.vue` 为候选预览和运行记录返回同源、无凭据的详情链接。已排除候选仍能查看详情，链接在新标签页打开。同步 API 合同、版本、Compose、前端产物及发行说明。
+- 152 Go 全量、定向 ESLint、Vue 类型检查、Vite 构建和隔离冒烟 10 组通过。测试覆盖普通及排除候选、凭据参数、不同来源和错误 ID。线上设置页已返回通过验证的 JS 资源。未进行真实浏览器点击和站点下载。
+- 152 已健康部署 `ptmove-nexus:1.0.6`，保留 1.0.5 回滚。复用 51 个经校验的 OCI 对象重建镜像附件，解压后的 Docker tar SHA-256 与 152 导出完全一致。压缩件 713803050 字节，SHA-256 `93b09b9635312eb45c169df8a18b70713a6588a2822cb345540df33dbb869e8d`。本记录编写时标签、双仓与发行待提交。未下载、发种或操作 81。

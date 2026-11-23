@@ -64,6 +64,9 @@ func TestReadOnlyScanMetadataAndExplicitEmptyEvidence(t *testing.T) {
 		t.Fatalf("requests=%d", requests)
 	}
 	raw, _ := json.Marshal(rows)
+	if !strings.Contains(string(raw), `"detail_url":"https://source.example.com/details.php?id=1"`) {
+		t.Fatal("preview did not expose the declared source detail link")
+	}
 	for _, secret := range []string{"source-secret", "target-secret", "d4:info", "DetailURL"} {
 		if strings.Contains(string(raw), secret) {
 			t.Fatalf("preview leaked internal data %s", secret)
@@ -160,6 +163,9 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	if byID["1"].Official || byID["1"].Eligible || !byID["2"].RestrictionsKnown || byID["2"].Allowed || !byID["3"].Episode || !byID["4"].PreviouslyDownloaded || !byID["10"].PreviouslyDownloaded || byID["502"].Eligible || !byID["503"].Duplicate || byID["503"].Eligible {
 		t.Fatalf("ineligible rows bypassed: %+v", byID)
 	}
+	if byID["2"].DetailURL != "https://zmpt.cc/details.php?id=2" || byID["500"].DetailURL != "https://zmpt.cc/details.php?id=500" {
+		t.Fatalf("source detail link missing for a listed or inspected result: %q / %q", byID["2"].DetailURL, byID["500"].DetailURL)
+	}
 	for _, id := range []string{"502", "504"} {
 		if candidate := byID[id]; candidate.Eligible || !strings.Contains(strings.Join(candidate.Reasons, " "), "完整种子体积不符合规则") {
 			t.Fatalf("exact size bounds not enforced for %s: %+v", id, candidate)
@@ -167,6 +173,26 @@ func TestZmptOfficialListingBoundsPagingAndEarlyExclusions(t *testing.T) {
 	}
 	if n := len(requests); n != 18 || widgetRequests != 5 || targetRequests != 0 {
 		t.Fatalf("visited %d pages/details/torrents/widget lookups, widget=%d target=%d, want 18/5/0: %v", n, widgetRequests, targetRequests, requests)
+	}
+}
+
+func TestCandidateDetailLinkUsesSameOriginAndOmitsCredentials(t *testing.T) {
+	for _, scenario := range []struct{ name, path, want string }{
+		{"query id", "/details.php?id={id}", "https://source.example.com/details.php?id=15"},
+		{"path id", "/torrent/{id}", "https://source.example.com/torrent/15"},
+		{"foreign host", "https://wrong.example/details.php?id={id}", ""},
+		{"conflicting id", "/details.php?id={id}&id=9", ""},
+		{"embedded key", "/details.php?id={id}&api%5Fkey=fixture", ""},
+		{"embedded passkey", "/details.php?id={id}&passkey=fixture", ""},
+		{"invalid query", "/details.php?id={id}&broken=%z", ""},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			source := testProfile("https://source.example.com")
+			source.Paths.Detail = scenario.path
+			if got := candidateDetailURL(source, "15"); got != scenario.want {
+				t.Fatalf("source link = %q, want %q", got, scenario.want)
+			}
+		})
 	}
 }
 

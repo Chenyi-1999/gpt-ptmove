@@ -145,6 +145,9 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	for i := range rows {
+		rows[i].DetailURL = candidateDetailURL(source, rows[i].ID)
+	}
 	policy.Rank(rows, settings)
 	return rows, nil
 }
@@ -172,7 +175,6 @@ func (s *Scanner) inspect(ctx context.Context, source, target Profile, sourceCoo
 	}
 	listedEntry := entry
 	doc, detail, err := s.sourceDetail(ctx, source, sourceCookie, entry.id)
-	c.DetailURL = detail
 	if err != nil {
 		return c, err
 	}

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "date": "2026-11-23",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.5",
-  "image_id": "sha256:32102073c575c0d5ccced0dbe5b2530fc8f6f4ece8b7f145386228a4d031b412",
+  "image": "ptmove-nexus:1.0.6",
+  "image_id": "sha256:9b5d753d8c58398daeb7d5e25d3c5d3bc2febca023a383274a668e92622c42ca",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "1143e9e774ee2db0fa810f4ff4a53bfc24e3aef38f2323486246ebb106164f57",
+  "image_archive_sha256": "93b09b9635312eb45c169df8a18b70713a6588a2822cb345540df33dbb869e8d",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -1025,5 +1025,21 @@
       "oci_blobs_verified": 56
     },
     "published_verified_at": "2026-11-23T00:45:52+08:00"
+  },
+  "starpt_v1_0_6": {
+    "version": "1.0.6",
+    "image_id": "sha256:9b5d753d8c58398daeb7d5e25d3c5d3bc2febca023a383274a668e92622c42ca",
+    "rollback_image_id": "sha256:32102073c575c0d5ccced0dbe5b2530fc8f6f4ece8b7f145386228a4d031b412",
+    "healthy": true,
+    "native_smoke_groups": 10,
+    "candidate_detail_asset": "AutomationSettings-7LDhTvwD.js",
+    "sha256": "51a03e7183dbca455cde1f668960c6f953430af9e082457013bca0ecc5d8a37b",
+    "automation_idle": true,
+    "archive": "starpt-v1.0.6-linux-amd64.tar.gz",
+    "image_archive_bytes": 713803050,
+    "docker_export_sha256": "efa1749ea9ef9f78afa9bffb7c6dda5ab46f22d7402f8233f199da47c1cd4e28",
+    "reused_oci_blobs": 51,
+    "tag": "v1.0.6",
+    "verified_at": "2026-11-23T08:27:29+08:00"
   }
 }

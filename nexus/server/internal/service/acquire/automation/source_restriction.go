@@ -66,6 +66,25 @@ func sameSourceDetail(link, endpoint, id string) bool {
 	return true
 }
 
+// candidateDetailURL 根据公开站点模板生成预览链接，避免转发列表原文或凭据信息。
+func candidateDetailURL(p Profile, id string) string {
+	detail, err := Endpoint(p, p.Paths.Detail, id, "", "")
+	if err != nil || (!strings.HasPrefix(detail, "https://") && !strings.HasPrefix(detail, "http://")) || !sameSourceDetail(detail, detail, id) {
+		return ""
+	}
+	checked, err := ValidateDetailURL(p, detail)
+	if err != nil {
+		return ""
+	}
+	parsed, _ := url.Parse(checked)
+	for key := range parsed.Query() {
+		if strings.Contains(strings.ToLower(key), "key") {
+			return ""
+		}
+	}
+	return checked
+}
+
 // InspectSourceRestriction 查询真实详情页上的限制。允许时再读取该详情对应的种子，
 // 返回其载荷标识以绑定发布内容。整个流程仅发送同源 GET，不写入文件。
 func (s *Scanner) InspectSourceRestriction(ctx context.Context, p Profile, cookie, id string) (known, allowed bool, hash string, err error) {

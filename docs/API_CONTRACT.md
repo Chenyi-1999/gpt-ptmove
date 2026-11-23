@@ -92,3 +92,4 @@ This section describes the native Go service and its authenticated `/api/v1` mac
 - `prefer_official` and `target_absent_priority` remain readable and writable for old clients. They are deprecated, returned for compatibility, and have no effect on the hard filters above.
 - Candidate preview exposes eligibility and skip reasons. Candidate `size` is the complete torrent size in bytes; clients should display it in a human-readable unit. A UI toggle or an API patch cannot weaken these checks.
 - `GET /api/automation/tasks?active=1` uses the administrator session and returns ongoing tasks for the workbench. `download_progress` is the latest qB fraction from 0 to 1 when available. Other phases use the task state and message.
+- Candidate rows include `detail_url` when their source profile provides a valid same-origin HTTP(S) detail address without credentials. The field may also be present on skipped rows so administrators can inspect the source reason.

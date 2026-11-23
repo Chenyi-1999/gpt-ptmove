@@ -156,6 +156,16 @@
         /><el-table-column label="候选" min-width="220"
           ><template #default="s">
             <div class="candidate-title">{{ s.row.title }}</div>
+            <a
+              v-if="safeDetailUrl(s.row.detail_url)"
+              class="candidate-detail-link"
+              :href="safeDetailUrl(s.row.detail_url)"
+              :aria-label="`在新标签页打开 ${s.row.title || `#${s.row.id}`} 的种子详情`"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click.stop
+              >详情</a
+            >
             <div class="candidate-badges">
               <el-tag v-if="s.row.official" size="small" type="success" effect="plain">官方</el-tag>
               <el-tag v-if="s.row.episode" size="small" type="warning" effect="plain">分集</el-tag>
@@ -241,6 +251,7 @@ type Site = { id: string; name: string; baseURL: string }
 type Candidate = {
   id: string
   title: string
+  detail_url?: string
   size: number
   seeders: number
   official?: boolean
@@ -262,6 +273,16 @@ type StatusBadge = {
   type: 'primary' | 'success' | 'warning' | 'info' | 'danger'
 }
 type Row = Record<string, unknown>
+const safeDetailUrl = (value?: string): string => {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return ''
+    return url.href
+  } catch {
+    return ''
+  }
+}
 const candidateStatus = (candidate: Candidate): StatusBadge => {
   if (candidate.eligible) return { label: '可处理', type: 'success' }
   if (candidate.duplicate_known && candidate.duplicate) return { label: '目标已存在', type: 'info' }
@@ -637,6 +658,18 @@ onMounted(load)
 
 .candidate-title {
   overflow-wrap: anywhere;
+}
+
+.candidate-detail-link {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--el-color-primary);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.candidate-detail-link:hover {
+  text-decoration: underline;
 }
 
 .candidate-badges {
