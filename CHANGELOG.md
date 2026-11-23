@@ -569,3 +569,10 @@
 - `scanner.go`、`source_restriction.go`、`policy.go` 和 `AutomationSettings.vue` 为候选预览和运行记录返回同源、无凭据的详情链接。已排除候选仍能查看详情，链接在新标签页打开。同步 API 合同、版本、Compose、前端产物及发行说明。
 - 152 Go 全量、定向 ESLint、Vue 类型检查、Vite 构建和隔离冒烟 10 组通过。测试覆盖普通及排除候选、凭据参数、不同来源和错误 ID。线上设置页已返回通过验证的 JS 资源。未进行真实浏览器点击和站点下载。
 - 152 已健康部署 `ptmove-nexus:1.0.6`，保留 1.0.5 回滚。复用 51 个经校验的 OCI 对象重建镜像附件，解压后的 Docker tar SHA-256 与 152 导出完全一致。压缩件 713803050 字节，SHA-256 `93b09b9635312eb45c169df8a18b70713a6588a2822cb345540df33dbb869e8d`。本记录编写时标签、双仓与发行待提交。未下载、发种或操作 81。
+
+## PTM-20261123-077 — 2026-11-23T08:31:58+08:00 — Codex root，STARPT v1.0.6 双仓发行
+
+- GitHub 和 Gitee 的 v1.0.6 标签均指向 `c2c657f5f2fa041eceb7e2143608ee7f7bfaa62e`。GitHub 私有发行 454858972 的完整镜像、Compose 和校验文件与本地 SHA-256 一致。
+- Gitee 发行 1355571 的 Compose 与校验文件重新下载后逐字节匹配。完整镜像从同版本 GitHub 私有发行提供。
+- D 盘历史 ZIP 已登记归档索引。包含源码、Docker 镜像、Compose、校验和恢复说明，核验 59 个 OCI 对象。ZIP SHA-256 `f9f4587ce77c7a37a68da082e88290aebca48ec86739a1c5afd69ce9a4270ff0`。
+- 两站附件及 152 部署证据记入 `docs/DEPLOYMENT.json`，本记录独立提交，版本标签继续指向发布源码。未实际下载、发种或访问 81。

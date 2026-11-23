@@ -1040,6 +1040,58 @@
     "docker_export_sha256": "efa1749ea9ef9f78afa9bffb7c6dda5ab46f22d7402f8233f199da47c1cd4e28",
     "reused_oci_blobs": 51,
     "tag": "v1.0.6",
-    "verified_at": "2026-11-23T08:27:29+08:00"
+    "verified_at": "2026-11-23T08:27:29+08:00",
+    "source_commit": "c2c657f5f2fa041eceb7e2143608ee7f7bfaa62e",
+    "github_release": {
+      "id": 454858972,
+      "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.6",
+      "assets": [
+        {
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "digest": "sha256:4b783c80e31897286a6f3387362ba1da38c4faee64e8dc48743405bf1a4c5e48",
+          "id": 780949761
+        },
+        {
+          "name": "starpt-v1.0.6-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "digest": "sha256:925bc089fb42d054597d8b271285d8ee5ae18c87218094ab3b9d6c2b34ab99c2",
+          "id": 780949759
+        },
+        {
+          "name": "starpt-v1.0.6-linux-amd64.tar.gz",
+          "size": 713803050,
+          "digest": "sha256:93b09b9635312eb45c169df8a18b70713a6588a2822cb345540df33dbb869e8d",
+          "id": 780950095
+        }
+      ],
+      "published_at": "2026-11-23T00:31:07Z"
+    },
+    "gitee_release": {
+      "id": 1355571,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.6",
+      "assets": [
+        {
+          "id": 3795407,
+          "name": "compose.starpt.yaml",
+          "size": 498,
+          "sha256": "4b783c80e31897286a6f3387362ba1da38c4faee64e8dc48743405bf1a4c5e48"
+        },
+        {
+          "id": 3795408,
+          "name": "starpt-v1.0.6-linux-amd64.tar.gz.sha256",
+          "size": 99,
+          "sha256": "925bc089fb42d054597d8b271285d8ee5ae18c87218094ab3b9d6c2b34ab99c2"
+        }
+      ],
+      "full_image": "Same private GitHub release"
+    },
+    "archive_zip": {
+      "name": "GPT-PTMOVE__2026-11-23_082828__历史发布__STARPT-v1.0.6.zip",
+      "bytes": 730865315,
+      "sha256": "f9f4587ce77c7a37a68da082e88290aebca48ec86739a1c5afd69ce9a4270ff0",
+      "oci_blobs_verified": 59
+    },
+    "published_verified_at": "2026-11-23T08:31:58+08:00"
   }
 }
