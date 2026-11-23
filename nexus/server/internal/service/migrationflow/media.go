@@ -72,9 +72,16 @@ func (s *MigrateService) MediaValidate(payload map[string]any) (map[string]any, 
 
 // recordScreenshotProgress 显示处理器实际回传的计数，远程旧客户端仅显示可确认的阶段。
 func recordScreenshotProgress(task taskObservation, stage string, completed, total int) {
+	message, progress := screenshotTaskProgress(stage, completed, total)
+	if message != "" {
+		task.update(message, progress)
+	}
+}
+
+func screenshotTaskProgress(stage string, completed, total int) (string, string) {
 	switch stage {
 	case "locating":
-		task.update("正在定位视频文件", "")
+		return "正在定位视频文件", ""
 	case "capturing", "uploading":
 		verb := "截取"
 		if stage == "uploading" {
@@ -85,7 +92,7 @@ func recordScreenshotProgress(task taskObservation, stage string, completed, tot
 		if completed >= 0 && total > 0 {
 			progress = fmt.Sprintf("已%s %d/%d 张", verb, completed, total)
 		}
-		task.update(label, progress)
+		return label, progress
 	case "remote", "remote_capture", "remote_upload":
 		label := "飞牛正在处理截图"
 		if stage == "remote_capture" {
@@ -97,8 +104,9 @@ func recordScreenshotProgress(task taskObservation, stage string, completed, tot
 		if total > 0 {
 			progress = fmt.Sprintf("计划 %d 张，等待客户端回传", total)
 		}
-		task.update(label, progress)
+		return label, progress
 	}
+	return "", ""
 }
 
 func (s *MigrateService) csptToken() string {

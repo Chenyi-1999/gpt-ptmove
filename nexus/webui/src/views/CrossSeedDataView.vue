@@ -60,6 +60,25 @@
 
       <el-button
         v-if="isMaintenanceMode"
+        type="success"
+        :icon="MagicStick"
+        :disabled="
+          selectedRows.length === 0 || selectedRows.length > 100 || isFillingMaintenanceMedia
+        "
+        :loading="isFillingMaintenanceMedia"
+        @click="fillSelectedMissingMedia"
+        plain
+        title="只补全所选记录中缺失的截图或 MediaInfo，截图会上传到已配置的图床"
+      >
+        {{
+          selectedRows.length > 100
+            ? `已选 ${selectedRows.length} 条（每批最多 100 条）`
+            : `补全所选截图和媒体信息 (${selectedRows.length})`
+        }}
+      </el-button>
+
+      <el-button
+        v-if="isMaintenanceMode"
         type="danger"
         :icon="Delete"
         @click="isDeleteMode && selectedRows.length > 0 ? executeBatchDelete() : toggleDeleteMode()"
@@ -207,7 +226,7 @@
         class="glass-table"
       >
         <el-table-column
-          v-if="isCrossSeedMode || (isMaintenanceMode && isDeleteMode)"
+          v-if="isCrossSeedMode || isMaintenanceMode"
           type="selection"
           width="55"
           align="center"
@@ -246,7 +265,8 @@
             <div
               class="mapped-cell"
               :class="{
-                'invalid-value': !isValidFormat(scope.row.type) || !isMapped('type', scope.row.type),
+                'invalid-value':
+                  !isValidFormat(scope.row.type) || !isMapped('type', scope.row.type),
               }"
             >
               {{ getMappedValue('type', scope.row.type) }}
@@ -313,7 +333,8 @@
             <div
               class="mapped-cell"
               :class="{
-                'invalid-value': !isValidFormat(scope.row.team) || !isMapped('team', scope.row.team),
+                'invalid-value':
+                  !isValidFormat(scope.row.team) || !isMapped('team', scope.row.team),
               }"
             >
               {{ getMappedValue('team', scope.row.team) }}
@@ -376,7 +397,9 @@
               size="small"
               :type="isMaintenanceMode ? 'primary' : 'default'"
               :disabled="isCrossSeedMode && (!checkSelectable(scope.row) || isEnqueueing)"
-              @click="isMaintenanceMode ? handleMaintain(scope.row) : handleSingleCrossSeed(scope.row)"
+              @click="
+                isMaintenanceMode ? handleMaintain(scope.row) : handleSingleCrossSeed(scope.row)
+              "
             >
               {{ isMaintenanceMode ? '维护' : '选目标' }}
             </el-button>
@@ -386,11 +409,15 @@
     </div>
 
     <div v-loading="loading" class="seed-mobile-list" :aria-busy="loading">
-      <el-empty v-if="!loading && !tableData.length" description="暂无待处理数据" :image-size="64" />
+      <el-empty
+        v-if="!loading && !tableData.length"
+        description="暂无待处理数据"
+        :image-size="64"
+      />
       <ul v-else aria-label="种子列表">
         <li v-for="row in tableData" :key="`${row.hash}-${row.site_name}-${row.torrent_id}`">
           <el-checkbox
-            v-if="isCrossSeedMode || isDeleteMode"
+            v-if="isCrossSeedMode || isMaintenanceMode"
             :model-value="selectedRows.includes(row)"
             :disabled="!checkSelectable(row)"
             :aria-label="`选择 ${row.subtitle || row.title || row.torrent_id}`"
@@ -422,7 +449,12 @@
     >
       <el-form label-position="top">
         <el-form-item label="目标站点">
-          <el-select v-model="queueTargetSite" aria-label="目标站点" placeholder="选择站点" :disabled="isEnqueueing">
+          <el-select
+            v-model="queueTargetSite"
+            aria-label="目标站点"
+            placeholder="选择站点"
+            :disabled="isEnqueueing"
+          >
             <el-option v-for="site in targetSitesList" :key="site" :label="site" :value="site" />
           </el-select>
         </el-form-item>
@@ -431,18 +463,29 @@
         <li v-for="row in queueReviewRows" :key="`${row.site_name}-${row.torrent_id}`">
           <strong>{{ row.subtitle || row.title || row.torrent_id }}</strong>
           <small>{{ row.nickname || row.site_name }} · #{{ row.torrent_id }}</small>
-          <p v-for="issue in getQueueReviewIssues(row)" :key="issue" class="seed-issue">{{ issue }}</p>
+          <p v-for="issue in getQueueReviewIssues(row)" :key="issue" class="seed-issue">
+            {{ issue }}
+          </p>
         </li>
       </ul>
       <template #footer>
         <el-button :disabled="isEnqueueing" @click="queueReviewVisible = false">取消</el-button>
-        <el-button type="primary" :loading="isEnqueueing" :disabled="!queueTargetSite || queueEligibleRows.length === 0" @click="submitQueueReview">
+        <el-button
+          type="primary"
+          :loading="isEnqueueing"
+          :disabled="!queueTargetSite || queueEligibleRows.length === 0"
+          @click="submitQueueReview"
+        >
           加入队列（{{ queueEligibleRows.length }}）
         </el-button>
       </template>
     </el-dialog>
 
-    <BDInfoRecordsDialog v-if="isMaintenanceMode" v-model="recordDialogVisible" @closed="fetchData" />
+    <BDInfoRecordsDialog
+      v-if="isMaintenanceMode"
+      v-model="recordDialogVisible"
+      @closed="fetchData"
+    />
 
     <!-- 维护：列表内弹窗编辑（非全页切换） -->
     <div v-if="isMaintenanceMode && maintenanceDialogVisible" class="modal-overlay">
@@ -450,7 +493,9 @@
         <template #header>
           <div class="modal-header maintenance-modal-header">
             <div class="maintenance-modal-title">
-              <span class="maintenance-modal-title-text">维护 - {{ selectedTorrentName || '加载中…' }}</span>
+              <span class="maintenance-modal-title-text"
+                >维护 - {{ selectedTorrentName || '加载中…' }}</span
+              >
             </div>
             <div class="maintenance-modal-actions">
               <el-select
@@ -524,7 +569,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Delete, Document, Download, Filter, List, Search, Warning } from '@element-plus/icons-vue'
+import {
+  Delete,
+  Document,
+  Download,
+  Filter,
+  List,
+  MagicStick,
+  Search,
+  Warning,
+} from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import type { ElTable, ElTree } from 'element-plus'
 import axios from 'axios'
@@ -533,6 +587,7 @@ import CrossSeedPanel from '@/components/CrossSeedPanel.vue'
 import BDInfoRecordsDialog from '@/components/cross-seed-data/BDInfoRecordsDialog.vue'
 import { useContentFiltersStore } from '@/stores/contentFilters'
 import { useCrossSeedStore } from '@/stores/crossSeed'
+import { useTaskMonitorStore } from '@/stores/taskMonitor'
 import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import type { ISourceInfo } from '@/types'
 import '@/assets/styles/glass-morphism.scss'
@@ -569,6 +624,8 @@ interface SeedParameter {
   is_reviewed: boolean
 }
 
+const pendingMaintenanceMediaTasks = new Set<string>()
+
 interface PathNode {
   path: string
   label: string
@@ -604,6 +661,7 @@ const router = useRouter()
 const route = useRoute()
 const contentFiltersStore = useContentFiltersStore()
 const crossSeedStore = useCrossSeedStore()
+const taskMonitorStore = useTaskMonitorStore()
 const torrentsViewState = useTorrentsViewState()
 const isMaintenanceMode = computed(() => props.mode === 'maintenance')
 const isCrossSeedMode = computed(() => !isMaintenanceMode.value)
@@ -665,10 +723,13 @@ const queueReviewVisible = ref(false)
 const queueReviewRows = ref<SeedParameter[]>([])
 const queueTargetSite = ref('')
 const isEnqueueing = ref(false)
-const queueEligibleRows = computed(() => queueReviewRows.value.filter((row) => !getQueueReviewIssues(row).length))
+const queueEligibleRows = computed(() =>
+  queueReviewRows.value.filter((row) => !getQueueReviewIssues(row).length),
+)
 const batchFetchDialogVisible = ref(false)
 const batchFetchPanelRef = ref<InstanceType<typeof BatchFetchPanel> | null>(null)
 const isDeleteMode = ref(false)
+const isFillingMaintenanceMedia = ref(false)
 const recordDialogVisible = ref(false)
 
 // 维护弹窗状态（仅 mode=maintenance）
@@ -688,6 +749,24 @@ const pathTreeData = ref<PathNode[]>([])
 const uniquePaths = ref<string[]>([])
 const uniquePathsLoaded = ref(false)
 const uniquePathsLoading = ref(false)
+
+watch(
+  () => taskMonitorStore.taskList,
+  (tasks) => {
+    if (!isMaintenanceMode.value) return
+    for (const task of tasks) {
+      if (task.kind !== 'maintenance_media_fill') continue
+      if (task.status === 'running') {
+        pendingMaintenanceMediaTasks.add(task.key)
+        continue
+      }
+      if (!pendingMaintenanceMediaTasks.has(task.key)) continue
+      pendingMaintenanceMediaTasks.delete(task.key)
+      void fetchData()
+    }
+  },
+  { immediate: true },
+)
 
 let fetchSequence = 0
 let searchDebounceTimer: ReturnType<typeof window.setTimeout> | null = null
@@ -832,7 +911,8 @@ const normalizeAndSortTags = (tags: string[] | string): string[] => {
   return [...tagList].sort(compareTagAZ)
 }
 
-const getTagsSortKey = (row: SeedParameter) => normalizeAndSortTags(row.tags).join('|').toLowerCase()
+const getTagsSortKey = (row: SeedParameter) =>
+  normalizeAndSortTags(row.tags).join('|').toLowerCase()
 
 const getMappedTags = (tags: string[] | string) => {
   const tagList = normalizeAndSortTags(tags)
@@ -968,7 +1048,10 @@ const getSeedIssues = (row: SeedParameter) => {
 const getQueueReviewIssues = (row: SeedParameter) => {
   const issues = getSeedIssues(row)
   const target = queueTargetSite.value.trim().toLowerCase()
-  if (target && [row.site_name, row.nickname].some((site) => site?.trim().toLowerCase() === target)) {
+  if (
+    target &&
+    [row.site_name, row.nickname].some((site) => site?.trim().toLowerCase() === target)
+  ) {
     issues.push('源站与目标站相同')
   }
   return issues
@@ -1005,7 +1088,7 @@ const buildPathTree = (paths: string[]): PathNode[] => {
 }
 
 const checkSelectable = (row: SeedParameter) => {
-  if (isMaintenanceMode.value && isDeleteMode.value) {
+  if (isMaintenanceMode.value) {
     return true
   }
   if (row.is_deleted) {
@@ -1036,7 +1119,11 @@ const fetchData = async () => {
       path_filters: JSON.stringify(activeFilters.value.paths || []),
       is_deleted: isMaintenanceMode.value ? activeFilters.value.isDeleted : '',
       exclude_target_sites: isCrossSeedMode.value ? activeFilters.value.excludeTargetSites : '',
-      review_status: isCrossSeedMode.value ? 'reviewed' : isMaintenanceMode.value ? reviewStatusFilter.value : '',
+      review_status: isCrossSeedMode.value
+        ? 'reviewed'
+        : isMaintenanceMode.value
+          ? reviewStatusFilter.value
+          : '',
       include_unique_paths: '0',
     })
     contentFiltersStore.appendQuery(params)
@@ -1178,7 +1265,9 @@ const loadUiSettings = async () => {
     if (settings.active_filters) {
       activeFilters.value = {
         paths: Array.isArray(settings.active_filters.paths) ? settings.active_filters.paths : [],
-        isDeleted: isMaintenanceMode.value ? String(settings.active_filters.isDeleted || '').trim() : '',
+        isDeleted: isMaintenanceMode.value
+          ? String(settings.active_filters.isDeleted || '').trim()
+          : '',
         excludeTargetSites: isCrossSeedMode.value
           ? String(settings.active_filters.excludeTargetSites || '').trim()
           : '',
@@ -1259,8 +1348,6 @@ const applyFilters = () => {
   currentPage.value = 1
   void fetchData()
   void saveUiSettings()
-
-
 }
 
 watch(searchQuery, () => {
@@ -1360,11 +1447,7 @@ const applySeedInfo = (seedInfoResult: SeedInfoResponse, rowKey?: string) => {
   crossSeedStore.setTaskId(`seed_maintenance_${idSuffix}_${Date.now()}`)
 }
 
-const openMaintenance = async (opts: {
-  torrentId: string
-  siteName: string
-  rowId?: string
-}) => {
+const openMaintenance = async (opts: { torrentId: string; siteName: string; rowId?: string }) => {
   const torrentId = opts.torrentId.trim()
   const siteName = opts.siteName.trim()
   if (!torrentId || !siteName) {
@@ -1496,6 +1579,72 @@ const handleSelectionChange = (selection: SeedParameter[]) => {
   selectedRows.value = selection
 }
 
+const fillSelectedMissingMedia = async () => {
+  if (!isMaintenanceMode.value || isFillingMaintenanceMedia.value) return
+  const rows = [...selectedRows.value]
+  if (!rows.length) {
+    ElMessage.warning('请先选择有效的种子记录')
+    return
+  }
+  if (rows.length > 100) {
+    ElMessage.warning('每批最多选择 100 条种子')
+    return
+  }
+  if (rows.some((row) => !row.hash?.trim() || !row.torrent_id?.trim() || !row.site_name?.trim())) {
+    ElMessage.warning('所选记录中有种子标识缺失，请刷新列表后重试')
+    return
+  }
+
+  try {
+    isFillingMaintenanceMedia.value = true
+    const response = await axios.post('/api/migrate/maintenance/media_fill', {
+      seeds: rows.map((row) => ({
+        hash: row.hash,
+        torrent_id: row.torrent_id,
+        site_name: row.site_name,
+        downloader_id: row.downloader_id || '',
+      })),
+    })
+    const result = response.data as {
+      success?: boolean
+      task_key?: string
+      task_id?: string
+      total?: number
+      error?: string
+      message?: string
+    }
+    const taskKey = typeof result.task_key === 'string' ? result.task_key.trim() : ''
+    if (!result.success || !taskKey.startsWith('operation:')) {
+      throw new Error(result.error || result.message || '服务端未返回有效的批量任务')
+    }
+
+    pendingMaintenanceMediaTasks.add(taskKey)
+    taskMonitorStore.markRunning({
+      key: taskKey,
+      rawId: result.task_id || null,
+      kind: 'maintenance_media_fill',
+      title: '批量补全截图和媒体信息',
+      message: `已提交 ${result.total || rows.length} 条种子，后台逐条检查缺失资料`,
+      progressText: `等待处理 ${result.total || rows.length} 条`,
+      routeTarget: { path: '/seed-maintenance' },
+    })
+    selectedRows.value = []
+    dataTable.value?.clearSelection()
+    ElMessage.success('批量补全任务已开始，可在首页任务卡片查看进度')
+  } catch (error: unknown) {
+    const message = axios.isAxiosError(error)
+      ? (error.response?.data as { message?: string; error?: string } | undefined)?.message ||
+        (error.response?.data as { error?: string } | undefined)?.error ||
+        error.message
+      : error instanceof Error
+        ? error.message
+        : '批量补全任务提交失败'
+    ElMessage.error(redactPrivateText(message))
+  } finally {
+    isFillingMaintenanceMedia.value = false
+  }
+}
+
 const toggleMobileSelection = (row: SeedParameter, selected: boolean) => {
   if (checkSelectable(row)) dataTable.value?.toggleRowSelection(row, selected)
 }
@@ -1591,6 +1740,7 @@ const getDeleteButtonText = () => {
 const toggleDeleteMode = () => {
   isDeleteMode.value = !isDeleteMode.value
   selectedRows.value = []
+  dataTable.value?.clearSelection()
 }
 
 const executeBatchDelete = async () => {
@@ -1626,6 +1776,7 @@ const executeBatchDelete = async () => {
 
     ElMessage.success(result.message || `成功删除 ${result.deleted_count} 条数据`)
     selectedRows.value = []
+    dataTable.value?.clearSelection()
     isDeleteMode.value = false
     await fetchData()
   } catch (error: unknown) {
@@ -2169,10 +2320,14 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 
-.seed-mobile-list { display: none; }
+.seed-mobile-list {
+  display: none;
+}
 
 @media (max-width: 720px) {
-  .table-container { display: none; }
+  .table-container {
+    display: none;
+  }
   .seed-mobile-list {
     display: block;
     min-height: 0;
@@ -2195,7 +2350,9 @@ onUnmounted(() => {
     border-bottom: 1px solid var(--el-border-color-light);
   }
 
-  .seed-mobile-list .el-button { min-height: 44px; }
+  .seed-mobile-list .el-button {
+    min-height: 44px;
+  }
 
   .seed-mobile-body {
     display: grid;
@@ -2205,7 +2362,11 @@ onUnmounted(() => {
     overflow-wrap: anywhere;
   }
 
-  .seed-mobile-body small { color: var(--el-text-color-secondary); }
-  .pagination-controls :deep(.el-pagination__sizes) { display: none; }
+  .seed-mobile-body small {
+    color: var(--el-text-color-secondary);
+  }
+  .pagination-controls :deep(.el-pagination__sizes) {
+    display: none;
+  }
 }
 </style>

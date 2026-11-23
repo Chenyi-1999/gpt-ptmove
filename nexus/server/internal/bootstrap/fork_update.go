@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.7"
+const forkVersion = "1.0.8"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-23",
+				"changes": []string{"在种子维护列表勾选多条记录，一键补全缺失截图和 MediaInfo", "后台逐条处理，首页任务显示进度与分项结果"},
+			},
+			{
+				"version": "1.0.7",
 				"date":    "2026-11-23",
 				"changes": []string{"首页任务显示候选预览、截图与媒体报告的真实阶段及最近结果", "转种维护可一键补齐缺失截图和 MediaInfo，自动选图后仍可手动重选"},
 			},

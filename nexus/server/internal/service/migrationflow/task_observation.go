@@ -18,6 +18,7 @@ type taskObservations struct {
 type observedTask struct {
 	kind, title, route        string
 	status, message, progress string
+	outcome                   string
 	started, updated          time.Time
 }
 
@@ -43,19 +44,23 @@ func (s *MigrateService) observeTask(kind, title, route string) taskObservation 
 
 // update 只记录实际改变的阶段或计数，已完成任务忽略迟到更新。
 func (o taskObservation) update(message, progress string) {
-	o.write("running", message, progress)
+	o.write("running", message, progress, "")
 }
 
 // finish 保留终态，确保短任务也能出现在下一次刷新中。
 func (o taskObservation) finish(success bool, message, progress string) {
+	o.finishWithOutcome(success, message, progress, "")
+}
+
+func (o taskObservation) finishWithOutcome(success bool, message, progress, outcome string) {
 	status := "failed"
 	if success {
 		status = "success"
 	}
-	o.write(status, message, progress)
+	o.write(status, message, progress, outcome)
 }
 
-func (o taskObservation) write(status, message, progress string) {
+func (o taskObservation) write(status, message, progress, outcome string) {
 	if o.state == nil {
 		return
 	}
@@ -66,6 +71,7 @@ func (o taskObservation) write(status, message, progress string) {
 		return
 	}
 	task.status, task.message, task.progress, task.updated = status, message, progress, time.Now()
+	task.outcome = outcome
 	o.state.rows[o.id] = task
 	if status != "running" {
 		o.state.prune(task.updated)
@@ -117,6 +123,9 @@ func (s *taskObservations) snapshot() []map[string]any {
 		}
 		if task.route != "" {
 			row["route_target"] = map[string]string{"path": task.route}
+		}
+		if task.outcome != "" {
+			row["outcome"] = task.outcome
 		}
 		rows = append(rows, row)
 	}

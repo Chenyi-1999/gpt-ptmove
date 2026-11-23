@@ -70,6 +70,7 @@
 | `internal/repository/schema_manager.go` | 建表/补字段/索引/结构维护 |
 | `internal/repository/sites_sync.go` | 从 `sites_data.json` 同步站点元数据 |
 | `internal/repository/migrate_repository.go` | 迁移相关查询与写入 |
+| `internal/repository/maintenance_media_repository.go` | 以字段快照保护维护截图和媒体报告写入 |
 | `internal/repository/torrent_repository.go` | 种子基础查询、路径列表等 |
 | `internal/repository/torrent_data_repository.go` | 种子详情查询、缓存站点查询 |
 | `internal/repository/torrent_sync_repository.go` | 下载器同步写库相关 |
@@ -120,6 +121,7 @@
 | `internal/http/handler/migrate/publish_batch_stream.go` | 发布批任务 SSE 流 |
 | `internal/http/handler/migrate/bdinfo.go` | BDInfo 状态/回调/任务管理接口 |
 | `internal/http/handler/migrate/task_monitor.go` | 全局任务监控聚合接口 |
+| `internal/http/handler/migrate/maintenance_media.go` | 批量补全所选维护资料的入口 |
 
 #### `internal/http/handler/settings`
 
@@ -178,6 +180,8 @@
 | `internal/service/migrationflow/tagging_helpers.go` | 标签重算与持久化辅助 |
 | `internal/service/migrationflow/publish_batch.go` | 单发/批发发布编排与事件流 |
 | `internal/service/migrationflow/task_monitor.go` | 聚合批量抓取/发布/BDInfo/发布队列任务快照 |
+| `internal/service/migrationflow/maintenance_media_batch.go` | 批量维护任务去重、串行执行和进度汇总 |
+| `internal/service/migrationflow/maintenance_media_seed.go` | 核对所选记录的缺项与视频归属，独立采集和保存 |
 | `internal/service/migrationflow/bdinfo_status.go` | BDInfo 状态/列表查询入口 |
 | `internal/service/migrationflow/bdinfo_callbacks.go` | BDInfo 回调接入入口 |
 | `internal/service/migrationflow/bdinfo_task_ops.go` | BDInfo 任务启动/重启/清理 |

@@ -329,6 +329,7 @@ func registerRoutes(
 		migrateAPI.POST("/download_torrent_only", migrateHandler.DownloadTorrentOnly)
 		migrateAPI.POST("/fetch_and_store", migrateHandler.FetchAndStore)
 		migrateAPI.POST("/refetch_maintenance_seed", migrateHandler.RefetchMaintenanceSeed)
+		migrateAPI.POST("/maintenance/media_fill", migrateHandler.StartMaintenanceMediaFill)
 		migrateAPI.POST("/update_db_seed_info", migrateHandler.UpdateDBSeedInfo)
 		migrateAPI.POST("/update_screenshot_review_status", migrateHandler.UpdateScreenshotReviewStatus)
 		migrateAPI.POST("/publish", migrateHandler.Publish)

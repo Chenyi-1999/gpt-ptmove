@@ -37,7 +37,14 @@ func ApplyManualUpdateFromPayload(
 		return map[string]any{"success": false, "message": "错误：torrent_id 和 site_name 不能为空"}, 400
 	}
 
-	existing, _ := repo.GetSeedParameter(torrentID, siteName)
+	existing, readErr := repo.GetSeedParameter(torrentID, siteName)
+	mediaBase, hasMediaBase := payload["maintenance_media_base"].(map[string]any)
+	if hasMediaBase {
+		if readErr != nil {
+			return map[string]any{"success": false, "message": "维护记录已无法读取，请刷新后再保存"}, 409
+		}
+		preserveUntouchedMaintenanceMedia(updated, mediaBase)
+	}
 	generatedHash := strings.TrimSpace(toStringAny(existing["hash"], ""))
 	if generatedHash == "" {
 		if newID != nil {
@@ -66,7 +73,7 @@ func ApplyManualUpdateFromPayload(
 
 	normalized := NormalizeSeedRow(record)
 	normalized["standardized_params"] = standardized
-	return map[string]any{
+	response := map[string]any{
 		"success":                  true,
 		"standardized_params":      standardized,
 		"final_publish_parameters": BuildFinalPublishParameters(normalized),
@@ -74,7 +81,24 @@ func ApplyManualUpdateFromPayload(
 		"raw_params_for_preview":   BuildRawPreviewParams(normalized),
 		"reverse_mappings":         reverseMappings,
 		"message":                  "参数更新并标准化成功",
-	}, 200
+	}
+	if hasMediaBase {
+		response["saved_maintenance_media"] = map[string]any{
+			"screenshots": record["screenshots"], "screenshot_review_status": record["screenshot_review_status"], "mediainfo": record["mediainfo"],
+		}
+	}
+	return response, 200
+}
+
+// preserveUntouchedMaintenanceMedia 移除旧表单中未编辑的媒体字段，使保存保留后台已经回填的资料。
+func preserveUntouchedMaintenanceMedia(updated, base map[string]any) {
+	for _, key := range []string{"screenshots", "screenshot_review_status", "mediainfo"} {
+		original, hasOriginal := base[key].(string)
+		value, hasValue := updated[key].(string)
+		if hasOriginal && hasValue && value == original {
+			delete(updated, key)
+		}
+	}
 }
 
 func applyManualUpdateTeamAcknowledgment(repo ManualUpdateRepo, record map[string]any) {

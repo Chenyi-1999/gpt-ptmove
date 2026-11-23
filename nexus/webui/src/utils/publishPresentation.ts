@@ -45,7 +45,7 @@ export const getTaskDisplayStatus = (task: {
   progressText: string
   outcome?: string
 }) => {
-  if (task.kind === 'media_fill' && task.outcome === 'partial')
+  if (['media_fill', 'maintenance_media_fill'].includes(task.kind) && task.outcome === 'partial')
     return { label: '部分完成', tone: 'neutral' } as const
   if (task.outcome)
     return getPublishDisplayStatus(task.outcome === 'published' ? 'success' : task.outcome)

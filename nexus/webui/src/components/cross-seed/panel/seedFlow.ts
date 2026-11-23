@@ -23,7 +23,7 @@ export type SeedFlowDeps = {
   sourceSite: ComputedRef<string>
   sourceTorrentId: ComputedRef<string>
   torrent: ComputedRef<WorkingTorrent | null>
-  crossSeedStore: { setParams: (params: object) => void }
+  crossSeedStore: { setParams: (params: object) => void; taskId?: string | null }
 
   allSitesStatus: Ref<SiteStatus[]>
   selectedTargetSites: Ref<string[]>
@@ -47,7 +47,10 @@ export type SeedFlowDeps = {
   fetchFlowErrorMessage: Ref<string>
 
   filterExtraEmptyLines: (text: string) => string
-  normalizeIntroBodyAndMediainfo: (rawBody: string, rawMediainfo: string) => {
+  normalizeIntroBodyAndMediainfo: (
+    rawBody: string,
+    rawMediainfo: string,
+  ) => {
     body: string
     mediainfo: string
   }
@@ -137,6 +140,14 @@ type ScreenshotValidationResult = {
   detailMessage?: string
 }
 
+type MaintenanceMediaBase = {
+  seedId: string
+  taskId: string | null
+  screenshots: string
+  screenshotReviewStatus: ScreenshotReviewStatus
+  mediainfo: string
+}
+
 export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
   const {
     sourceSite,
@@ -167,6 +178,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     screenshotValid,
     screenshotImages,
   } = deps
+  let maintenanceMediaBase: MaintenanceMediaBase | null = null
 
   const normalizeScreenshotReviewStatus = (value: unknown): ScreenshotReviewStatus => {
     if (typeof value !== 'string') return 'none'
@@ -317,14 +329,21 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         timeout: 15000,
       })
       if (request !== restrictionRequest || siteName !== sourceSite.value) return
-      const { success, source_restriction_status: status, source_restriction_message: message } = response.data || {}
+      const {
+        success,
+        source_restriction_status: status,
+        source_restriction_message: message,
+      } = response.data || {}
       sourceRestriction.value = {
         status: success && (status === 'allowed' || status === 'denied') ? status : 'unknown',
         message: typeof message === 'string' ? redactPrivateText(message) : '',
       }
     } catch {
       if (request !== restrictionRequest || siteName !== sourceSite.value) return
-      sourceRestriction.value = { status: 'unknown', message: '未能核验源站转种限制，请重新获取种子信息' }
+      sourceRestriction.value = {
+        status: 'unknown',
+        message: '未能核验源站转种限制，请重新获取种子信息',
+      }
     }
   }
 
@@ -367,9 +386,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       | undefined
     const directSite =
       (typeof currentSiteDetails?.site === 'string' ? currentSiteDetails.site.trim() : '') ||
-      (typeof currentSiteDetails?.site_name === 'string'
-        ? currentSiteDetails.site_name.trim()
-        : '')
+      (typeof currentSiteDetails?.site_name === 'string' ? currentSiteDetails.site_name.trim() : '')
     if (directSite) {
       return directSite
     }
@@ -473,7 +490,10 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
 
     void checkSourceRestriction(options.restrictionContextId ?? null)
 
-    const normalizedMedia = normalizeIntroBodyAndMediainfo(dbData.body || '', dbData.mediainfo || '')
+    const normalizedMedia = normalizeIntroBodyAndMediainfo(
+      dbData.body || '',
+      dbData.mediainfo || '',
+    )
     const compositeSeedId = `${dbData.hash || options.torrentId}_${options.torrentId}_${options.englishSiteName}`
     const monitorRouteTarget =
       options.monitorKey && options.taskIdValue
@@ -526,6 +546,16 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       raw_params_for_preview: dbData.raw_params_for_preview || {},
     }
 
+    maintenanceMediaBase = crossSeedStore.taskId?.startsWith('seed_maintenance_')
+      ? {
+          seedId: compositeSeedId,
+          taskId: taskId.value,
+          screenshots: torrentData.value.intro.screenshots,
+          screenshotReviewStatus: torrentData.value.screenshot_review_status,
+          mediainfo: torrentData.value.mediainfo,
+        }
+      : null
+
     if ((!dbData.title_components || dbData.title_components.length === 0) && dbData.title) {
       try {
         const parseResponse = await axios.post('/api/utils/parse_title', { title: dbData.title })
@@ -541,7 +571,10 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       }
     }
 
-    if ((!torrentData.value.imdb_link || !torrentData.value.douban_link) && torrentData.value.intro.body) {
+    if (
+      (!torrentData.value.imdb_link || !torrentData.value.douban_link) &&
+      torrentData.value.intro.body
+    ) {
       let imdbExtracted = false
       let doubanExtracted = false
       if (!torrentData.value.imdb_link) {
@@ -589,14 +622,16 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         routeTarget: monitorRouteTarget,
       })
     }
-    const screenshotValidationResult = await checkScreenshotValidity(({ index, totalCount, url }) => {
-      if (!options.monitorKey || !options.monitorTitle) return
-      updateFetchTaskStage(options.monitorKey, options.taskIdValue, {
-        message: `${options.monitorTitle}：正在校验截图有效性`,
-        progressText: `正在校验第 ${index}/${totalCount} 张截图（${formatScreenshotUrlForMessage(url)}）`,
-        routeTarget: monitorRouteTarget,
-      })
-    })
+    const screenshotValidationResult = await checkScreenshotValidity(
+      ({ index, totalCount, url }) => {
+        if (!options.monitorKey || !options.monitorTitle) return
+        updateFetchTaskStage(options.monitorKey, options.taskIdValue, {
+          message: `${options.monitorTitle}：正在校验截图有效性`,
+          progressText: `正在校验第 ${index}/${totalCount} 张截图（${formatScreenshotUrlForMessage(url)}）`,
+          routeTarget: monitorRouteTarget,
+        })
+      },
+    )
     if (!screenshotValidationResult.allValid) {
       const validationMessage =
         screenshotValidationResult.detailMessage || '截图校验失败，请手动修复或重新获取截图。'
@@ -679,7 +714,9 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     updateFetchTaskStage(options.monitorKey, backendTaskId, {
       message: `${options.monitorTitle}：源站抓取已返回，正在等待数据库回读`,
       progressText:
-        (options.maxDbReadAttempts ?? 1) > 1 ? '正在轮询数据库回读结果' : '正在从数据库回读最新数据',
+        (options.maxDbReadAttempts ?? 1) > 1
+          ? '正在轮询数据库回读结果'
+          : '正在从数据库回读最新数据',
       routeTarget: buildFetchRouteTarget({ taskId: backendTaskId || undefined, status: 'running' }),
     })
 
@@ -700,7 +737,10 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
           maxDbReadAttempts > 1
             ? `数据库回读重试 ${attempt}/${maxDbReadAttempts}`
             : '正在从数据库回读最新数据',
-        routeTarget: buildFetchRouteTarget({ taskId: backendTaskId || undefined, status: 'running' }),
+        routeTarget: buildFetchRouteTarget({
+          taskId: backendTaskId || undefined,
+          status: 'running',
+        }),
       })
       try {
         if (maxDbReadAttempts > 1) {
@@ -747,7 +787,8 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
     await applyDbSeedData(finalDbResponse.data.data, {
       torrentId: options.torrentId,
       englishSiteName: options.englishSiteName,
-      taskIdValue: finalDbResponse.data.task_id || storeResponse.data.task_id || options.taskIdValue || null,
+      taskIdValue:
+        finalDbResponse.data.task_id || storeResponse.data.task_id || options.taskIdValue || null,
       restrictionContextId: finalDbResponse.data.task_id || storeResponse.data.task_id || null,
       successNotification: options.successNotification,
       checkBdinfoFromFetch: true,
@@ -762,7 +803,8 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
   }
 
   const refetchFromSource = async () => {
-    if (!sourceSite.value || !torrent.value || isLoading.value || isRefetchingFromSource.value) return
+    if (!sourceSite.value || !torrent.value || isLoading.value || isRefetchingFromSource.value)
+      return
 
     const confirmed = await ElMessageBox.confirm(
       '重新从源站拉取后，当前面板内未保存的手动修改将被最新抓取结果覆盖，是否继续？',
@@ -852,12 +894,11 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         title: '重新抓取源种子信息',
         message: '重新抓取源种子信息失败',
         progressText: `来源站点 ${sourceSite.value}`,
-        error:
-          axios.isAxiosError(error)
-            ? ((error.response?.data as { message?: string } | undefined)?.message || error.message)
-            : error instanceof Error
-              ? error.message
-              : '重新从源站拉取时发生错误，请查看后台日志。',
+        error: axios.isAxiosError(error)
+          ? (error.response?.data as { message?: string } | undefined)?.message || error.message
+          : error instanceof Error
+            ? error.message
+            : '重新从源站拉取时发生错误，请查看后台日志。',
         routeTarget: buildFetchRouteTarget({ taskId: refetchTaskId, status: 'failed' }),
       })
       ElNotification.closeAll()
@@ -913,7 +954,9 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       kind: 'seed_fetch',
       rawId: activeFetchTaskId,
       title: '抓取源种子信息',
-      message: prefetchedDbSeedInfo ? '正在加载缓存种子信息' : `正在抓取 ${sourceSite.value} 种子信息`,
+      message: prefetchedDbSeedInfo
+        ? '正在加载缓存种子信息'
+        : `正在抓取 ${sourceSite.value} 种子信息`,
       progressText: prefetchedDbSeedInfo ? '正在读取数据库缓存' : '正在准备日志流',
       routeTarget: baseRouteTarget,
     })
@@ -936,7 +979,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         )
       }
       const dbResponse = prefetchedDbSeedInfo
-        ? ({ status: 200, data: prefetchedDbSeedInfo as DbSeedInfoResponse })
+        ? { status: 200, data: prefetchedDbSeedInfo as DbSeedInfoResponse }
         : await axios.post<DbSeedInfoResponse>(
             '/api/migrate/prepare_seed_info',
             {
@@ -966,8 +1009,11 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
           kind: 'seed_fetch',
           rawId: activeFetchTaskId,
           title: '抓取源种子信息',
-          message: prefetchedDbSeedInfo ? '正在整理缓存种子信息' : `正在处理 ${sourceSite.value} 种子信息`,
-          progressText: dbResponse.status === 202 ? '正在等待源站抓取完成' : '正在校验并填充维护表单',
+          message: prefetchedDbSeedInfo
+            ? '正在整理缓存种子信息'
+            : `正在处理 ${sourceSite.value} 种子信息`,
+          progressText:
+            dbResponse.status === 202 ? '正在等待源站抓取完成' : '正在校验并填充维护表单',
           routeTarget: buildFetchRouteTarget({ taskId: activeFetchTaskId, status: 'running' }),
         })
       }
@@ -1001,7 +1047,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         } catch (error: unknown) {
           ElNotification.closeAll()
           const message = axios.isAxiosError(error)
-            ? ((error.response?.data as { message?: string } | undefined)?.message || error.message)
+            ? (error.response?.data as { message?: string } | undefined)?.message || error.message
             : error instanceof Error
               ? error.message
               : '从源站点抓取时发生错误，请查看后台日志。'
@@ -1131,7 +1177,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       }
     } catch (error: unknown) {
       const message = axios.isAxiosError(error)
-        ? ((error.response?.data as { message?: string } | undefined)?.message || error.message)
+        ? (error.response?.data as { message?: string } | undefined)?.message || error.message
         : error instanceof Error
           ? error.message
           : String(error)
@@ -1185,7 +1231,8 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         },
         maxDbReadAttempts: 3,
         dbRetryDelayMs: 1000,
-        dbReadFailureMessage: '数据抓取成功但数据库读取失败，已重试3次。请检查数据库连接或稍后重试。',
+        dbReadFailureMessage:
+          '数据抓取成功但数据库读取失败，已重试3次。请检查数据库连接或稍后重试。',
       })
 
       if (!reloaded) {
@@ -1196,7 +1243,7 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       ElNotification.closeAll()
 
       const message = axios.isAxiosError(error)
-        ? ((error.response?.data as { message?: string } | undefined)?.message || error.message)
+        ? (error.response?.data as { message?: string } | undefined)?.message || error.message
         : error instanceof Error
           ? error.message
           : String(error)
@@ -1435,15 +1482,32 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         standardized_params: torrentData.value.standardized_params,
       }
 
-      console.log('发送到后端的标准参数:', torrentData.value.standardized_params)
-
-      // 调用新的更新接口，此时会将 is_reviewed 设置为 true
-      const response = await axios.post('/api/migrate/update_db_seed_info', {
+      const currentMaintenanceMediaBase =
+        crossSeedStore.taskId?.startsWith('seed_maintenance_') &&
+        maintenanceMediaBase?.seedId === torrentData.value.seed_id &&
+        maintenanceMediaBase.taskId === taskId.value
+          ? maintenanceMediaBase
+          : null
+      const savePayload = {
         torrent_name: currentTorrent.name,
         torrent_id: torrentId,
         site_name: siteName,
         updated_parameters: updatedParameters,
-      })
+        ...(currentMaintenanceMediaBase
+          ? {
+              maintenance_media_base: {
+                screenshots: currentMaintenanceMediaBase.screenshots,
+                screenshot_review_status: currentMaintenanceMediaBase.screenshotReviewStatus,
+                mediainfo: currentMaintenanceMediaBase.mediainfo,
+              },
+            }
+          : {}),
+      }
+
+      console.log('发送到后端的标准参数:', torrentData.value.standardized_params)
+
+      // 调用新的更新接口，此时会将 is_reviewed 设置为 true
+      const response = await axios.post('/api/migrate/update_db_seed_info', savePayload)
 
       console.log('已调用更新接口，is_reviewed 将被设置为 true')
 
@@ -1464,6 +1528,45 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
         if (updatedReverseMappings) {
           reverseMappings.value = updatedReverseMappings
           console.log('成功更新反向映射表:', reverseMappings.value)
+        }
+
+        const savedMedia = response.data.saved_maintenance_media as
+          | {
+              screenshots?: unknown
+              screenshot_review_status?: unknown
+              mediainfo?: unknown
+            }
+          | undefined
+        const shouldRehydrateMaintenanceMedia =
+          currentMaintenanceMediaBase !== null &&
+          maintenanceMediaBase === currentMaintenanceMediaBase &&
+          currentMaintenanceMediaBase.seedId === torrentData.value.seed_id &&
+          currentMaintenanceMediaBase.taskId === taskId.value &&
+          crossSeedStore.taskId?.startsWith('seed_maintenance_')
+        if (shouldRehydrateMaintenanceMedia && currentMaintenanceMediaBase && savedMedia) {
+          const screenshots =
+            typeof savedMedia.screenshots === 'string'
+              ? savedMedia.screenshots
+              : torrentData.value.intro.screenshots
+          const screenshotReviewStatus =
+            typeof savedMedia.screenshot_review_status === 'string' &&
+            ['pending', 'confirmed', 'none'].includes(savedMedia.screenshot_review_status)
+              ? normalizeScreenshotReviewStatus(savedMedia.screenshot_review_status)
+              : torrentData.value.screenshot_review_status
+          const mediainfo =
+            typeof savedMedia.mediainfo === 'string'
+              ? savedMedia.mediainfo
+              : torrentData.value.mediainfo
+          torrentData.value.intro.screenshots = screenshots
+          torrentData.value.screenshot_review_status = screenshotReviewStatus
+          torrentData.value.mediainfo = mediainfo
+          maintenanceMediaBase = {
+            seedId: torrentData.value.seed_id || '',
+            taskId: taskId.value,
+            screenshots,
+            screenshotReviewStatus,
+            mediainfo,
+          }
         }
 
         // 更新本地数据，保留用户修改的内容
@@ -1586,9 +1689,9 @@ export function createSeedFlow(deps: SeedFlowDeps): SeedFlowApi {
       } catch (error: unknown) {
         console.error('重新获取种子数据时出错:', error)
         const message = axios.isAxiosError(error)
-          ? ((error.response?.data as { error?: string; message?: string } | undefined)?.error ||
+          ? (error.response?.data as { error?: string; message?: string } | undefined)?.error ||
             (error.response?.data as { message?: string } | undefined)?.message ||
-            error.message)
+            error.message
           : error instanceof Error
             ? error.message
             : '重新获取种子数据时发生错误'

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pt-nexus/server/internal/config"
@@ -21,12 +22,14 @@ type MigrateService struct {
 
 	extractorEngine *extract.Engine
 
-	contextState    *publishworkflow.ContextState
-	logStreamState  *acquirefetch.LogStreamState
-	batchFetchState *acquirefetch.BatchFetchState
-	publishState    *publishworkflow.BatchState
-	bdinfoState     *processingbdflow.BDInfoState
-	observations    *taskObservations
+	contextState            *publishworkflow.ContextState
+	logStreamState          *acquirefetch.LogStreamState
+	batchFetchState         *acquirefetch.BatchFetchState
+	publishState            *publishworkflow.BatchState
+	bdinfoState             *processingbdflow.BDInfoState
+	observations            *taskObservations
+	maintenanceMediaRunning atomic.Bool
+	maintenanceMediaWrites  sync.Mutex
 
 	queueRepo         *repository.PublishQueueRepository
 	publishLogRepo    *repository.PublishLogRepository

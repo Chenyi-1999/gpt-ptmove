@@ -99,3 +99,9 @@ This section describes the native Go service and its authenticated `/api/v1` mac
 `GET /api/migrate/task_monitor` 汇总候选预览、截图、媒体报告、批量获取、下载、发布、BDInfo 和自动化处理。首页和任务抽屉共用列表。候选预览在正在处理的条目与最终可选数量之间分别报告，短期操作结果保留至多 30 分钟和最近 60 条。当前飞牛 HTTPS 客户端回传整批截图结果，本机截图可以报告实际截取和上传的进度。
 
 `POST /api/migrate/refresh_mediainfo_async` 传入 `fill_missing: true` 时只为当前草稿返回报告，先复用完整报告或从简介提取，再尝试下载器与本地分析。此模式只返回结果供草稿回填。缺少 BDInfo 的蓝光原盘仍可使用原有的 MediaInfo「重新获取」入口。
+
+`POST /api/migrate/maintenance/media_fill` 使用 Web 管理员认证。请求体为 `{"seeds":[{"hash":"…","torrent_id":"…","site_name":"…","downloader_id":"…"}]}`，下载器标识可选。每批最多 100 条，重复标识合并。返回 202 和 `task_id`、`task_key`、`total`，用 `task_key` 从任务监控匹配本次批次。同一时间只运行一批，重复提交返回 409。
+
+批量补全只修改选中记录缺失的媒体字段。已有可用截图和媒体报告保留。MediaInfo 优先从简介提取，必要时核对相同哈希的已完成 qB 文件。新增视频截图须取得五张互异的有效 Pixhost 图片才会保存。截图和媒体报告各自检查并发写入，各自保存。此接口不会获取源站种子文件、添加 qB 任务或发布。任务进度为当前服务进程内的短期结果，已落库的项目在重启后仍可读取。
+
+维护详情保存可在 `POST /api/migrate/update_db_seed_info` 附带 `maintenance_media_base`，包含打开草稿时的 `screenshots`、`screenshot_review_status` 和 `mediainfo`。未在草稿改动的媒体字段沿用最新数据库值。响应中的 `saved_maintenance_media` 返回最终保存的资料。

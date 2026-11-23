@@ -15,6 +15,8 @@ const updateDBSeedLogModule = "迁移-种子更新"
 // 失败场景：缺少必要参数、读取/写入数据库失败。
 // 副作用：覆盖写入 seed_parameters（对齐历史行为：Delete+Create），并将 is_reviewed 置为 true。
 func (s *MigrateService) UpdateDBSeedInfo(payload map[string]any) (map[string]any, int) {
+	s.maintenanceMediaWrites.Lock()
+	defer s.maintenanceMediaWrites.Unlock()
 	result, status := processingpersist.ApplyManualUpdateFromPayload(
 		s.repo,
 		payload,
