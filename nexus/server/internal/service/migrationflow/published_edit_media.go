@@ -2,6 +2,7 @@ package migrationflow
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -30,6 +31,9 @@ func (s *MigrateService) GeneratePublishedEditMedia(ctx context.Context, logID u
 	if !request.Screenshots && !request.MediaInfo {
 		return fail(http.StatusBadRequest, "请选择要补充的媒体资料")
 	}
+	observed := s.observeTask("published_media", "补充已发布种子的媒体资料", "")
+	defer observed.finish(false, "媒体资料未能生成", "")
+	observed.update("正在核对种子归属和视频文件", "")
 	target, failure, status := s.resolvePublishedEdit(logID)
 	if failure != nil {
 		return failure, status
@@ -88,6 +92,7 @@ func (s *MigrateService) GeneratePublishedEditMedia(ctx context.Context, logID u
 	out := map[string]any{"success": true}
 	fieldErrors := map[string]string{}
 	if request.MediaInfo {
+		observed.update("飞牛正在提取 MediaInfo", "")
 		report, isBDMV, mediaErr := downloader.FetchMediaInfoByProxy(remotePath, torrent.Name)
 		isMediaInfo, _, _ := processingmedia.ValidateMediaInfoFormat(report)
 		if mediaErr != nil || isBDMV || !isMediaInfo {
@@ -97,6 +102,7 @@ func (s *MigrateService) GeneratePublishedEditMedia(ctx context.Context, logID u
 		}
 	}
 	if request.Screenshots {
+		observed.update("飞牛正在生成并上传截图", "等待客户端下载结果")
 		bbcode, shotErr := downloader.FetchScreenshotsByProxy(remotePath, torrent.Name, nil)
 		if shotErr != nil {
 			fieldErrors["screenshot_bbcode"] = "飞牛截图或上传图床失败"
@@ -117,6 +123,15 @@ func (s *MigrateService) GeneratePublishedEditMedia(ctx context.Context, logID u
 		return out, http.StatusBadGateway
 	}
 	logx.Infof(publishedEditLogModule, "媒体草稿请求完成 日志ID=%d 失败项=%d", logID, len(fieldErrors))
+	if len(fieldErrors) > 0 {
+		observed.finish(false, "部分资料已生成", fmt.Sprintf("%d 项待重试", len(fieldErrors)))
+	} else {
+		progress := ""
+		if shots, ok := out["screenshot_bbcode"].(string); ok {
+			progress = fmt.Sprintf("已返回 %d 张截图", strings.Count(strings.ToLower(shots), "[/img]"))
+		}
+		observed.finish(true, "媒体草稿已准备", progress)
+	}
 	return out, http.StatusOK
 }
 

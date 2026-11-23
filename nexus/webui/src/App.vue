@@ -58,7 +58,7 @@
           title="后台任务"
           aria-haspopup="dialog"
           :aria-expanded="taskDrawerVisible"
-          @click="taskDrawerVisible = true"
+          @click="openTaskMonitor"
         >
           <Monitor aria-hidden="true" />
           <span v-if="taskMonitorBadge > 0" class="star-shell__task-count" aria-hidden="true">
@@ -372,6 +372,7 @@ const runningCount = computed(() => taskMonitorStore.runningCount)
 const failedCount = computed(() => taskMonitorStore.failedCount)
 const taskMonitorBadge = computed(() => runningCount.value + failedCount.value)
 let taskMonitorRefreshTimer: ReturnType<typeof window.setInterval> | null = null
+let taskMonitorSyncing = false
 
 type ServerTaskRouteTarget = {
   path?: string
@@ -463,12 +464,14 @@ const handleTaskMonitorAction = async (task: TaskMonitorItem, action: TaskMonito
 
 const syncTaskMonitor = async () => {
   const token = localStorage.getItem('token')
-  if (isLoginPage.value || !token) return
+  if (isLoginPage.value || !token || taskMonitorSyncing || document.hidden) return
+  taskMonitorSyncing = true
   try {
-    const response = await axios.get('/api/migrate/task_monitor')
+    const response = await axios.get('/api/migrate/task_monitor', { timeout: 8000 })
     if (isLoginPage.value || localStorage.getItem('token') !== token) return
     const payload = response.data
-    const tasks = Array.isArray(payload?.tasks) ? (payload.tasks as ServerTaskItem[]) : []
+    if (payload?.success !== true || !Array.isArray(payload.tasks)) throw new Error('任务列表无效')
+    const tasks = payload.tasks as ServerTaskItem[]
     const normalizeRouteQuery = (query?: Record<string, unknown>) => {
       if (!query) return undefined
       return Object.fromEntries(
@@ -508,8 +511,17 @@ const syncTaskMonitor = async () => {
       })),
     )
   } catch (error) {
+    if (isLoginPage.value || localStorage.getItem('token') !== token) return
+    taskMonitorStore.serverState = 'unavailable'
     console.warn('同步任务监控失败:', error)
+  } finally {
+    taskMonitorSyncing = false
   }
+}
+
+const openTaskMonitor = () => {
+  taskDrawerVisible.value = true
+  void syncTaskMonitor()
 }
 
 const openTaskRoute = (routeTarget?: { path: string; query?: Record<string, string> }) => {
@@ -799,13 +811,17 @@ onMounted(() => {
   syncTaskMonitor()
   taskMonitorRefreshTimer = window.setInterval(() => {
     void syncTaskMonitor()
-  }, 15000)
+  }, 2000)
+  window.addEventListener('starpt-open-task-monitor', openTaskMonitor)
+  document.addEventListener('visibilitychange', syncTaskMonitor)
   window.addEventListener('background-updated', handleBackgroundUpdate)
   window.addEventListener('app-global-refresh-loading', handleRefreshLoadingChange as EventListener)
   window.addEventListener('resize', updateIsMobile)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('starpt-open-task-monitor', openTaskMonitor)
+  document.removeEventListener('visibilitychange', syncTaskMonitor)
   if (taskMonitorRefreshTimer) {
     window.clearInterval(taskMonitorRefreshTimer)
     taskMonitorRefreshTimer = null

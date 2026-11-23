@@ -1,9 +1,23 @@
-import { computed, ref, watch, onBeforeUnmount, type ComputedRef, type Ref, type WritableComputedRef } from 'vue'
+import {
+  computed,
+  ref,
+  watch,
+  onBeforeUnmount,
+  type ComputedRef,
+  type Ref,
+  type WritableComputedRef,
+} from 'vue'
 import axios from 'axios'
 import { ElNotification } from '@/utils/uiNotify'
 import { openSSE, type EventSourceLike } from '@/desktop/sse'
 import { useTaskMonitorStore } from '@/stores/taskMonitor'
-import { getAutoAddPresentation, getPublishDisplayStatus, getPublishResponseStatus, redactPrivateText, safeTrackerResultUrl } from '@/utils/publishPresentation'
+import {
+  getAutoAddPresentation,
+  getPublishDisplayStatus,
+  getPublishResponseStatus,
+  redactPrivateText,
+  safeTrackerResultUrl,
+} from '@/utils/publishPresentation'
 
 import type {
   LimitAlert,
@@ -72,6 +86,7 @@ export type PublishFlowDeps = {
 }
 
 export type PublishFlowApi = {
+  hasUsableDraftMediaReport: (text: string) => boolean
   stopPublishBatchSSE: () => void
   handleLogProgressComplete: () => void
   handleLogProgressClose: () => void
@@ -143,10 +158,11 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   const blockingToastHandler = ref<{ close: () => void } | null>(null)
   const blockingTaskKinds = new Set(['seed_fetch', 'seed_refetch'])
 
-  const blockingTask = computed(() =>
-    taskMonitorStore.taskList.find(
-      (task) => task.status === 'running' && blockingTaskKinds.has(task.kind),
-    ) || null,
+  const blockingTask = computed(
+    () =>
+      taskMonitorStore.taskList.find(
+        (task) => task.status === 'running' && blockingTaskKinds.has(task.kind),
+      ) || null,
   )
 
   const blockingTaskMessage = computed(() => {
@@ -185,19 +201,23 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
     const logs = typeof rawResult.logs === 'string' ? redactPrivateText(rawResult.logs) : ''
     const status = getPublishResponseStatus(rawResult)
     const autoAdd = getAutoAddPresentation(status, rawResult.auto_add_result)
-    const downloaderName = downloaderList.value.find((d) => d.id === rawResult.auto_add_result?.downloader_id)?.name
+    const downloaderName = downloaderList.value.find(
+      (d) => d.id === rawResult.auto_add_result?.downloader_id,
+    )?.name
     return {
       ...rawResult,
       siteName,
       logs,
       url: safeTrackerResultUrl(rawResult.url),
       isExisted: status === 'exists' || status === 'edited',
-      message: typeof rawResult.message === 'string'
-        ? redactPrivateText(rawResult.message)
-        : getCleanMessage(logs) || getPublishDisplayStatus(status).label,
-      downloaderStatus: rawResult.auto_add_result && autoAdd.label !== '未执行'
-        ? { success: autoAdd.tone === 'success', message: autoAdd.detail, downloaderName }
-        : null,
+      message:
+        typeof rawResult.message === 'string'
+          ? redactPrivateText(rawResult.message)
+          : getCleanMessage(logs) || getPublishDisplayStatus(status).label,
+      downloaderStatus:
+        rawResult.auto_add_result && autoAdd.label !== '未执行'
+          ? { success: autoAdd.tone === 'success', message: autoAdd.detail, downloaderName }
+          : null,
     }
   }
 
@@ -216,14 +236,16 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   const isBatchPublishing = ref(false)
   const batchPublishConcurrency = ref(1)
 
-  const buildPublishLogsRouteTarget = (patch: {
-    trigger?: string
-    scene?: string
-    status?: string
-    search?: string
-    targetSite?: string
-    queueGroupId?: string
-  } = {}) => {
+  const buildPublishLogsRouteTarget = (
+    patch: {
+      trigger?: string
+      scene?: string
+      status?: string
+      search?: string
+      targetSite?: string
+      queueGroupId?: string
+    } = {},
+  ) => {
     const query = Object.fromEntries(
       Object.entries({
         ...(patch.trigger ? { trigger: patch.trigger } : {}),
@@ -356,7 +378,8 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
 
             case 'batch_stopped': {
               const reason = data.reason as string
-              const message = typeof data.message === 'string' ? redactPrivateText(data.message) : ''
+              const message =
+                typeof data.message === 'string' ? redactPrivateText(data.message) : ''
               const title =
                 reason === 'limit_reached'
                   ? '发种限制触发'
@@ -430,7 +453,8 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
                   kind: 'publish_batch',
                   rawId: publishBatchId.value || taskId.value,
                   title: '批量发布种子',
-                  message: latestResult?.message || (siteName ? `${siteName} 已完成` : '站点发布已完成'),
+                  message:
+                    latestResult?.message || (siteName ? `${siteName} 已完成` : '站点发布已完成'),
                   progressText: getPublishProgressText(),
                   routeTarget: buildPublishLogsRouteTarget({
                     trigger: 'batch_publish',
@@ -454,12 +478,20 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
 
               const results = finalResultsList.value
               if (results.length < selectedTargetSites.value.length) {
-                limitAlert.value = { visible: true, title: '部分结果未完成', message: '请查看任务记录确认缺失结果' }
+                limitAlert.value = {
+                  visible: true,
+                  title: '部分结果未完成',
+                  message: '请查看任务记录确认缺失结果',
+                }
               }
               const totalCount = selectedTargetSites.value.length
-              const publishSuccessCount = results.filter((r) => getPublishResponseStatus(r) === 'success').length
+              const publishSuccessCount = results.filter(
+                (r) => getPublishResponseStatus(r) === 'success',
+              ).length
               const existsCount = results.filter((r) => r.isExisted).length
-              const failedCount = results.filter((r) => getPublishResponseStatus(r) === 'failed').length
+              const failedCount = results.filter(
+                (r) => getPublishResponseStatus(r) === 'failed',
+              ).length
               const incompleteCount = totalCount - publishSuccessCount - existsCount - failedCount
               const autoAddFailed = results.some((r) => r.downloaderStatus?.success === false)
               const summary = [
@@ -467,7 +499,9 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
                 existsCount ? `已存在 ${existsCount}` : '',
                 failedCount ? `失败 ${failedCount}` : '',
                 incompleteCount > 0 ? `未完成 ${incompleteCount}` : '',
-              ].filter(Boolean).join(' · ')
+              ]
+                .filter(Boolean)
+                .join(' · ')
               const addSuccessCount = results.filter((r) => r.downloaderStatus?.success).length
 
               ElNotification({
@@ -536,7 +570,11 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
         resetBatchPublishRuntime()
         stopPublishBatchSSE()
         ElNotification.closeAll()
-        limitAlert.value = { visible: true, title: '进度连接中断', message: '当前结果未确认，请查看任务记录' }
+        limitAlert.value = {
+          visible: true,
+          title: '进度连接中断',
+          message: '当前结果未确认，请查看任务记录',
+        }
         ElNotification.error({
           title: '连接错误',
           message: '批量发布进度连接中断，请查看任务记录',
@@ -560,11 +598,16 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
         }
         isLoading.value = false
       }
-
     } catch (error: unknown) {
       const restrictionDenied = readRestrictionRejection(error)
-      const message = restrictionDenied ? sourceRestriction.value.message : '批量发布状态未确认，请查看任务记录'
-      limitAlert.value = { visible: true, title: restrictionDenied ? '源站转种限制' : '发布未确认', message }
+      const message = restrictionDenied
+        ? sourceRestriction.value.message
+        : '批量发布状态未确认，请查看任务记录'
+      limitAlert.value = {
+        visible: true,
+        title: restrictionDenied ? '源站转种限制' : '发布未确认',
+        message,
+      }
       resetBatchPublishRuntime()
       stopPublishBatchSSE()
       ElNotification.closeAll()
@@ -584,7 +627,12 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
           }),
         })
       }
-      ElNotification.error({ title: restrictionDenied ? '源站转种限制' : '批量发布未确认', message, duration: 0, showClose: true })
+      ElNotification.error({
+        title: restrictionDenied ? '源站转种限制' : '批量发布未确认',
+        message,
+        duration: 0,
+        showClose: true,
+      })
       isLoading.value = false
     }
   }
@@ -611,7 +659,13 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   }
 
   const handlePublish = async () => {
-    if (isLoading.value || isEnqueueing.value || selectedTargetSites.value.length === 0 || !canSubmit()) return
+    if (
+      isLoading.value ||
+      isEnqueueing.value ||
+      selectedTargetSites.value.length === 0 ||
+      !canSubmit()
+    )
+      return
     await handlePublishBatch()
   }
 
@@ -808,7 +862,12 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
       : error instanceof Error
         ? error.message || defaultMessage
         : defaultMessage
-    ElNotification.error({ title: '操作失败', message: redactPrivateText(message), duration: 0, showClose: true })
+    ElNotification.error({
+      title: '操作失败',
+      message: redactPrivateText(message),
+      duration: 0,
+      showClose: true,
+    })
   }
 
   // 辅助函数：获取映射后的中文值
@@ -1528,6 +1587,12 @@ export function createPublishFlow(deps: PublishFlowDeps): PublishFlowApi {
   const filterUploadedParam = safeTrackerResultUrl
 
   return {
+    hasUsableDraftMediaReport: (text: string) =>
+      _isValidMediainfo(text) ||
+      _isValidBDInfo(text) ||
+      (/^Input #\d+,.* from '[^\r\n]+':\s*$/m.test(text) &&
+        /^[ \t]+Duration: \d+:\d\d:\d\d(?:\.\d+)?,/m.test(text) &&
+        /^[ \t]+Stream #\d+:\d+[^\r\n]*: Video: [^\r\n]+\b\d{2,5}x\d{2,5}\b/m.test(text)),
     stopPublishBatchSSE,
     handleLogProgressComplete,
     handleLogProgressClose,

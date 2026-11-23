@@ -93,3 +93,9 @@ This section describes the native Go service and its authenticated `/api/v1` mac
 - Candidate preview exposes eligibility and skip reasons. Candidate `size` is the complete torrent size in bytes; clients should display it in a human-readable unit. A UI toggle or an API patch cannot weaken these checks.
 - `GET /api/automation/tasks?active=1` uses the administrator session and returns ongoing tasks for the workbench. `download_progress` is the latest qB fraction from 0 to 1 when available. Other phases use the task state and message.
 - Candidate rows include `detail_url` when their source profile provides a valid same-origin HTTP(S) detail address without credentials. The field may also be present on skipped rows so administrators can inspect the source reason.
+
+## 首页任务与草稿媒体补全
+
+`GET /api/migrate/task_monitor` 汇总候选预览、截图、媒体报告、批量获取、下载、发布、BDInfo 和自动化处理。首页和任务抽屉共用列表。候选预览在正在处理的条目与最终可选数量之间分别报告，短期操作结果保留至多 30 分钟和最近 60 条。当前飞牛 HTTPS 客户端回传整批截图结果，本机截图可以报告实际截取和上传的进度。
+
+`POST /api/migrate/refresh_mediainfo_async` 传入 `fill_missing: true` 时只为当前草稿返回报告，先复用完整报告或从简介提取，再尝试下载器与本地分析。此模式只返回结果供草稿回填。缺少 BDInfo 的蓝光原盘仍可使用原有的 MediaInfo「重新获取」入口。

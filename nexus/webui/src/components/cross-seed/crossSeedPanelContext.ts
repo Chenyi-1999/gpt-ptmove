@@ -172,6 +172,10 @@ export interface CrossSeedPanelContext {
   posterImages: ComputedRef<string[]>
   getProxyImageUrl: (url: string) => string
   handleImageErrorWithProxy: (url: string, type: 'poster' | 'screenshot', index: number) => void
+  canFillMissingMedia: ComputedRef<boolean>
+  isFillingMissingMedia: Ref<boolean>
+  fillMissingMedia: () => Promise<void>
+  reselectScreenshots: () => Promise<void>
   refreshScreenshots: () => Promise<void>
   isRefreshingScreenshots: Ref<boolean>
   confirmScreenshotReview: () => Promise<void>

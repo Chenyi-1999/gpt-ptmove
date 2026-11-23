@@ -26,6 +26,7 @@ type MigrateService struct {
 	batchFetchState *acquirefetch.BatchFetchState
 	publishState    *publishworkflow.BatchState
 	bdinfoState     *processingbdflow.BDInfoState
+	observations    *taskObservations
 
 	queueRepo         *repository.PublishQueueRepository
 	publishLogRepo    *repository.PublishLogRepository
@@ -48,6 +49,7 @@ func NewMigrateService(repo *repository.MigrateRepository, cfg *config.Manager) 
 		batchFetchState: acquirefetch.NewBatchFetchState(),
 		publishState:    publishworkflow.NewBatchState(),
 		bdinfoState:     processingbdflow.NewBDInfoState(),
+		observations:    &taskObservations{rows: make(map[string]observedTask)},
 	}
 }
 

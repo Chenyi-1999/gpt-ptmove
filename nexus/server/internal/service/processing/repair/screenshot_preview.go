@@ -54,6 +54,7 @@ func ShouldUseScreenshotPreview(input ScreenshotGenerateInput) (bool, error) {
 }
 
 func InspectScreenshotSubtitles(input ScreenshotGenerateInput) (ScreenshotSubtitleInspection, error) {
+	input.reportScreenshotProgress("locating", 0, 0)
 	payload := input.Payload
 	sourceInfo := input.SourceInfo
 	savePath, downloaderID, torrentName, contentName := parseScreenshotSourceParams(payload, sourceInfo, input.ContentName)
@@ -119,6 +120,7 @@ func InspectScreenshotSubtitles(input ScreenshotGenerateInput) (ScreenshotSubtit
 // 失败场景：视频文件无法定位、ffmpeg/ffprobe 缺失、盒子代理不可用或候选不足时返回错误。
 // 副作用：会读取视频文件、执行外部命令；启用盒子代理时会发起代理 HTTP 请求。
 func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewCount int) (ScreenshotPreviewBundle, error) {
+	input.reportScreenshotProgress("locating", 0, 0)
 	payload := input.Payload
 	sourceInfo := input.SourceInfo
 	previewCount = normalizeScreenshotPreviewCount(previewCount)
@@ -127,6 +129,7 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 	savePath, downloaderID, torrentName, contentName := parseScreenshotSourceParams(payload, sourceInfo, input.ContentName)
 	downloader, decision, dErr := downloaderclient.DecideProxy(input.RootConfig, downloaderID)
 	if decision.Enabled {
+		input.reportScreenshotProgress("remote_capture", -1, previewCount)
 		remoteCandidates := buildRemotePathCandidatesForProxy(savePath, torrentName, contentName)
 		var lastErr error
 		for _, remoteCandidate := range remoteCandidates {
@@ -137,6 +140,7 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 				buildSelectedSubtitleSIDPointer(selectedSubtitleSID, selectedSubtitleProvided),
 			)
 			if err == nil && len(previewBundle.Candidates) > 0 {
+				input.reportRemoteScreenshotResult("capturing", len(previewBundle.Candidates), previewCount)
 				if len(previewBundle.Candidates) >= screenshotPreviewMinCount {
 					logx.Infof(screenshotPreviewLogModule, "盒子代理候选截图生成成功 remote_path=%s count=%d", remoteCandidate, len(previewBundle.Candidates))
 					return ScreenshotPreviewBundle{
@@ -168,6 +172,7 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 		} else {
 			logx.Warnf(screenshotPreviewLogModule, "盒子代理候选截图未命中有效路径 downloader_id=%s", downloaderID)
 		}
+		input.reportScreenshotProgress("locating", 0, 0)
 	} else if dErr != nil && strings.TrimSpace(decision.Reason) == "config_error" {
 		logx.Warnf(screenshotPreviewLogModule, "盒子代理候选截图跳过：读取下载器配置失败 downloader_id=%s err=%v", downloaderID, dErr)
 	}
@@ -229,6 +234,7 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 	defer os.RemoveAll(tmpDir)
 
 	candidates := make([]ScreenshotPreviewCandidate, 0, len(points))
+	input.reportScreenshotProgress("capturing", 0, len(points))
 	for idx, point := range points {
 		filePath := filepath.Join(tmpDir, fmt.Sprintf("preview_%02d.jpg", idx+1))
 		var captureErr error
@@ -246,12 +252,16 @@ func GenerateScreenshotPreviewCandidates(input ScreenshotGenerateInput, previewC
 			logx.Warnf(screenshotPreviewLogModule, "读取候选截图失败 index=%d path=%s err=%v", idx, filePath, readErr)
 			continue
 		}
+		if len(content) == 0 {
+			continue
+		}
 		candidates = append(candidates, ScreenshotPreviewCandidate{
 			ID:          fmt.Sprintf("candidate-%02d", len(candidates)+1),
 			TimeSeconds: point,
 			TimeLabel:   formatSecondClock(point),
 			PreviewData: "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(content),
 		})
+		input.reportScreenshotProgress("capturing", len(candidates), len(points))
 	}
 	if len(candidates) < screenshotPreviewMinCount {
 		return ScreenshotPreviewBundle{}, fmt.Errorf("可用候选截图不足，仅生成 %d 张", len(candidates))
@@ -275,6 +285,7 @@ func GenerateAndUploadSelectedScreenshots(input ScreenshotGenerateInput, selecte
 }
 
 func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selectedTimes []float64, requireSelected bool) ([]string, error) {
+	input.reportScreenshotProgress("locating", 0, 0)
 	payload := input.Payload
 	sourceInfo := input.SourceInfo
 	selectedSubtitleSID, selectedSubtitleProvided := parseSelectedSubtitleSIDAny(payload["selected_subtitle_sid"])
@@ -287,6 +298,11 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 
 	downloader, decision, dErr := downloaderclient.DecideProxy(input.RootConfig, downloaderID)
 	if decision.Enabled {
+		requested := screenshotTotalCount
+		if requireSelected {
+			requested = len(selectedTimes)
+		}
+		input.reportScreenshotProgress("remote", -1, requested)
 		remoteCandidates := buildRemotePathCandidatesForProxy(savePath, torrentName, contentName)
 		var lastErr error
 		for _, remoteCandidate := range remoteCandidates {
@@ -310,6 +326,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 				urls := ExtractImageURLsFromText(bbcode)
 				if len(urls) > 0 {
 					logx.PlainInfof("已通过盒子代理生成截图 remote_path=%s count=%d", remoteCandidate, len(urls))
+					input.reportRemoteScreenshotResult("uploading", len(urls), requested)
 					return urls, nil
 				}
 				lastErr = fmt.Errorf("代理返回的截图 BBCode 未包含可用图片链接")
@@ -334,6 +351,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 		} else {
 			logx.PlainWarnf("盒子代理截图未命中有效路径，回退本地截图 remote_candidates=%v", remoteCandidates)
 		}
+		input.reportScreenshotProgress("locating", 0, 0)
 	} else if dErr != nil && strings.TrimSpace(decision.Reason) == "config_error" {
 		logx.PlainWarnf("盒子代理截图跳过：读取下载器配置失败 downloader_id=%s err=%v", downloaderID, dErr)
 	}
@@ -433,6 +451,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 	}
 
 	const uploadWorkers = 5
+	progress := startScreenshotProgress(input, len(points))
 	jobs := make(chan uploadJob, len(points))
 	results := make(chan uploadResult, len(points))
 	var wg sync.WaitGroup
@@ -462,6 +481,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 					}
 				}
 				results <- uploadResult{Index: job.Index, OK: true, URL: finalURL, LogBlock: buf.String()}
+				progress.frameUploaded()
 			}
 		}()
 	}
@@ -469,6 +489,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 	uploadLogs := make([]string, len(points))
 	uploadedURLs := make([]string, len(points))
 	uploadedOK := make([]bool, len(points))
+	uploadTotal := 0
 
 	for i, point := range points {
 		timeStr := formatSecondHMS(point)
@@ -487,6 +508,7 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 			logx.PlainInfof("❌ mpv 未生成文件: %s", rawPNG)
 			continue
 		}
+		progress.frameCaptured()
 
 		isHDR := false
 		if hdr, hdrErr := detectHDRFromPNG(ffprobePath, rawPNG); hdrErr == nil {
@@ -518,9 +540,11 @@ func generateAndUploadScreenshotsWithPoints(input ScreenshotGenerateInput, selec
 		}
 		logx.PlainInfof("   ✅ 压缩完成: %.2f MB (压缩率 %.1f%%) | 耗时 %.2fs | HDR: %v", float64(dstSize)/1024.0/1024.0, ratio, compressTime, isHDR)
 		jobs <- uploadJob{Index: i, TimeStr: timeStr, FilePath: finalPNG}
+		uploadTotal++
 	}
 
 	close(jobs)
+	progress.startUploads(uploadTotal)
 	wg.Wait()
 	close(results)
 

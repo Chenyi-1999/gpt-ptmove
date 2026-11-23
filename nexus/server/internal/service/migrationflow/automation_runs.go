@@ -73,7 +73,9 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 		_ = s.repo.FinishRunLeased(run, "completed", "本月计划已结束", run.CandidatesJSON, run.Selected, s.now())
 		return
 	}
-	rows, _, err := s.scan(ctx, snapshot.Route.Settings, excludedIDs)
+	observed := s.migrate.observeTask("candidate_scan", "执行自动化候选扫描", "/settings/automation")
+	defer observed.finish(false, "候选扫描未完成", "")
+	rows, _, err := s.scan(ctx, snapshot.Route.Settings, observed, excludedIDs)
 	if err != nil {
 		state := "failed"
 		message := err.Error()
@@ -96,6 +98,7 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 	message := "只读扫描完成，没有预留或下载"
 	state := "completed"
 	if run.Execute {
+		observed.update("正在登记合格候选", candidateResultProgress(rows))
 		raw, _ := json.Marshal(snapshot.Route)
 		for index := range rows {
 			c := &rows[index]
@@ -144,5 +147,7 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 		}
 	}
 	raw, _ := json.Marshal(rows)
-	_ = s.repo.FinishRunLeased(run, state, message, string(raw), run.Selected+count, s.now())
+	if err := s.repo.FinishRunLeased(run, state, message, string(raw), run.Selected+count, s.now()); err == nil {
+		observed.finish(state != "failed", message, candidateResultProgress(rows))
+	}
 }

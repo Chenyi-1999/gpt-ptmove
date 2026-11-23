@@ -15,6 +15,7 @@ type ScreenshotGenerateInput struct {
 	SourceInfo  map[string]any
 	ContentName string
 	RootConfig  map[string]any
+	Progress    func(stage string, completed, total int)
 }
 
 // ScreenshotSubtitleState 表示截图流程中的字幕判定状态。

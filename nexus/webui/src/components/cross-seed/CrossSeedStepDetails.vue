@@ -1,5 +1,18 @@
 <template>
-  <div class="step-container details-container">
+  <div class="step-container details-container media-details-container">
+    <div class="media-details-actions">
+      <el-button
+        :icon="MagicStick"
+        type="primary"
+        size="small"
+        plain
+        :disabled="!canFillMissingMedia"
+        :loading="isFillingMissingMedia"
+        @click="fillMissingMedia"
+      >
+        一键补全截图和媒体信息
+      </el-button>
+    </div>
     <el-tabs v-model="activeTab" type="border-card" class="details-tabs">
       <el-tab-pane label="主要信息" name="main">
         <div class="main-info-container">
@@ -261,7 +274,9 @@
                         >
                           <span
                             :style="{
-                              color: invalidTagsList.includes(option.value) ? 'var(--star-danger)' : '',
+                              color: invalidTagsList.includes(option.value)
+                                ? 'var(--star-danger)'
+                                : '',
                             }"
                           >
                             {{ option.label }}
@@ -347,6 +362,15 @@
                         plain
                       >
                         确认截图
+                      </el-button>
+                      <el-button
+                        v-if="screenshotImages.length"
+                        @click="reselectScreenshots"
+                        :disabled="isRefreshingScreenshots"
+                        size="small"
+                        text
+                      >
+                        重选截图
                       </el-button>
                       <el-button
                         :icon="Refresh"
@@ -546,7 +570,7 @@
 </template>
 
 <script setup lang="ts">
-import { Close, Monitor, Refresh } from '@element-plus/icons-vue'
+import { Close, MagicStick, Monitor, Refresh } from '@element-plus/icons-vue'
 import { useCrossSeedPanelContext } from './crossSeedPanelContext'
 
 const {
@@ -570,6 +594,10 @@ const {
   posterImages,
   getProxyImageUrl,
   handleImageErrorWithProxy,
+  canFillMissingMedia,
+  isFillingMissingMedia,
+  fillMissingMedia,
+  reselectScreenshots,
   refreshScreenshots,
   isRefreshingScreenshots,
   confirmScreenshotReview,
@@ -589,3 +617,15 @@ const {
   filteredDeclarationsList,
 } = useCrossSeedPanelContext()
 </script>
+
+<style scoped>
+.media-details-container {
+  flex-direction: column;
+}
+
+.media-details-actions {
+  display: flex;
+  flex: none;
+  padding: 8px clamp(8px, 1.5vw, 20px);
+}
+</style>

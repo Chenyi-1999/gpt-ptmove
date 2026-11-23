@@ -25,6 +25,7 @@ const screenshotTotalCount = 5
 // 失败场景：路径定位失败、mpv/ffmpeg/ffprobe 不可用、上传失败时返回错误。
 // 副作用：读取本地媒体、执行外部命令、向 Pixhost 发起网络请求；会输出叙事式纯文本日志。
 func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, error) {
+	input.reportScreenshotProgress("locating", 0, 0)
 	payload := input.Payload
 	sourceInfo := input.SourceInfo
 	selectedSubtitleSID, selectedSubtitleProvided := parseSelectedSubtitleSIDAny(payload["selected_subtitle_sid"])
@@ -50,6 +51,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 	// 对齐 MediaInfo：当 downloader.use_proxy=true 且本机不挂载媒体目录时，优先通过盒子代理远程截图。
 	downloader, decision, dErr := downloaderclient.DecideProxy(input.RootConfig, downloaderID)
 	if decision.Enabled {
+		input.reportScreenshotProgress("remote", -1, screenshotTotalCount)
 		remoteCandidates := buildRemotePathCandidatesForProxy(savePath, torrentName, contentName)
 		var lastErr error
 		for _, remoteCandidate := range remoteCandidates {
@@ -62,6 +64,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 				urls := ExtractImageURLsFromText(bbcode)
 				if len(urls) > 0 {
 					logx.PlainInfof("已通过盒子代理生成截图 remote_path=%s count=%d", remoteCandidate, len(urls))
+					input.reportRemoteScreenshotResult("uploading", len(urls), screenshotTotalCount)
 					return urls, nil
 				}
 				lastErr = fmt.Errorf("代理返回的截图 BBCode 未包含可用图片链接")
@@ -87,6 +90,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 		} else {
 			logx.PlainWarnf("盒子代理截图未命中有效路径，回退本地截图 remote_candidates=%v", remoteCandidates)
 		}
+		input.reportScreenshotProgress("locating", 0, 0)
 	} else if dErr != nil && strings.TrimSpace(decision.Reason) == "config_error" {
 		logx.PlainWarnf("盒子代理截图跳过：读取下载器配置失败 downloader_id=%s err=%v", downloaderID, dErr)
 	}
@@ -192,6 +196,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 	}
 
 	const uploadWorkers = 5
+	progress := startScreenshotProgress(input, len(points))
 	jobs := make(chan uploadJob, len(points))
 	results := make(chan uploadResult, len(points))
 	var wg sync.WaitGroup
@@ -221,6 +226,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 					}
 				}
 				results <- uploadResult{Index: job.Index, OK: true, URL: finalURL, LogBlock: buf.String()}
+				progress.frameUploaded()
 			}
 		}()
 	}
@@ -228,6 +234,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 	uploadLogs := make([]string, len(points))
 	uploadedURLs := make([]string, len(points))
 	uploadedOK := make([]bool, len(points))
+	uploadTotal := 0
 
 	for i, point := range points {
 		timeStr := formatSecondHMS(point)
@@ -246,6 +253,7 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 			logx.PlainInfof("❌ mpv 未生成文件: %s", rawPNG)
 			continue
 		}
+		progress.frameCaptured()
 
 		isHDR := false
 		if hdr, hdrErr := detectHDRFromPNG(ffprobePath, rawPNG); hdrErr == nil {
@@ -279,9 +287,11 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 
 		// 上传不并发截图，但上传并发。
 		jobs <- uploadJob{Index: i, TimeStr: timeStr, FilePath: finalPNG}
+		uploadTotal++
 	}
 
 	close(jobs)
+	progress.startUploads(uploadTotal)
 	wg.Wait()
 	close(results)
 

@@ -57,7 +57,7 @@
       <HomeSpeedPanel class="star-home__speed" />
 
       <div class="star-home__panels">
-        <HomeAutomationProgress />
+        <HomeTaskMonitor />
 
         <section class="home-card home-panel" aria-labelledby="home-traffic-title">
           <div class="home-panel__heading">
@@ -202,7 +202,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import HomeSpeedPanel from '@/components/HomeSpeedPanel.vue'
-import HomeAutomationProgress from '@/components/HomeAutomationProgress.vue'
+import HomeTaskMonitor from '@/components/HomeTaskMonitor.vue'
 import {
   ArrowRight,
   Bottom,

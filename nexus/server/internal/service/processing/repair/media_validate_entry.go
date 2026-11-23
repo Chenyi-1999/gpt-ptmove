@@ -6,9 +6,10 @@ import (
 
 // MediaValidateEntryDeps 定义媒体校验入口流程依赖。
 type MediaValidateEntryDeps struct {
-	GetRootConfig func() map[string]any
-	GetCSPTToken  func() string
-	GetSeedMedia  func(seedID string) string
+	GetRootConfig      func() map[string]any
+	GetCSPTToken       func() string
+	GetSeedMedia       func(seedID string) string
+	ScreenshotProgress func(stage string, completed, total int)
 }
 
 // MediaValidateEntry 执行媒体校验入口流程，统一拼装运行配置与外部依赖。
@@ -27,6 +28,7 @@ func MediaValidateEntry(payload map[string]any, deps MediaValidateEntryDeps) (ma
 		csptToken = strings.TrimSpace(deps.GetCSPTToken())
 	}
 	return ValidateMediaPayload(payload, rootConfig, csptToken, MediaValidateDeps{
-		GetSeedMediaInfo: deps.GetSeedMedia,
+		GetSeedMediaInfo:   deps.GetSeedMedia,
+		ScreenshotProgress: deps.ScreenshotProgress,
 	})
 }

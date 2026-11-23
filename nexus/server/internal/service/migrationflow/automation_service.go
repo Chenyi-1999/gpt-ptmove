@@ -182,7 +182,7 @@ func (s *AutomationService) resolveContext(ctx context.Context, v policy.Setting
 	}
 	return source, target, nil
 }
-func (s *AutomationService) scan(ctx context.Context, v policy.Settings, excludedIDs ...map[string]bool) ([]policy.Candidate, automationSnapshot, error) {
+func (s *AutomationService) scan(ctx context.Context, v policy.Settings, task taskObservation, excludedIDs ...map[string]bool) ([]policy.Candidate, automationSnapshot, error) {
 	source, target, err := s.resolveContext(ctx, v)
 	if err != nil {
 		return nil, automationSnapshot{}, err
@@ -208,16 +208,18 @@ func (s *AutomationService) scan(ctx context.Context, v policy.Settings, exclude
 	if err != nil {
 		return nil, snapshot, errors.New("源站订阅配置不可用")
 	}
+	ctx = observeAutomationScan(ctx, task)
 	rows, err := s.scanner.Scan(ctx, sp, tp, sourceCookie, targetCookie, rss, v, excludedIDs...)
 	if err == nil {
-		s.excludePreviouslyDownloaded(ctx, source.ID, rows, v)
+		s.excludePreviouslyDownloaded(ctx, source.ID, rows, v, task)
+		err = ctx.Err()
 	}
 	return rows, snapshot, err
 }
 
 // excludePreviouslyDownloaded 只读核对合格候选的自动化账本与已配置下载器。
 // 现有或正在下载的载荷被排除，未知历史不得入队。相同哈希只查询一次下载器。
-func (s *AutomationService) excludePreviouslyDownloaded(ctx context.Context, source string, rows []policy.Candidate, settings policy.Settings) {
+func (s *AutomationService) excludePreviouslyDownloaded(ctx context.Context, source string, rows []policy.Candidate, settings policy.Settings, task taskObservation) {
 	repo := s.repo.WithContext(ctx)
 	var reader automationDownloader
 	var readerErr error
@@ -227,11 +229,18 @@ func (s *AutomationService) excludePreviouslyDownloaded(ctx context.Context, sou
 		err   error
 	}
 	queried := make(map[string]downloadLookup)
+	total := eligibleCandidates(rows)
+	checked := 0
 	for index := range rows {
 		candidate := &rows[index]
 		if !candidate.Eligible {
 			continue
 		}
+		if ctx.Err() != nil {
+			return
+		}
+		checked++
+		task.update("核对下载记录", fmt.Sprintf("正在核对第 %d/%d 条", checked, total))
 		seen, err := repo.HasDownloadHistory(source, candidate.ID, candidate.InfoHash, "")
 		if err != nil {
 			candidate.Eligible = false
@@ -289,6 +298,8 @@ func (s *AutomationService) checkTaskDownloadHistory(ctx context.Context, task r
 
 // Preview 只读取站点详情、查重和 torrent 元数据，不预留、不落盘、不加种、不上传。
 func (s *AutomationService) Preview(ctx context.Context, body map[string]any) (map[string]any, int) {
+	task := s.migrate.observeTask("candidate_preview", "获取预览候选", "/settings/automation")
+	defer task.finish(false, "预览未完成", "")
 	v, err := s.settings(s.repo.WithContext(ctx))
 	if err != nil {
 		return automationError(errors.New("配置读取失败"), 500)
@@ -301,10 +312,14 @@ func (s *AutomationService) Preview(ctx context.Context, body map[string]any) (m
 	if err != nil {
 		return automationError(err, 400)
 	}
-	rows, snapshot, err := s.scan(ctx, v)
+	rows, snapshot, err := s.scan(ctx, v, task)
 	if err != nil {
+		if ctx.Err() != nil {
+			task.finish(false, "预览已中断", "")
+		}
 		return automationError(err, 400)
 	}
+	task.finish(true, "预览完成", candidateResultProgress(rows))
 	return map[string]any{"success": true, "candidates": rows, "settings": v, "source_digest": snapshot.Source.Digest, "target_digest": snapshot.Target.Digest}, 200
 }
 

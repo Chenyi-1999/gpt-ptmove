@@ -95,6 +95,7 @@ const loadPersistedTasks = (): Record<string, TaskMonitorItem> => {
       }
 
       const task = value as Partial<TaskMonitorItem>
+      const interrupted = task.source !== 'server' && task.status === 'running'
       return [
         [
           key,
@@ -106,11 +107,12 @@ const loadPersistedTasks = (): Record<string, TaskMonitorItem> => {
             outcome: normalizeText(task.outcome) || undefined,
             autoAddStatus: normalizeText(task.autoAddStatus) || undefined,
             title: privateText(task.title) || '后台任务',
-            status:
-              task.status === 'running' || task.status === 'success' || task.status === 'failed'
+            status: interrupted
+              ? 'failed'
+              : task.status === 'running' || task.status === 'success' || task.status === 'failed'
                 ? task.status
                 : 'running',
-            message: privateText(task.message),
+            message: interrupted ? '页面已重载，执行结果待核对' : privateText(task.message),
             error: privateText(task.error),
             progressText: privateText(task.progressText),
             actions: normalizeActions(task.actions),
@@ -213,6 +215,7 @@ const persistClearedServerTasks = (clearedTasks: Record<string, ClearedServerTas
 
 export const useTaskMonitorStore = defineStore('taskMonitor', () => {
   const tasks = ref<Record<string, TaskMonitorItem>>(loadPersistedTasks())
+  const serverState = ref<'loading' | 'ready' | 'unavailable'>('loading')
   const clearedServerTasks = ref<Record<string, ClearedServerTaskState>>(loadClearedServerTasks())
 
   const taskList = computed(() =>
@@ -364,6 +367,7 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
   }
 
   const replaceServerTasks = (serverTasks: UpsertTaskInput[]) => {
+    serverState.value = 'ready'
     const preservedLocalTasks = Object.fromEntries(
       Object.entries(tasks.value).filter(([, task]) => task.source !== 'server'),
     )
@@ -421,6 +425,7 @@ export const useTaskMonitorStore = defineStore('taskMonitor', () => {
 
   return {
     tasks,
+    serverState,
     taskList,
     runningTasks,
     failedTasks,

@@ -85,7 +85,19 @@ func automationFakePages(t *testing.T, s *AutomationService, titles ...string) *
 }
 func TestAutomationPreviewHasNoDurableOrDownloaderEffects(t *testing.T) {
 	s, db := automationFixture(t)
+	s.migrate = NewMigrateService(nil, nil)
 	calls := automationFakePages(t, s)
+	transport := s.scanner.Client.Transport
+	s.scanner.Client.Transport = automationTransport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/details.php" {
+			monitor, _ := s.migrate.TaskMonitorSnapshot()
+			jobs := monitor["tasks"].([]map[string]any)
+			if len(jobs) != 1 || jobs[0]["status"] != "running" || jobs[0]["message"] != "正在核验第 1 条种子详情" {
+				t.Fatalf("candidate progress was not visible during the actual request: %#v", jobs)
+			}
+		}
+		return transport.RoundTrip(req)
+	})
 	s.downloaderHook = func(string) (automationDownloader, error) { t.Fatal("preview touched downloader"); return nil, nil }
 	result, status := s.Preview(context.Background(), map[string]any{})
 	if status != 200 || result["success"] != true {
@@ -93,6 +105,11 @@ func TestAutomationPreviewHasNoDurableOrDownloaderEffects(t *testing.T) {
 	}
 	if *calls != 4 {
 		t.Fatalf("requests=%d", *calls)
+	}
+	monitor, _ := s.migrate.TaskMonitorSnapshot()
+	jobs := monitor["tasks"].([]map[string]any)
+	if len(jobs) != 1 || jobs[0]["status"] != "success" || jobs[0]["progress_text"] != "共 1 条 · 可选 1 条 · 已排除 0 条" {
+		t.Fatalf("short preview result was not retained or counted accurately: %#v", jobs)
 	}
 	for _, model := range []any{&repository.AutomationTask{}, &repository.AutomationQuota{}, &repository.AutomationRun{}, &repository.PublishQueueTask{}} {
 		var count int64

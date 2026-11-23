@@ -192,6 +192,11 @@ import './cross-seed/crossSeedPanel.scss'
 import { createPublishFlow, type RawPublishResult } from './cross-seed/panel/publishFlow'
 import { createSeedFlow } from './cross-seed/panel/seedFlow'
 import type { WorkingTorrent } from './cross-seed/panel/types'
+import {
+  autoScreenshotCount,
+  chooseAutomaticScreenshots,
+  countDistinctScreenshotURLs,
+} from './cross-seed/panel/mediaCompletion'
 import { crossSeedPanelContextKey } from './cross-seed/crossSeedPanelContext'
 import { resolveSourceTorrentId } from '@/utils/sourceTorrentId'
 import type {
@@ -367,6 +372,7 @@ interface ScreenshotPreviewSubtitleStreamItem {
 interface ScreenshotPreviewCacheEntry {
   candidates: ScreenshotPreviewCandidateItem[]
   selectionLimit: number
+  selectedIds: string[]
   subtitleState: ScreenshotSubtitleState
   subtitleStreams: ScreenshotPreviewSubtitleStreamItem[]
   currentSubtitleSID: number
@@ -760,6 +766,11 @@ const currentScreenshotPreviewSubtitleSID = ref(0)
 const screenshotPreviewCache = ref<Record<string, ScreenshotPreviewCacheEntry>>({})
 const isRefreshingIntro = ref(false)
 const isRefreshingMediainfo = ref(false)
+const isFillingMissingMedia = ref(false)
+let mediaFillController: AbortController | undefined
+let reusableScreenshotPreview:
+  | { draft: TorrentData; screenshots: string; bundle: ScreenshotPreviewCacheEntry }
+  | undefined
 const isRefreshingPosters = ref(false)
 const isHandlingScreenshotError = ref(false) // 防止重复处理截图错误
 const screenshotValid = ref(true) // 跟踪截图是否有效
@@ -909,6 +920,22 @@ const reverseMappings = ref<ReverseMappings>({
 
 const posterImages = computed(() => parseImageUrls(torrentData.value.intro.poster))
 const screenshotImages = computed(() => parseImageUrls(torrentData.value.intro.screenshots))
+const needsScreenshots = computed(() => !screenshotValid.value || !screenshotImages.value.length)
+const needsMediaInfo = computed(
+  () => !publishFlow.hasUsableDraftMediaReport(String(torrentData.value.mediainfo || '')),
+)
+const canFillMissingMedia = computed(
+  () =>
+    Boolean(torrentData.value.seed_id && torrent.value) &&
+    (needsScreenshots.value || needsMediaInfo.value) &&
+    !isRefreshingScreenshots.value &&
+    !isFinalizingScreenshotPreview.value &&
+    !isRefreshingMediainfo.value &&
+    !isRefetchingFromSource.value &&
+    !isHandlingScreenshotError.value &&
+    !showScreenshotPreviewDialog.value &&
+    !isFillingMissingMedia.value,
+)
 const isScreenshotReviewPending = computed(
   () => torrentData.value.screenshot_review_status === 'pending',
 )
@@ -929,9 +956,10 @@ const buildScreenshotPayload = (type: string, extra: Record<string, unknown> = {
   ...extra,
 })
 
-const postScreenshotValidateRequest = (payload: Record<string, unknown>) =>
+const postScreenshotValidateRequest = (payload: Record<string, unknown>, signal?: AbortSignal) =>
   axios.post('/api/media/validate', payload, {
     timeout: screenshotMediaValidateTimeoutMs,
+    signal,
   })
 
 const extractApiErrorMessage = (error: unknown, defaultMessage: string) =>
@@ -1116,6 +1144,7 @@ const applyCachedScreenshotPreview = (subtitleSID: number) => {
     cached.subtitleState,
     cached.subtitleStreams,
     cached.currentSubtitleSID,
+    cached.selectedIds,
   )
   return true
 }
@@ -1126,20 +1155,22 @@ const setScreenshotPreviewBundle = (
   subtitleState: ScreenshotSubtitleState,
   subtitleStreams: ScreenshotPreviewSubtitleStreamItem[],
   currentSubtitleSID: number,
+  selectedIds: string[] = [],
 ) => {
   screenshotPreviewCandidates.value = candidates
   activeScreenshotPreviewId.value = candidates[0]?.id || ''
-  selectedScreenshotPreviewIds.value = []
+  selectedScreenshotPreviewIds.value = [...selectedIds]
   screenshotPreviewSelectionLimit.value = selectionLimit > 0 ? selectionLimit : 5
   screenshotPreviewSubtitleState.value = subtitleState
   screenshotPreviewSubtitleStreams.value = subtitleStreams
   currentScreenshotPreviewSubtitleSID.value = currentSubtitleSID
-  torrentData.value.screenshot_review_status = 'pending'
+  if (needsScreenshots.value) torrentData.value.screenshot_review_status = 'pending'
   showScreenshotPreviewDialog.value = true
 
   screenshotPreviewCache.value[buildScreenshotPreviewCacheKey(currentSubtitleSID)] = {
     candidates,
     selectionLimit: screenshotPreviewSelectionLimit.value,
+    selectedIds: [...selectedIds],
     subtitleState,
     subtitleStreams,
     currentSubtitleSID,
@@ -1187,7 +1218,7 @@ const applyScreenshotPreviewCandidates = (
 }
 
 const openFetchedScreenshotPreview = async () => {
-  if (!torrentData.value.original_main_title) return
+  if (!torrentData.value.original_main_title.trim() && !torrent.value?.name) return
   if (isRefreshingScreenshots.value || isFinalizingScreenshotPreview.value) return
 
   isRefreshingScreenshots.value = true
@@ -1237,6 +1268,27 @@ const openFetchedScreenshotPreview = async () => {
   } finally {
     isRefreshingScreenshots.value = false
   }
+}
+
+const reselectScreenshots = async () => {
+  if (isRefreshingScreenshots.value || isFinalizingScreenshotPreview.value) return
+  const cached = reusableScreenshotPreview
+  if (
+    cached?.draft === torrentData.value &&
+    cached.screenshots === torrentData.value.intro.screenshots
+  ) {
+    const bundle = cached.bundle
+    setScreenshotPreviewBundle(
+      bundle.candidates,
+      bundle.selectionLimit,
+      bundle.subtitleState,
+      bundle.subtitleStreams,
+      bundle.currentSubtitleSID,
+      bundle.selectedIds,
+    )
+    return
+  }
+  await openFetchedScreenshotPreview()
 }
 
 const switchScreenshotPreviewSubtitle = async (subtitleSID: number) => {
@@ -1333,13 +1385,17 @@ const toggleScreenshotPreviewSelection = (id: string) => {
     selectedScreenshotPreviewIds.value = selectedScreenshotPreviewIds.value.filter(
       (item) => item !== id,
     )
-    return
-  }
-  if (selectedScreenshotPreviewIds.value.length >= screenshotPreviewSelectionLimit.value) {
+  } else if (selectedScreenshotPreviewIds.value.length >= screenshotPreviewSelectionLimit.value) {
     ElNotification.warning(`最多只能选择 ${screenshotPreviewSelectionLimit.value} 张候选截图。`)
     return
+  } else {
+    selectedScreenshotPreviewIds.value = [...selectedScreenshotPreviewIds.value, id]
   }
-  selectedScreenshotPreviewIds.value = [...selectedScreenshotPreviewIds.value, id]
+  const cached =
+    screenshotPreviewCache.value[
+      buildScreenshotPreviewCacheKey(currentScreenshotPreviewSubtitleSID.value)
+    ]
+  if (cached) cached.selectedIds = [...selectedScreenshotPreviewIds.value]
 }
 
 const confirmScreenshotPreviewSelection = async () => {
@@ -1356,6 +1412,15 @@ const confirmScreenshotPreviewSelection = async () => {
     ElNotification.error('候选截图时间点读取失败，请重新生成候选截图。')
     return
   }
+
+  const draft = torrentData.value
+  const seedId = draft.seed_id
+  const previousScreenshots = draft.intro.screenshots
+  const previousReviewStatus = draft.screenshot_review_status
+  const selectedBundle =
+    screenshotPreviewCache.value[
+      buildScreenshotPreviewCacheKey(currentScreenshotPreviewSubtitleSID.value)
+    ]
 
   isFinalizingScreenshotPreview.value = true
   isRefreshingScreenshots.value = true
@@ -1375,9 +1440,31 @@ const confirmScreenshotPreviewSelection = async () => {
     ElNotification.closeAll()
 
     if (response.data.success && response.data.screenshots) {
-      torrentData.value.intro.screenshots = response.data.screenshots
-      torrentData.value.screenshot_review_status = 'confirmed'
+      if (
+        torrentData.value !== draft ||
+        draft.seed_id !== seedId ||
+        draft.intro.screenshots !== previousScreenshots ||
+        draft.screenshot_review_status !== previousReviewStatus
+      )
+        return
+      const urls = parseImageUrls(response.data.screenshots)
+      const verified = countDistinctScreenshotURLs(urls)
+      if (urls.length !== selectedTimes.length || verified !== selectedTimes.length) {
+        ElNotification.warning(
+          `收到 ${verified}/${selectedTimes.length} 张有效截图，已保留当前截图和勾选。`,
+        )
+        return
+      }
+      draft.intro.screenshots = response.data.screenshots
+      draft.screenshot_review_status = 'confirmed'
       screenshotValid.value = true
+      if (selectedBundle) {
+        reusableScreenshotPreview = {
+          draft,
+          screenshots: draft.intro.screenshots,
+          bundle: selectedBundle,
+        }
+      }
       showScreenshotPreviewDialog.value = false
       ElNotification.success({
         title: '截图已更新',
@@ -1883,6 +1970,186 @@ const refreshMediainfo = async () => {
   }
 }
 
+const fillMissingMedia = async () => {
+  if (!canFillMissingMedia.value) return
+
+  const draft = torrentData.value
+  const workingTorrent = torrent.value
+  const seedId = draft.seed_id
+  const source = sourceSite.value
+  const sourceId = sourceTorrentId.value
+  const originalScreenshots = draft.intro.screenshots
+  const originalReview = draft.screenshot_review_status
+  const originalMediaInfo = draft.mediainfo
+  const fillScreenshots = needsScreenshots.value
+  const fillMediaInfo = needsMediaInfo.value
+  const controller = new AbortController()
+  mediaFillController = controller
+  isFillingMissingMedia.value = true
+  isRefreshingScreenshots.value = fillScreenshots
+  isRefreshingMediainfo.value = fillMediaInfo
+
+  const screenshotPayload = buildScreenshotPayload('screenshot_preview', { preview_count: 12 })
+  const mediaPayload = {
+    seed_id: seedId,
+    save_path: workingTorrent.save_path,
+    content_name: draft.original_main_title,
+    downloader_id: workingTorrent.downloaderId,
+    torrent_name: workingTorrent.name,
+    current_mediainfo: originalMediaInfo,
+    fill_missing: true,
+  }
+  const isCurrentDraft = () =>
+    !controller.signal.aborted &&
+    !isRefetchingFromSource.value &&
+    torrentData.value === draft &&
+    draft.seed_id === seedId &&
+    sourceSite.value === source &&
+    sourceTorrentId.value === sourceId &&
+    torrent.value === workingTorrent &&
+    workingTorrent.save_path === mediaPayload.save_path &&
+    workingTorrent.name === mediaPayload.torrent_name &&
+    workingTorrent.downloaderId === mediaPayload.downloader_id
+  const canApplyScreenshots = () =>
+    isCurrentDraft() &&
+    draft.intro.screenshots === originalScreenshots &&
+    draft.screenshot_review_status === originalReview
+
+  const taskKey = `media-fill:${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const title = '补全截图和媒体信息'
+  const stages = new Map<string, string>()
+  const setStage = (label: string, message: string) => {
+    stages.set(label, message)
+    taskMonitorStore.markRunning({
+      key: taskKey,
+      kind: 'media_fill',
+      title,
+      message: draft.original_main_title || workingTorrent.name || '正在补齐维护资料',
+      progressText: [...stages].map(([field, stage]) => `${field} ${stage}`).join(' · '),
+    })
+  }
+  const tasks: Promise<{ message: string; failed: boolean }>[] = []
+  const collect = (label: string, run: () => Promise<string>) => {
+    tasks.push(
+      run().then(
+        (message) => {
+          setStage(label, message)
+          return { message: `${label}：${message}`, failed: false }
+        },
+        (error: unknown) => {
+          const reason = controller.signal.aborted
+            ? '已离开当前草稿'
+            : redactPrivateText(extractApiErrorMessage(error, '获取失败'))
+          const message = `${label}：${reason}`
+          setStage(label, controller.signal.aborted ? '草稿已关闭' : '获取失败')
+          return { message, failed: true }
+        },
+      ),
+    )
+  }
+
+  if (fillScreenshots) {
+    collect('截图', async () => {
+      setStage('截图', '正在生成候选')
+      const { data: preview } = await postScreenshotValidateRequest(
+        screenshotPayload,
+        controller.signal,
+      )
+      if (!preview.success) throw new Error(preview.error || '候选截图获取失败')
+      if (!canApplyScreenshots()) return '已保留当前草稿的截图'
+
+      const candidates = normalizeScreenshotPreviewCandidates(preview.candidates)
+      const selected = chooseAutomaticScreenshots(candidates)
+      if (selected.length !== autoScreenshotCount) {
+        throw new Error('可用候选不足 5 张，请重试或手动选择')
+      }
+      const subtitleSID = normalizeScreenshotPreviewCurrentSubtitleSID(preview.current_subtitle_sid)
+      setStage('截图', '已选中 5 张，正在生成正式截图')
+      const { data: finalized } = await postScreenshotValidateRequest(
+        {
+          ...screenshotPayload,
+          type: 'screenshot_finalize',
+          selected_times: selected.map(({ timeSeconds }) => timeSeconds),
+          selected_subtitle_sid: subtitleSID,
+        },
+        controller.signal,
+      )
+      const screenshots = typeof finalized.screenshots === 'string' ? finalized.screenshots : ''
+      const urls = parseImageUrls(screenshots)
+      if (!finalized.success) throw new Error(finalized.error || '正式截图生成失败')
+      if (
+        urls.length !== autoScreenshotCount ||
+        countDistinctScreenshotURLs(urls) !== autoScreenshotCount
+      ) {
+        throw new Error('未获得 5 张不同的正式截图，请重试或手动选择')
+      }
+      if (!canApplyScreenshots()) return '已保留当前草稿的截图'
+
+      draft.intro.screenshots = screenshots
+      draft.screenshot_review_status = 'confirmed'
+      screenshotValid.value = true
+      reusableScreenshotPreview = {
+        draft,
+        screenshots,
+        bundle: {
+          candidates,
+          selectionLimit: autoScreenshotCount,
+          selectedIds: selected.map(({ id }) => id),
+          subtitleState: normalizeScreenshotSubtitleState(preview.subtitle_state),
+          subtitleStreams: normalizeScreenshotPreviewSubtitleStreams(preview.subtitle_streams),
+          currentSubtitleSID: subtitleSID,
+        },
+      }
+      return '已回填 5 张，可手动重选'
+    })
+  }
+
+  if (fillMediaInfo) {
+    collect('MediaInfo', async () => {
+      setStage('MediaInfo', '正在查找或提取报告')
+      const { data } = await axios.post('/api/migrate/refresh_mediainfo_async', mediaPayload, {
+        signal: controller.signal,
+        timeout: screenshotMediaValidateTimeoutMs,
+      })
+      const report = typeof data.mediainfo === 'string' ? data.mediainfo.trim() : ''
+      if (!data.success || !report) throw new Error(data.message || '未返回可用媒体报告')
+      if (!isCurrentDraft() || draft.mediainfo !== originalMediaInfo) return '已保留当前草稿的报告'
+      draft.mediainfo = report
+      return '已回填报告'
+    })
+  }
+
+  try {
+    const results = await Promise.all(tasks)
+    const failures = results.filter(({ failed }) => failed).map(({ message }) => message)
+    const summary = results.map(({ message }) => message).join('；')
+    if (failures.length > 0) {
+      const partial = failures.length < results.length
+      taskMonitorStore.markFailed(taskKey, {
+        title,
+        outcome: partial ? 'partial' : undefined,
+        message: partial ? '部分资料处理完成' : '补全资料失败',
+        error: failures.join('；'),
+        progressText: summary,
+      })
+      if (isCurrentDraft()) {
+        ElNotification.warning({
+          title: partial ? '部分资料已补全' : '补全资料失败',
+          message: summary,
+        })
+      }
+    } else {
+      taskMonitorStore.markSuccess(taskKey, { title, message: summary, progressText: summary })
+      if (isCurrentDraft()) ElNotification.success({ title: '资料处理完成', message: summary })
+    }
+  } finally {
+    mediaFillController = undefined
+    isFillingMissingMedia.value = false
+    if (fillScreenshots) isRefreshingScreenshots.value = false
+    if (fillMediaInfo) isRefreshingMediainfo.value = false
+  }
+}
+
 // 检查 BDInfo 状态并自动启动进度显示
 const checkAndStartBDInfoProgress = async (seedId: string, isFromFetch: boolean = false) => {
   const maxRetries = isFromFetch ? 5 : 3 // 从抓取流程调用时增加重试次数
@@ -2325,6 +2592,7 @@ const runInBackground = () => {
 
 // 在组件卸载时清理轮询
 onUnmounted(() => {
+  mediaFillController?.abort()
   cleanupDetailsTabsDrag()
   window.removeEventListener('resize', rebindDetailsTabsDrag)
   stopPublishBatchSSE()
@@ -2459,7 +2727,7 @@ const handleImageError = async (url: string, type: 'poster' | 'screenshot', inde
   }
 
   // 防止重复处理截图错误
-  if (type === 'screenshot' && isHandlingScreenshotError.value) {
+  if (type === 'screenshot' && (isHandlingScreenshotError.value || isFillingMissingMedia.value)) {
     console.log(`截图错误已正在处理中，跳过重复请求: ${url}`)
     return
   }
@@ -2855,6 +3123,10 @@ provide(crossSeedPanelContextKey, {
   posterImages,
   getProxyImageUrl,
   handleImageErrorWithProxy,
+  canFillMissingMedia,
+  isFillingMissingMedia,
+  fillMissingMedia,
+  reselectScreenshots,
   refreshScreenshots,
   isRefreshingScreenshots,
   confirmScreenshotReview,

@@ -11,7 +11,8 @@ const screenshotValidateLogModule = "媒体校验-截图"
 
 // MediaValidateDeps 定义媒体校验流程依赖。
 type MediaValidateDeps struct {
-	GetSeedMediaInfo func(seedID string) string
+	GetSeedMediaInfo   func(seedID string) string
+	ScreenshotProgress func(stage string, completed, total int)
 }
 
 // ValidateMediaPayload 按类型执行截图/海报/简介/媒体信息校验与修复。
@@ -23,16 +24,18 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 	contentName := strings.TrimSpace(toStringAny(payload["content_name"], ""))
 	sourceInfo, _ := payload["source_info"].(map[string]any)
 	subtitle := strings.TrimSpace(toStringAny(sourceInfo["subtitle"], ""))
+	screenshot := ScreenshotGenerateInput{
+		Payload:     payload,
+		SourceInfo:  sourceInfo,
+		ContentName: contentName,
+		RootConfig:  rootConfig,
+		Progress:    deps.ScreenshotProgress,
+	}
 
 	switch mediaType {
 	case "screenshot_preview":
 		previewCount := parsePreviewCountAny(payload["preview_count"])
-		previewBundle, previewErr := GenerateScreenshotPreviewCandidates(ScreenshotGenerateInput{
-			Payload:     payload,
-			SourceInfo:  sourceInfo,
-			ContentName: contentName,
-			RootConfig:  rootConfig,
-		}, previewCount)
+		previewBundle, previewErr := GenerateScreenshotPreviewCandidates(screenshot, previewCount)
 		if previewErr != nil {
 			return map[string]any{"success": false, "error": previewErr.Error()}, 400
 		}
@@ -47,12 +50,7 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 
 	case "screenshot_finalize":
 		selectedTimes := parseFloatSliceAny(payload["selected_times"])
-		generated, genErr := GenerateAndUploadSelectedScreenshots(ScreenshotGenerateInput{
-			Payload:     payload,
-			SourceInfo:  sourceInfo,
-			ContentName: contentName,
-			RootConfig:  rootConfig,
-		}, selectedTimes)
+		generated, genErr := GenerateAndUploadSelectedScreenshots(screenshot, selectedTimes)
 		if genErr != nil {
 			return map[string]any{"success": false, "error": genErr.Error()}, 400
 		}
@@ -63,23 +61,13 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 
 	case "screenshot":
 		// “重新获取截图”语义：优先沿用原有字幕流直出逻辑；仅在未找到可用字幕流时返回候选截图供人工选择。
-		usePreview, previewDecisionErr := ShouldUseScreenshotPreview(ScreenshotGenerateInput{
-			Payload:     payload,
-			SourceInfo:  sourceInfo,
-			ContentName: contentName,
-			RootConfig:  rootConfig,
-		})
+		usePreview, previewDecisionErr := ShouldUseScreenshotPreview(screenshot)
 		if previewDecisionErr != nil {
 			usePreview = false
 		}
 		if usePreview {
 			previewCount := parsePreviewCountAny(payload["preview_count"])
-			previewBundle, previewErr := GenerateScreenshotPreviewCandidates(ScreenshotGenerateInput{
-				Payload:     payload,
-				SourceInfo:  sourceInfo,
-				ContentName: contentName,
-				RootConfig:  rootConfig,
-			}, previewCount)
+			previewBundle, previewErr := GenerateScreenshotPreviewCandidates(screenshot, previewCount)
 			if previewErr != nil {
 				return map[string]any{"success": false, "error": previewErr.Error()}, 400
 			}
@@ -94,12 +82,7 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 			}, 200
 		}
 
-		generated, genErr := GenerateAndUploadScreenshots(ScreenshotGenerateInput{
-			Payload:     payload,
-			SourceInfo:  sourceInfo,
-			ContentName: contentName,
-			RootConfig:  rootConfig,
-		})
+		generated, genErr := GenerateAndUploadScreenshots(screenshot)
 		if genErr != nil {
 			return map[string]any{"success": false, "error": genErr.Error()}, 400
 		}

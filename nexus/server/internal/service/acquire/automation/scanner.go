@@ -110,7 +110,9 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 				continue
 			}
 			inspected++
+			reportScanProgress(ctx, ScanProgress{Stage: "detail", Current: inspected, Completed: inspected - 1})
 			c, err := s.inspect(ctx, source, target, sourceCookie, targetCookie, entry, inspectPreview)
+			reportScanProgress(ctx, ScanProgress{Stage: "detail", Completed: inspected})
 			if err != nil {
 				c.Reasons = []string{"详情或查重读取失败"}
 				rows = append(rows, c)
@@ -121,6 +123,7 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 	}
 	if zmpt {
 		for page := 0; page < zmptListingPageLimit && inspected < detailLimit; page++ {
+			reportScanProgress(ctx, ScanProgress{Stage: "listing", Page: page + 1, Completed: inspected})
 			doc, err := s.readListing(ctx, zmptListingURL(base, settings, page), sourceCookie)
 			if err != nil {
 				return nil, err
@@ -136,6 +139,7 @@ func (s *Scanner) Scan(ctx context.Context, source, target Profile, sourceCookie
 			}
 		}
 	} else {
+		reportScanProgress(ctx, ScanProgress{Stage: "listing"})
 		entries, err := s.genericSourceEntries(ctx, source, sourceCookie, rss)
 		if err != nil {
 			return nil, err

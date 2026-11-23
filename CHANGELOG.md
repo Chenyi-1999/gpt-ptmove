@@ -576,3 +576,10 @@
 - Gitee 发行 1355571 的 Compose 与校验文件重新下载后逐字节匹配。完整镜像从同版本 GitHub 私有发行提供。
 - D 盘历史 ZIP 已登记归档索引。包含源码、Docker 镜像、Compose、校验和恢复说明，核验 59 个 OCI 对象。ZIP SHA-256 `f9f4587ce77c7a37a68da082e88290aebca48ec86739a1c5afd69ce9a4270ff0`。
 - 两站附件及 152 部署证据记入 `docs/DEPLOYMENT.json`，本记录独立提交，版本标签继续指向发布源码。未实际下载、发种或访问 81。
+
+## PTM-20261123-078 — 2026-11-23T12:28:49+08:00 — Codex root、task_monitor_design、media_one_click、media_capture_progress、task_media_review，STARPT v1.0.7 任务进度和媒体资料补全
+
+- `automation/scanner.go`、`migrationflow/task_monitor.go`、`automation_observation.go` 和 `HomeTaskMonitor.vue` 将候选预览、后台扫描、截图、MediaInfo、下载与发布任务接入统一状态。候选扫描显示当前条目和完成汇总，短任务保留终态，独立任务并行展示。首页与全局抽屉共享同一状态。
+- `CrossSeedPanel.vue`、`mediaCompletion.ts`、`CrossSeedStepDetails.vue` 和 `refresh_flow.go` 为维护及转种草稿提供缺失资料补全。自动选 5 个不同时间点，收到 5 张互异有效图才回填。可以手动重选。已有完整媒体报告保留，优先从简介提取，再用下载器。回填只更新草稿。保留 Blu-ray 手动进入 BDInfo 的路径。
+- 152 无外网隔离环境通过 Go 全量、前端定向 ESLint、Vue 类型检查、Vite 构建与 10 组原生冒烟。本机 Node 的 3 个截图选择测试也通过。认证测试验证两个独立失败任务的保留。线上 Docker 健康返回 v1.0.7 并与验证的首页文件逐字匹配。未进行真实浏览器点击、真实截图、下载、发种或 81 操作。飞牛既有客户端回传阶段和最终数量，运行中逐张计数仅本机生成路径可用。
+- 部署镜像 `sha256:a99d7cc9edfe6a895e92e19dc2c7c5b56c701bb683a8921f237e782d982cd6af`，回滚镜像 v1.0.6。完整导出镜像 734015181 字节，SHA-256 `e9b2be9aad5680d6dfe56622d1af12954e302bb2e29b33df2f3d8bdc166b56b4`。附发行说明、Compose、前端构建产物和部署指标。记录时双仓提交、标签推送及发行附件上传待进行。

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.6",
+  "version": "1.0.7",
   "date": "2026-11-23",
   "timezone": "Asia/Shanghai",
   "host": "152.136.236.238",
   "directory": "/opt/gpt-ptmove-nexus",
   "container": "ptmove-nexus-ptmove-nexus-1",
-  "image": "ptmove-nexus:1.0.6",
-  "image_id": "sha256:9b5d753d8c58398daeb7d5e25d3c5d3bc2febca023a383274a668e92622c42ca",
+  "image": "ptmove-nexus:1.0.7",
+  "image_id": "sha256:a99d7cc9edfe6a895e92e19dc2c7c5b56c701bb683a8921f237e782d982cd6af",
   "architecture": "linux/amd64",
-  "image_archive_sha256": "93b09b9635312eb45c169df8a18b70713a6588a2822cb345540df33dbb869e8d",
+  "image_archive_sha256": "e9b2be9aad5680d6dfe56622d1af12954e302bb2e29b33df2f3d8bdc166b56b4",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
   "automation_enabled": false,
@@ -970,7 +970,10 @@
     "canary_sample_download_progress": 0.42,
     "zmpt_readonly_ascending_rows": 100,
     "production_automation_idle": true,
-    "tested_browser_routes": ["/", "/settings/automation"],
+    "tested_browser_routes": [
+      "/",
+      "/settings/automation"
+    ],
     "browser_render_verified": false,
     "git_tag": "v1.0.5",
     "source_commit": "b8073dbc074dd7574afb6d869f2df67ebf60e002",
@@ -1093,5 +1096,27 @@
       "oci_blobs_verified": 59
     },
     "published_verified_at": "2026-11-23T08:31:58+08:00"
+  },
+  "starpt_v1_0_7": {
+    "version": "1.0.7",
+    "image_id": "sha256:a99d7cc9edfe6a895e92e19dc2c7c5b56c701bb683a8921f237e782d982cd6af",
+    "rollback_image_id": "sha256:9b5d753d8c58398daeb7d5e25d3c5d3bc2febca023a383274a668e92622c42ca",
+    "healthy": true,
+    "native_smoke_groups": 10,
+    "authenticated_task_snapshot": true,
+    "home_asset": "HomeView-BbHRJW2H.js",
+    "home_asset_sha256": "851c2c481db4d554222d387632acb59882cb80fb2afff653d8bfc8f56b623e63",
+    "automation_idle": true,
+    "tag": "v1.0.7",
+    "go_test_all": true,
+    "frontend_lint_typecheck_build": true,
+    "screenshot_selection_tests": 3,
+    "browser_interactions_verified": false,
+    "remote_per_frame_progress": false,
+    "archive": "starpt-v1.0.7-linux-amd64.tar.gz",
+    "image_archive_bytes": 734015181,
+    "docker_export_sha256": "3ed91c5edf7d4475a4a2d44208dccf237338a9391ad6beac9abe1661442901e9",
+    "reused_oci_blobs": 54,
+    "verified_at": "2026-11-23T12:28:49+08:00"
   }
 }

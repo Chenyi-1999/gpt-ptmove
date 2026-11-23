@@ -249,7 +249,11 @@ type AutomationTaskProgress struct {
 	Message          string   `json:"message"`
 	DownloadProgress *float64 `json:"download_progress,omitempty"`
 	UpdatedAt        int64    `json:"updated_at"`
+	CreatedAt        int64    `json:"-"`
+	QueueID          *int64   `json:"-"`
 }
+
+const automationProgressColumns = "id, title, source, target, size, state, message, download_progress, updated_at, created_at, queue_id"
 
 // ActiveTasks 返回工作台所需的并行任务状态，跳过历史与内部配置。
 func (r *AutomationRepository) ActiveTasks() ([]AutomationTaskProgress, error) {
@@ -257,8 +261,18 @@ func (r *AutomationRepository) ActiveTasks() ([]AutomationTaskProgress, error) {
 	states := []string{"reserved", "downloading", AutomationStateWaitingBatch, "preparing", AutomationStateWaitingMedia,
 		"ready", "queued_publish", "publishing", "published", "seeding", "reconciling", AutomationStateDuplicateCleanup}
 	err := r.db.Model(&AutomationTask{}).
-		Select("id", "title", "source", "target", "size", "state", "message", "download_progress", "updated_at").
+		Select(automationProgressColumns).
 		Where("state IN ?", states).Order("updated_at DESC").Order("id ASC").Find(&rows).Error
+	return rows, err
+}
+
+// RecentAutomationOutcomes 返回近期没有单独站点发布回执的自动化终态。
+func (r *AutomationRepository) RecentAutomationOutcomes(since int64) ([]AutomationTaskProgress, error) {
+	rows := []AutomationTaskProgress{}
+	err := r.db.Model(&AutomationTask{}).Select(automationProgressColumns).
+		Where("state IN ? AND updated_at >= ? AND (publish_attempted = ? OR publish_attempted IS NULL)",
+			[]string{"failed", "cancelled", AutomationStateAlreadyExists, "needs_review"}, since, false).
+		Order("updated_at DESC").Order("id ASC").Limit(20).Find(&rows).Error
 	return rows, err
 }
 

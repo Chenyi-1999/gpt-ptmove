@@ -20,6 +20,23 @@ const taskMonitorActionHint = "此操作会请求取消或标记监控状态，�
 // 副作用：读取内存态任务状态与数据库中的发布队列/日志。
 func (s *MigrateService) TaskMonitorSnapshot() (map[string]any, int) {
 	tasks := make([]map[string]any, 0)
+	tasks = append(tasks, s.observations.snapshot()...)
+	observedQueues := map[int64]bool{}
+	if s.automation != nil && s.automation.repo != nil {
+		if active, err := s.automation.repo.ActiveTasks(); err == nil {
+			for _, task := range active {
+				tasks = append(tasks, automationMonitorEntry(task))
+				if task.QueueID != nil {
+					observedQueues[*task.QueueID] = true
+				}
+			}
+		}
+		if recent, err := s.automation.repo.RecentAutomationOutcomes(time.Now().Add(-observationRetention).UnixMilli()); err == nil {
+			for _, task := range recent {
+				tasks = append(tasks, automationMonitorEntry(task))
+			}
+		}
+	}
 
 	for _, task := range s.publishState.Snapshot() {
 		tasks = append(tasks, buildBatchPublishTaskEntry(task))
@@ -40,6 +57,9 @@ func (s *MigrateService) TaskMonitorSnapshot() (map[string]any, int) {
 			return map[string]any{"success": false, "message": "读取发布队列失败: " + err.Error()}, 500
 		}
 		for _, task := range activeQueueTasks {
+			if observedQueues[task.ID] {
+				continue
+			}
 			tasks = append(tasks, buildQueueTaskEntry(task))
 		}
 	}

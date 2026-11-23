@@ -67,6 +67,7 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 	downloaderID := strings.TrimSpace(toStringWithDefault(payload["downloader_id"], toStringWithDefault(payload["downloaderId"], "")))
 	torrentName := strings.TrimSpace(toStringWithDefault(payload["torrent_name"], toStringWithDefault(payload["torrentName"], "")))
 	currentMediainfo := strings.TrimSpace(toStringWithDefault(payload["current_mediainfo"], toStringWithDefault(payload["mediainfo"], "")))
+	fillMissing, _ := payload["fill_missing"].(bool)
 	logx.Infof(
 		logModule,
 		"开始刷新：seed_id=%s save_path=%s torrent_name=%s content_name=%s downloader_id=%s",
@@ -76,6 +77,27 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 	hash, torrentID, siteName, parseErr := "", "", "", error(nil)
 	if deps.ParseSeedID != nil {
 		hash, torrentID, siteName, parseErr = deps.ParseSeedID(seedID)
+	}
+	if fillMissing {
+		if repo == nil || deps.ParseSeedID == nil || parseErr != nil {
+			return map[string]any{"success": false, "message": "无法定位当前草稿的媒体资料"}, 400
+		}
+		row, err := repo.GetSeedParameterByKey(hash, torrentID, siteName)
+		if err != nil {
+			return map[string]any{"success": false, "message": "无法读取当前草稿的媒体资料"}, 404
+		}
+		for _, report := range []string{currentMediainfo, toStringWithDefault(row["mediainfo"], "")} {
+			if HasUsableMediaReport(report) {
+				return draftMediaReport(report, "已使用现有媒体信息")
+			}
+		}
+		description := toStringWithDefault(row["statement"], "") + "\n" + toStringWithDefault(row["body"], "")
+		if report := QuotedMediaInfo(description); report != "" {
+			return draftMediaReport(report, "已从简介提取媒体信息")
+		}
+		if status := strings.ToLower(strings.TrimSpace(toStringWithDefault(row["mediainfo_status"], ""))); status == "processing" || status == "processing_bdinfo" {
+			return map[string]any{"success": false, "message": "已有媒体分析任务正在执行，请在任务监控查看"}, 409
+		}
 	}
 
 	if (savePath == "" || torrentName == "") && parseErr == nil && repo != nil {
@@ -109,6 +131,9 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 				break
 			}
 			if probe.Success && probe.IsBDMV {
+				if fillMissing {
+					return draftBDInfoRequired()
+				}
 				logx.Warnf(logModule, "盒子代理提示蓝光原盘：seed_id=%s remote_path=%s message=%s", seedID, remoteCandidate, strings.TrimSpace(probe.Message))
 				if deps.StartBDInfoTask == nil {
 					logx.Errorf(logModule, "启动BDInfo失败：seed_id=%s reason=StartBDInfoTask回调为空", seedID)
@@ -139,6 +164,9 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 			}
 			if probe.Success && strings.TrimSpace(probe.MediaInfo) != "" {
 				mediainfoText := strings.TrimSpace(probe.MediaInfo)
+				if fillMissing {
+					return draftMediaReport(mediainfoText, "已从下载器获取 MediaInfo")
+				}
 				seedUpdates, _ := persistMediainfoAndCollectUpdates(seedID, parseErr, repo, deps, hash, torrentID, siteName, savePath, torrentName, mediainfoText, logModule)
 				seedUpdatesValue := any(nil)
 				if len(seedUpdates) > 0 {
@@ -190,6 +218,9 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 
 	isBluray, detectedPath := DetectBlurayDiscByCandidates(translatedSavePath, torrentName, contentName)
 	if isBluray {
+		if fillMissing {
+			return draftBDInfoRequired()
+		}
 		logx.Warnf(logModule, "蓝光判定命中：seed_id=%s resolved_path=%s action=启动BDInfo", seedID, detectedPath)
 		if deps.StartBDInfoTask == nil {
 			logx.Errorf(logModule, "启动BDInfo失败：seed_id=%s reason=StartBDInfoTask回调为空", seedID)
@@ -236,6 +267,9 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 		logx.Errorf(logModule, "提取MediaInfo失败：seed_id=%s target_file=%s err=%v", seedID, targetResult.TargetFile, err)
 		return map[string]any{"success": false, "message": err.Error()}, 500
 	}
+	if fillMissing {
+		return draftMediaReport(mediainfoText, "已获取本地 MediaInfo")
+	}
 
 	_, seedUpdatesValue := persistMediainfoAndCollectUpdates(seedID, parseErr, repo, deps, hash, torrentID, siteName, savePath, torrentName, mediainfoText, logModule)
 
@@ -260,6 +294,19 @@ func RefreshMediainfoAsync(payload map[string]any, repo RefreshMediainfoRepo, de
 			"is_bluray":      false,
 		},
 	}, 200
+}
+
+// draftMediaReport 返回可回填到维护表单的完整报告，不改数据库中的草稿。
+func draftMediaReport(report, message string) (map[string]any, int) {
+	if !HasUsableMediaReport(report) {
+		return map[string]any{"success": false, "message": "媒体工具未返回完整报告"}, 422
+	}
+	return map[string]any{"success": true, "mediainfo": strings.TrimSpace(report), "message": message}, 200
+}
+
+// draftBDInfoRequired 保留已有原盘资料和任务，原盘专用入口负责启动分析。
+func draftBDInfoRequired() (map[string]any, int) {
+	return map[string]any{"success": false, "message": "检测到蓝光原盘，请在媒体信息页使用「重新获取」启动 BDInfo"}, 422
 }
 
 func buildRemotePathCandidates(savePath, torrentName, contentName string) []string {
