@@ -50,6 +50,7 @@ type tjuptFeedFakeQB struct {
 	guard        func() error
 	beforeWrite  func()
 	adds         []bool
+	uploadLimits []int
 	starts       []string
 	unknown      bool
 	removes      []string
@@ -77,7 +78,7 @@ func (d *tjuptFeedFakeQB) TjuptFeedTorrents(_ context.Context, hashes []string) 
 	return result, d.lookupErr
 }
 
-func (d *tjuptFeedFakeQB) AddTjuptFeedTorrent(_ context.Context, _ []byte, _, savePath string, paused bool, tags []string, category, hash string) (*downloaderclient.TaggedQBTorrent, error) {
+func (d *tjuptFeedFakeQB) AddTjuptFeedTorrent(_ context.Context, _ []byte, _, savePath string, paused bool, tags []string, category, hash string, uploadLimitMBps int) (*downloaderclient.TaggedQBTorrent, error) {
 	if _, exists := d.rows[hash]; exists {
 		return nil, downloaderclient.ErrTjuptFeedAlreadyExists
 	}
@@ -88,6 +89,7 @@ func (d *tjuptFeedFakeQB) AddTjuptFeedTorrent(_ context.Context, _ []byte, _, sa
 		return nil, err
 	}
 	d.adds = append(d.adds, paused)
+	d.uploadLimits = append(d.uploadLimits, uploadLimitMBps)
 	if d.unknown {
 		return nil, downloaderclient.ErrTjuptFeedUnconfirmed
 	}

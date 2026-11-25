@@ -50,13 +50,17 @@ type TjuptFeedInput struct {
 
 // TjuptFeedView 返回页面状态，不输出订阅地址或令牌。
 type TjuptFeedView struct {
-	Settings      TjuptFeedSettings `json:"settings"`
-	Enabled       bool              `json:"enabled"`
-	RSSConfigured bool              `json:"rss_configured"`
-	HNRConfigured bool              `json:"hnr_configured"`
-	Running       bool              `json:"running"`
-	LastRunAt     string            `json:"last_run_at,omitempty"`
-	LastMessage   string            `json:"last_message"`
+	Settings struct {
+		TjuptFeedSettings
+		UseSiteUploadLimit bool `json:"use_site_upload_limit"`
+	} `json:"settings"`
+	SiteUploadLimitMBps *int   `json:"site_upload_limit_mbps"`
+	Enabled             bool   `json:"enabled"`
+	RSSConfigured       bool   `json:"rss_configured"`
+	HNRConfigured       bool   `json:"hnr_configured"`
+	Running             bool   `json:"running"`
+	LastRunAt           string `json:"last_run_at,omitempty"`
+	LastMessage         string `json:"last_message"`
 }
 
 // TjuptFeedResult 汇总本轮处理结果，恢复试运行任务不计入新增。
@@ -145,8 +149,37 @@ func (f *TjuptFeed) View(ctx context.Context) (TjuptFeedView, error) {
 		RSSConfigured: len(row.RSS) > 0, HNRConfigured: len(row.HNR) > 0,
 		LastRunAt: tjuptTime(row.LastRun), LastMessage: row.LastMessage,
 	}
-	view.Settings, err = decodeTjuptFeedSettings(row.Policy)
-	return view, err
+	view.Settings.TjuptFeedSettings, err = decodeTjuptFeedSettings(row.Policy)
+	if err != nil {
+		return view, err
+	}
+	view.Settings.UseSiteUploadLimit = row.UseSiteUploadLimit
+	if limit, err := tjuptSiteUploadLimit(ctx, f.repo); err == nil {
+		view.SiteUploadLimitMBps = &limit
+	}
+	return view, nil
+}
+
+// SetSiteUploadLimit 在循环启用或暂停时独立保存上传限速开关。
+func (f *TjuptFeed) SetSiteUploadLimit(ctx context.Context, enabled bool) error {
+	row, err := f.repo.Control(ctx)
+	if err != nil || row.UseSiteUploadLimit == enabled {
+		return err
+	}
+	applied, err := f.repo.SetSiteUploadLimit(ctx, row.SiteUploadLimitRevision, enabled)
+	if err == nil && !applied {
+		return ErrTjuptFeedBusy
+	}
+	return err
+}
+
+// tjuptSiteUploadLimit 按站点设置的显示规则处理 0 和超过 999 MB/s 的不限速值。
+func tjuptSiteUploadLimit(ctx context.Context, repo *repository.TjuptFeedRepository) (int, error) {
+	limit, err := repo.SiteUploadLimit(ctx)
+	if limit > 999 {
+		return 0, err
+	}
+	return limit, err
 }
 
 // Save 校验并保存新设置，保存不会领取 RSS、连接 qB 或改变启停状态。

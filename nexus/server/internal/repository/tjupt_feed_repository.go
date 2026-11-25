@@ -10,19 +10,21 @@ import (
 
 // TjuptFeedControl 保存直连 RSS 的设置、加密凭据与执行租约。
 type TjuptFeedControl struct {
-	ID              int    `gorm:"primaryKey;autoIncrement:false"`
-	Policy          string `gorm:"type:text"`
-	RSS             []byte `json:"-"`
-	HNR             []byte `json:"-"`
-	Enabled         bool
-	IntervalMinutes int
-	Revision        int64
-	Lease           string
-	LeaseUntil      int64
-	Fence           int64
-	LastRun         int64
-	LastCleanup     int64 `gorm:"not null;default:0"`
-	LastMessage     string
+	ID                      int    `gorm:"primaryKey;autoIncrement:false"`
+	Policy                  string `gorm:"type:text"`
+	RSS                     []byte `json:"-"`
+	HNR                     []byte `json:"-"`
+	Enabled                 bool
+	UseSiteUploadLimit      bool  `gorm:"not null;default:false"`
+	SiteUploadLimitRevision int64 `gorm:"not null;default:0"`
+	IntervalMinutes         int
+	Revision                int64
+	Lease                   string
+	LeaseUntil              int64
+	Fence                   int64
+	LastRun                 int64
+	LastCleanup             int64 `gorm:"not null;default:0"`
+	LastMessage             string
 }
 
 // TjuptFeedTask 保存投种前的身份、容量及投种后的回执。归档任务仍参与去重。
@@ -98,6 +100,31 @@ func (r *TjuptFeedRepository) Control(ctx context.Context) (TjuptFeedControl, er
 	return row, err
 }
 
+// SiteUploadLimit 只读取站点设置中的北洋园上传限速，缺失或重复记录均返回错误。
+func (r *TjuptFeedRepository) SiteUploadLimit(ctx context.Context) (int, error) {
+	var rows []struct{ SpeedLimit *int }
+	err := r.db.WithContext(ctx).Table("sites").Select("speed_limit").
+		Where("site = ?", "tjupt").Limit(2).Find(&rows).Error
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) != 1 || rows[0].SpeedLimit == nil || *rows[0].SpeedLimit < 0 {
+		return 0, errors.New("北洋园站点上传限速不明确")
+	}
+	return *rows[0].SpeedLimit, nil
+}
+
+// SetSiteUploadLimit 独立更新上传限速开关，保留其他配置和退种观察版本。
+func (r *TjuptFeedRepository) SetSiteUploadLimit(ctx context.Context, revision int64, enabled bool) (bool, error) {
+	result := r.db.WithContext(ctx).Model(&TjuptFeedControl{}).
+		Where("id = ? AND site_upload_limit_revision = ?", 1, revision).
+		Updates(map[string]any{
+			"use_site_upload_limit":      enabled,
+			"site_upload_limit_revision": gorm.Expr("site_upload_limit_revision + 1"),
+		})
+	return result.RowsAffected == 1, result.Error
+}
+
 // Save 保存停止状态下的设置，读写之间发生启停或设置变更时拒绝覆盖。
 func (r *TjuptFeedRepository) Save(ctx context.Context, row TjuptFeedControl, now int64) (bool, error) {
 	result := r.db.WithContext(ctx).Model(&TjuptFeedControl{}).
@@ -138,12 +165,15 @@ func (r *TjuptFeedRepository) Claim(ctx context.Context, expected TjuptFeedContr
 	return result.RowsAffected == 1, result.Error
 }
 
-// Verify 在外部写请求发出前确认运行模式与租约仍然有效。
-func (r *TjuptFeedRepository) Verify(ctx context.Context, lease string, trial bool, now int64) error {
+// Verify 在外部写请求发出前确认运行模式、租约以及投种时的限速开关版本。
+func (r *TjuptFeedRepository) Verify(ctx context.Context, lease string, trial bool, now int64, uploadLimitRevision *int64) error {
 	var count int64
-	err := r.db.WithContext(ctx).Model(&TjuptFeedControl{}).
-		Where("id = ? AND lease = ? AND lease_until > ? AND enabled = ?", 1, lease, now, !trial).
-		Count(&count).Error
+	query := r.db.WithContext(ctx).Model(&TjuptFeedControl{}).
+		Where("id = ? AND lease = ? AND lease_until > ? AND enabled = ?", 1, lease, now, !trial)
+	if uploadLimitRevision != nil {
+		query = query.Where("site_upload_limit_revision = ?", *uploadLimitRevision)
+	}
+	err := query.Count(&count).Error
 	if err == nil && count != 1 {
 		return ErrTjuptFeedLease
 	}

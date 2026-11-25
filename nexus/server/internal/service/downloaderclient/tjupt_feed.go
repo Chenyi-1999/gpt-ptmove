@@ -151,7 +151,7 @@ func (client *qbClient) tjuptFeedTorrentRows(ctx context.Context, query url.Valu
 
 // AddTjuptFeedTorrent 通过原生 qB API 提交单个已验证的北洋园种子。试运行以停止状态入队。
 // 投种前核对哈希，投种后要求对应添加回执及哈希、状态、标签、分类的读回一致。
-func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filename, savePath string, paused bool, tags []string, category, hash string) (*TaggedQBTorrent, error) {
+func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filename, savePath string, paused bool, tags []string, category, hash string, uploadLimitMBps int) (*TaggedQBTorrent, error) {
 	hash, valid := normalizeTjuptFeedHash(hash)
 	meta, err := acquirefetch.ParseTorrentMeta(data)
 	if !valid || err != nil || meta.InfoHash != hash {
@@ -171,6 +171,10 @@ func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filena
 		"seedMode":      "false",
 		"tags":          strings.Join(tags, ","),
 		"category":      category,
+	}
+	uploadLimitBytes := normalizeUploadLimitBytes(uploadLimitMBps)
+	if uploadLimitBytes > 0 {
+		fields["upLimit"] = strconv.Itoa(uploadLimitBytes)
 	}
 	if savePath = strings.TrimSpace(savePath); savePath != "" {
 		fields["savepath"] = savePath
@@ -205,7 +209,7 @@ func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filena
 	if !tjuptFeedAddAcknowledged(reply, hash) {
 		return nil, fmt.Errorf("%w: 没有收到对应哈希的添加回执", ErrTjuptFeedUnconfirmed)
 	}
-	return client.confirmTjuptFeedTorrent(ctx, hash, category, tags, 0, paused)
+	return client.confirmTjuptFeedTorrent(ctx, hash, category, tags, 0, paused, uploadLimitBytes)
 }
 
 // ResumeTjuptFeedTorrent 仅启动添加时间、试运行标记、分类均匹配的停止任务。
@@ -244,7 +248,7 @@ func (d Downloader) ResumeTjuptFeedTorrent(ctx context.Context, hash string, add
 	if result := strings.TrimSpace(string(reply)); result != "" && result != "Ok." {
 		return nil, fmt.Errorf("%w: 没有收到 qB 启动回执", ErrTjuptFeedUnconfirmed)
 	}
-	return client.confirmTjuptFeedTorrent(ctx, hash, category, tags, addedOn, false)
+	return client.confirmTjuptFeedTorrent(ctx, hash, category, tags, addedOn, false, 0)
 }
 
 // TjuptFeedStopped 识别 qB 两代接口明确停止的任务状态。
@@ -348,7 +352,7 @@ func (torrent TaggedQBTorrent) matchesTjuptFeedScope(category string, tags []str
 }
 
 // confirmTjuptFeedTorrent 允许 qB 短时间同步新增状态，仅重复读取，不重新发送写请求。
-func (client *qbClient) confirmTjuptFeedTorrent(ctx context.Context, hash, category string, tags []string, addedOn int64, paused bool) (*TaggedQBTorrent, error) {
+func (client *qbClient) confirmTjuptFeedTorrent(ctx context.Context, hash, category string, tags []string, addedOn int64, paused bool, uploadLimitBytes int) (*TaggedQBTorrent, error) {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 	ticker := time.NewTicker(200 * time.Millisecond)
@@ -361,6 +365,9 @@ func (client *qbClient) confirmTjuptFeedTorrent(ctx context.Context, hash, categ
 		if torrent != nil {
 			if !torrent.matchesTjuptFeedScope(category, tags, addedOn) {
 				return nil, fmt.Errorf("%w: qB 返回的种子标签、分类或添加时间不符", ErrTjuptFeedUnconfirmed)
+			}
+			if uploadLimitBytes > 0 && (torrent.UpLimit == nil || *torrent.UpLimit != int64(uploadLimitBytes)) {
+				return nil, fmt.Errorf("%w: qB 返回的上传限速与设置不符", ErrTjuptFeedUnconfirmed)
 			}
 			if (paused && torrent.TjuptFeedStopped()) || (!paused && torrent.TjuptFeedStarted()) {
 				return torrent, nil

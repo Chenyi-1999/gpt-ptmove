@@ -11,6 +11,37 @@
   "image_archive_sha256": "6bd74930a232760202d55761ef20fb8d04431e82e53e04993eee41a5b0c9db85",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
+  "release_v1_0_12": {
+    "version": "1.0.12",
+    "architecture": "linux/amd64",
+    "isolated_152": {
+      "host": "152.136.236.238",
+      "image": "ptmove-nexus:1.0.12",
+      "image_id": "sha256:d8a7da81fbce7d9f8a0a351830d124cc68b954d94642eaab7530a6f54c410f61",
+      "image_archive_bytes": 835693284,
+      "image_archive_sha256": "280375fb2fc982b96e3975a17c91582004d16f7365d6ff32909d2d15ca75c190",
+      "network": "none",
+      "host_directory": "/opt/gpt-ptmove-nexus/releases/site-upload-limit-261126",
+      "production_container_updated": false
+    },
+    "production_ovh": {
+      "host": "149.202.66.152",
+      "url": "https://starpt.star1999.de/plugins",
+      "image": "ptmove-nexus:1.0.12-ovh.1",
+      "image_id": "sha256:9ea6aa5444c5b42efbdb42e40c8aa04e6158b5f3fc4fdc66809d3cb1d698171f",
+      "rollback_container": "starpt-v111-rollback",
+      "rollback_directory": "/project/GPT-PTMOVE/releases/site-upload-limit-261126",
+      "feed_enabled": true,
+      "cleanup_enabled": true,
+      "use_site_upload_limit": false,
+      "site_upload_limit_mbps": 90,
+      "downloader_connection_reverified": true,
+      "public_assets_verified": 5,
+      "public_ui_verified": true
+    },
+    "server_binary_sha256": "ab83a98670bd74416cfb23e2f35a8b14a4aac4c539714f8596e6ed34dc5f87ca",
+    "site_upload_limit_verified": true
+  },
   "release_v1_0_11": {
     "version": "1.0.11",
     "architecture": "linux/amd64",

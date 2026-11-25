@@ -1133,6 +1133,7 @@ type TaggedQBTorrent struct {
 	SavePath    string   `json:"save_path"`
 	UploadBPS   *int64   `json:"upspeed"`
 	Uploaded    *int64   `json:"uploaded"`
+	UpLimit     *int64   `json:"up_limit"`
 	SeedingTime *int64   `json:"seeding_time"`
 }
 

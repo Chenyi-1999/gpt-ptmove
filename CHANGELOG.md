@@ -705,3 +705,13 @@
 - D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。已核对 74 个 OCI 对象并登记归档索引。ZIP SHA-256 4a1748c4b288516d817314b9c161a471d9b632959b789828d19eb54dd2e52a04。
 - 腾讯 152 使用同一发行镜像的断网容器，实测 2000 能通过原生 API 保存及回读，RSS 循环保持关闭。
 - OVH 生产运行 v1.0.11，RSS 循环以不限任务数量运行。腾讯 152 生产容器保持原部署。本条与 docs/DEPLOYMENT.json 为独立回执提交，标签不变。未访问 81，未重新发种。
+
+## PTM-20261126-TJUPT-V111-RECEIPT-SYNC — 2026-11-26T06:40:02+08:00 — Codex root，发行回执后续同步
+
+- v1.0.11 的代码标签和发行附件已在 Gitee 和 GitHub 私有仓库验证。回执提交 3f4701c9e50f4c5b38f5a97299cc755c897335b0 已推送 Gitee。GitHub 的回执推送尝试在默认配置、OpenSSL 与 HTTP/1.1 下均遇到 TLS 断开或超时，官方 API 复核其主分支仍指向发行提交 b86376946064e304d859d00291b49d6da57b19c8。待 GitHub Git 传输恢复后只补推回执。此条仅本地记录，无部署变更。
+
+## PTM-20261126-OVH-TJUPT-UPLOAD-LIMIT — 2026-11-26T06:59:39+08:00 — Codex root、site_upload_limit_core、site_upload_limit_qb、site_upload_limit_ui，北洋园 RSS 站点上传限速开关
+
+- 修改 nexus/server/internal/service/migrationflow/tjupt_feed*.go、internal/repository/tjupt_feed_repository.go、internal/service/downloaderclient、internal/http/handler/tjupt_feed_handler.go 与 nexus/webui/src/components/plugins/TjuptRssPanel.vue。插件新增默认关闭的即时保存开关。启用时，正式运行和试运行向 qB 新加任务前读取设置中的北洋园上传限速。修改站点设置后下一次添加即使用新值。原有任务、下载限速和自动退种阈值保持。缺少唯一有效站点配置时阻止加种。同步 API、插件、发行文档、版本、Compose 和前端 dist。
+- Linux Go 1.23 全量测试、Vue 类型检查、定向 ESLint、Vite 构建和差异检查通过。模拟 qB 核对上传限速回读、无限速省略、失败不盲重试。桌面 1440 与手机 390 像素验证即时启停及状态回显。两地断网容器验证默认值、运行中独立保存、站点值实时回读、常规保存不覆盖开关及认证。
+- OVH 已部署 ptmove-nexus:1.0.12-ovh.1，公网版本、资源及插件页核对通过，当前设置 90 MB/s，开关保持默认关闭。RSS 循环和原清理设置恢复运行，原数据目录保持。腾讯 152 对 ptmove-nexus:1.0.12 做隔离验证与完整镜像归档，镜像 835693284 字节，SHA-256 280375fb2fc982b96e3975a17c91582004d16f7365d6ff32909d2d15ca75c190，生产容器未替换。未手工实际加种、重新发种或访问 81。记录时提交及双仓发行待完成。

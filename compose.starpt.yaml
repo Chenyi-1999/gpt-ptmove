@@ -3,7 +3,7 @@ name: starpt
 
 services:
   starpt:
-    image: ptmove-nexus:1.0.11
+    image: ptmove-nexus:1.0.12
     pull_policy: never
     restart: unless-stopped
     ports:

@@ -50,6 +50,8 @@
 
 插件页的北洋园 RSS 循环由 `internal/http/handler/tjupt_feed_handler.go` 暴露，`internal/service/migrationflow/tjupt_feed*.go` 编排试运行与正式投种，`internal/repository/tjupt_feed_repository.go` 持久化配置、运行租约和任务记录。下载器使用现有的直连 qB 配置。旧版签名调度仍由 `internal/service/migrationflow/tjupt_automation*.go` 和独立台账提供兼容，两个调度入口互斥。
 
+北洋园插件的上传限速开关使用独立接口保存。新任务加种时从现有站点设置读取上传限速，由 `internal/service/downloaderclient` 写入该 qB 任务。用户可在 RSS 循环运行时调整开关。
+
 正式循环可按插件配置判断低速退种。H&R 同一记录的二次达标确认及低速窗口由 `internal/service/migrationflow/tjupt_feed*.go` 编排和持久化，`internal/service/downloaderclient` 在调用原生 qB 移除前复查任务归属、Tracker 和实时速度，保留下载文件。
 
 ### 3.2 `internal/config`

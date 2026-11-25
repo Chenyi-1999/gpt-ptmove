@@ -31,6 +31,20 @@ func registerTjuptFeed(g *gin.RouterGroup, feed *migrationflow.TjuptFeed, transi
 		}
 		view(c)
 	})
+	g.POST("/upload-limit", func(c *gin.Context) {
+		var input struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if c.ShouldBindJSON(&input) != nil || input.Enabled == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "请选择开启或关闭站点上传限速"})
+			return
+		}
+		if err := feed.SetSiteUploadLimit(c.Request.Context(), *input.Enabled); err != nil {
+			tjuptFeedError(c, err, http.StatusServiceUnavailable, "站点上传限速开关暂无法保存")
+			return
+		}
+		view(c)
+	})
 	g.POST("/trial", func(c *gin.Context) {
 		if !lockTjuptTransition(c, transition) {
 			return

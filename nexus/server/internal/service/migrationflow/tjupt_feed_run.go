@@ -24,7 +24,7 @@ const tjuptFeedPendingSeconds = 600
 
 type tjuptFeedDownloader interface {
 	TjuptFeedTorrents(context.Context, []string) (map[string]downloaderclient.TaggedQBTorrent, error)
-	AddTjuptFeedTorrent(context.Context, []byte, string, string, bool, []string, string, string) (*downloaderclient.TaggedQBTorrent, error)
+	AddTjuptFeedTorrent(context.Context, []byte, string, string, bool, []string, string, string, int) (*downloaderclient.TaggedQBTorrent, error)
 	ResumeTjuptFeedTorrent(context.Context, string, int64, string, string) (*downloaderclient.TaggedQBTorrent, error)
 	RemoveTjuptFeedTorrent(context.Context, string, int64, string, int64) error
 }
@@ -87,8 +87,8 @@ func (f *TjuptFeed) runCycle(ctx context.Context, row repository.TjuptFeedContro
 		return TjuptFeedResult{Message: "旧版北洋园任务尚未结束，本轮未投种"}, err
 	}
 	scope := tjuptFeedDigest(d.ID, d.Host, d.Username)
-	guard := func() error {
-		if err := f.repo.Verify(ctx, lease, trial, time.Now().Unix()); err != nil {
+	guard := func(uploadLimitRevision *int64) error {
+		if err := f.repo.Verify(ctx, lease, trial, time.Now().Unix(), uploadLimitRevision); err != nil {
 			return err
 		}
 		current, err := f.plugin.downloader(cfg.DownloaderID)
@@ -99,7 +99,11 @@ func (f *TjuptFeed) runCycle(ctx context.Context, row repository.TjuptFeedContro
 		return f.checkLegacy(ctx)
 	}
 	cycle := tjuptFeedCycle{
-		cfg: cfg, repo: f.repo, downloader: f.connect(d, guard), lease: lease, trial: trial, scope: scope,
+		cfg: cfg, repo: f.repo, downloader: f.connect(d, func() error { return guard(nil) }), lease: lease, trial: trial, scope: scope,
+		useSiteUploadLimit: row.UseSiteUploadLimit,
+		newAdder: func() tjuptFeedDownloader {
+			return f.connect(d, func() error { return guard(&row.SiteUploadLimitRevision) })
+		},
 		trialScope: tjuptFeedDigest(scope, cfg.rss, cfg.Tags, cfg.Category, cfg.SavePath,
 			fmt.Sprintf("%g/%g/%g/%d", cfg.MinGiB, cfg.MaxGiB, cfg.TotalLimitGiB, cfg.ActiveLimit)),
 	}
@@ -122,20 +126,22 @@ func (f *TjuptFeed) runCycle(ctx context.Context, row repository.TjuptFeedContro
 }
 
 type tjuptFeedCycle struct {
-	cfg            tjuptFeedConfig
-	repo           *repository.TjuptFeedRepository
-	downloader     tjuptFeedDownloader
-	lease          string
-	scope          string
-	trialScope     string
-	trial          bool
-	used           int64
-	active         int
-	resumed        int
-	held           int
-	resumeFailed   int
-	cleanup        *tjuptFeedCleanup
-	cleanupMessage string
+	cfg                tjuptFeedConfig
+	repo               *repository.TjuptFeedRepository
+	downloader         tjuptFeedDownloader
+	lease              string
+	scope              string
+	trialScope         string
+	trial              bool
+	used               int64
+	active             int
+	resumed            int
+	held               int
+	resumeFailed       int
+	cleanup            *tjuptFeedCleanup
+	cleanupMessage     string
+	useSiteUploadLimit bool
+	newAdder           func() tjuptFeedDownloader
 }
 
 func (c *tjuptFeedCycle) execute(ctx context.Context, site tjuptAcquisition, fetchRSS bool) (result TjuptFeedResult, runErr error) {
@@ -244,6 +250,14 @@ func (c *tjuptFeedCycle) execute(ctx context.Context, site tjuptAcquisition, fet
 }
 
 func (c *tjuptFeedCycle) add(ctx context.Context, sourceID string, meta tjupt.Torrent, limit int64, result *TjuptFeedResult) (string, error) {
+	uploadLimitMBps := 0
+	if c.useSiteUploadLimit {
+		var err error
+		uploadLimitMBps, err = tjuptSiteUploadLimit(ctx, c.repo)
+		if err != nil {
+			return "无法读取北洋园站点上传限速，本轮未继续投种", nil
+		}
+	}
 	random, err := tjuptFeedRandomID()
 	if err != nil {
 		return "无法生成投种回执标识，本轮已停止", err
@@ -263,8 +277,8 @@ func (c *tjuptFeedCycle) add(ctx context.Context, sourceID string, meta tjupt.To
 		result.Skipped++
 		return "", nil
 	}
-	receipt, err := c.downloader.AddTjuptFeedTorrent(ctx, meta.Data, task.Hash+".torrent",
-		c.cfg.SavePath, c.trial, append(tjuptFeedTags(c.cfg.Tags), task.Marker), c.cfg.Category, task.Hash)
+	receipt, err := c.newAdder().AddTjuptFeedTorrent(ctx, meta.Data, task.Hash+".torrent",
+		c.cfg.SavePath, c.trial, append(tjuptFeedTags(c.cfg.Tags), task.Marker), c.cfg.Category, task.Hash, uploadLimitMBps)
 	if err == nil && (!tjuptFeedReceiptMatches(task, receipt) || (c.trial && !receipt.TjuptFeedStopped()) ||
 		(!c.trial && !receipt.TjuptFeedStarted())) {
 		err = downloaderclient.ErrTjuptFeedUnconfirmed
@@ -286,7 +300,7 @@ func (c *tjuptFeedCycle) add(ctx context.Context, sourceID string, meta tjupt.To
 			return "本轮无法更新投种台账", releaseErr
 		}
 		if errors.Is(err, repository.ErrTjuptFeedLease) {
-			return "本轮已停止，未继续投种", nil
+			return "运行状态或上传限速开关已变更，本轮未继续投种", nil
 		}
 		result.Failed++
 		return "qB 未能接收新任务，请检查下载器连接或配置", nil

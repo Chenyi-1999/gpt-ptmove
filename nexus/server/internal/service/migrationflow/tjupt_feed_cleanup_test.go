@@ -70,7 +70,7 @@ func newTjuptCleanupFixture(t *testing.T) *tjuptCleanupFixture {
 		task.Hash: {Hash: task.Hash, AddedOn: task.AddedOn, State: "stalledUP", Progress: &progress,
 			Tags: tjuptTag + ", " + task.Marker, Tracker: "https://tracker.tjupt.org/announce", UploadBPS: &speed, Uploaded: &uploaded},
 	}}
-	qb.guard = func() error { return feed.repo.Verify(ctx, lease, false, time.Now().Unix()) }
+	qb.guard = func() error { return feed.repo.Verify(ctx, lease, false, time.Now().Unix(), nil) }
 	code := 20
 	return &tjuptCleanupFixture{
 		feed: feed, qb: qb, task: task, lease: lease, sampleAt: started, firstRunAt: started,

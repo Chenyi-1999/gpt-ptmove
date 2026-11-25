@@ -38,6 +38,7 @@ type FeedSettings = {
   cleanup_enabled: boolean
   upload_threshold_kib: number
   low_speed_minutes: number
+  use_site_upload_limit?: boolean
 }
 type RunResult = {
   added: number
@@ -51,11 +52,12 @@ type FeedState = {
   running: boolean
   rss_configured: boolean
   hnr_configured: boolean
+  site_upload_limit_mbps: number | null
   last_run_at?: string
   last_message?: string
   last_result?: RunResult | null
 }
-type Action = 'save' | 'refresh' | 'trial' | 'start' | 'stop' | 'preview' | 'status'
+type Action = 'save' | 'refresh' | 'trial' | 'start' | 'stop' | 'preview' | 'status' | 'upload-limit'
 
 const downloaders = ref<Downloader[]>([])
 const feed = ref<FeedState | null>(null)
@@ -69,6 +71,7 @@ const loading = ref(true)
 const busy = ref<Action | null>(null)
 const loadError = ref('')
 const configError = ref('')
+const uploadLimitError = ref('')
 const runError = ref('')
 const previewError = ref('')
 const statusError = ref('')
@@ -257,6 +260,27 @@ async function toggleRun() {
   }
 }
 
+async function toggleSiteUploadLimit() {
+  if (busy.value || !feed.value) return
+  const enabled = !feed.value.settings.use_site_upload_limit
+  busy.value = 'upload-limit'
+  uploadLimitError.value = ''
+  try {
+    // This setting is saved independently so unrelated unsaved form changes stay intact.
+    feed.value = await request<FeedState>('/feed/upload-limit', 'POST', { enabled })
+  } catch (error) {
+    uploadLimitError.value = errorMessage(error, '更新站点上传限速失败。')
+  } finally {
+    busy.value = null
+  }
+}
+
+const siteUploadLimitLabel = computed(() => {
+  const value = feed.value?.site_upload_limit_mbps
+  if (value == null) return '暂不可读取'
+  return value === 0 ? '不限速' : `${value} MB/s`
+})
+
 async function preview() {
   if (busy.value || !feed.value?.rss_configured) return
   busy.value = 'preview'
@@ -438,6 +462,32 @@ onUnmounted(() => window.clearInterval(pollTimer))
         </div>
         <p v-if="configError" class="panel-message panel-error" role="alert">{{ configError }}</p>
       </form>
+
+      <section class="panel-card upload-limit-card" aria-labelledby="tjupt-upload-limit-heading">
+        <div class="section-heading">
+          <div>
+            <h3 id="tjupt-upload-limit-heading">站点上传限速</h3>
+            <p class="help-text">使用北洋园站点设置中的上传限速（当前：{{ siteUploadLimitLabel }}）。<RouterLink to="/settings/cookie">前往站点管理</RouterLink></p>
+          </div>
+          <span class="status-pill" :class="feed.settings.use_site_upload_limit ? 'status-safe' : 'status-muted'" role="status">
+            {{ feed.settings.use_site_upload_limit ? '已开启' : '已关闭' }}
+          </span>
+        </div>
+        <p class="help-text">适用于正式运行和试运行新加入 qB 的任务，仅限制上传，不改变已有任务。</p>
+        <div class="action-row">
+          <button
+            class="action-button"
+            :class="feed.settings.use_site_upload_limit ? 'action-secondary' : ''"
+            type="button"
+            :aria-pressed="feed.settings.use_site_upload_limit"
+            :aria-disabled="!!busy"
+            @click="toggleSiteUploadLimit"
+          >
+            {{ busy === 'upload-limit' ? '保存中…' : feed.settings.use_site_upload_limit ? '关闭限速' : '开启限速' }}
+          </button>
+        </div>
+        <p v-if="uploadLimitError" class="panel-message panel-error" role="alert">{{ uploadLimitError }}</p>
+      </section>
 
       <section class="panel-card" aria-labelledby="tjupt-run-heading">
         <div class="section-heading">

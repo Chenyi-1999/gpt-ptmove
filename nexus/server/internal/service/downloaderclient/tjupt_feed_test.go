@@ -39,12 +39,16 @@ func TestTjuptFeedNativeAdd(t *testing.T) {
 		trial           bool
 		legacy          bool
 		outcome         string
+		uploadLimitMBps int
 		wantUnconfirmed bool
 		wantReadback    bool
 	}{
 		{name: "qB 5.3.1 stopped, JSON ack", trial: true, wantReadback: true},
 		{name: "qB 4.x paused, fixed ack", trial: true, legacy: true, wantReadback: true},
 		{name: "qB 5.3.1 normal download", wantReadback: true},
+		{name: "positive upload cap", trial: true, uploadLimitMBps: 2, wantReadback: true},
+		{name: "upload cap readback mismatch", uploadLimitMBps: 2, outcome: "wrong upload limit", wantUnconfirmed: true, wantReadback: true},
+		{name: "upload cap disabled", uploadLimitMBps: 0, wantReadback: true},
 		{name: "native ack for another hash", outcome: "wrong ack", wantUnconfirmed: true},
 		{name: "legacy negative ack", trial: true, legacy: true, outcome: "bad ack", wantUnconfirmed: true},
 		{name: "trial returns downloading", trial: true, outcome: "wrong state", wantUnconfirmed: true, wantReadback: true},
@@ -80,6 +84,7 @@ func TestTjuptFeedNativeAdd(t *testing.T) {
 						return
 					}
 					state, category, tags, returnedHash := replyState, tjuptMockCategory, "starpt-tjupt, seeding, "+tjuptMockMarker, hash
+					upLimit := int64(tc.uploadLimitMBps * 1024 * 1024)
 					switch tc.outcome {
 					case "wrong state":
 						state = "downloading"
@@ -89,8 +94,10 @@ func TestTjuptFeedNativeAdd(t *testing.T) {
 						tags = "starpt-tjupt, seeding"
 					case "wrong hash":
 						returnedHash = otherHash
+					case "wrong upload limit":
+						upLimit++
 					}
-					tjuptMockTorrents(w, returnedHash, state, tags, category)
+					_ = json.NewEncoder(w).Encode([]TaggedQBTorrent{{Hash: returnedHash, State: state, Tags: tags, Category: category, AddedOn: tjuptMockAddedOn, UpLimit: &upLimit}})
 				case "POST /api/v2/torrents/add":
 					posts.Add(1)
 					pausedFlag := fmt.Sprint(tc.trial)
@@ -106,6 +113,13 @@ func TestTjuptFeedNativeAdd(t *testing.T) {
 						if got := r.MultipartForm.Value[key]; len(got) != 1 || got[0] != want {
 							t.Errorf("%s = %q, want %q", key, got, want)
 						}
+					}
+					wantUpLimit := ""
+					if tc.uploadLimitMBps > 0 {
+						wantUpLimit = fmt.Sprint(tc.uploadLimitMBps * 1024 * 1024)
+					}
+					if got := r.MultipartForm.Value["upLimit"]; wantUpLimit == "" && len(got) != 0 || wantUpLimit != "" && (len(got) != 1 || got[0] != wantUpLimit) {
+						t.Errorf("upLimit = %q, want %q (empty means omitted)", got, wantUpLimit)
 					}
 					if r.FormValue("savepath") != "" || r.FormValue("autoTMM") != "" {
 						t.Error("plugin should allow the selected category to determine its save path")
@@ -140,7 +154,7 @@ func TestTjuptFeedNativeAdd(t *testing.T) {
 			}))
 			defer server.Close()
 			d := Downloader{Type: "qbittorrent", Enabled: true, Host: server.URL, APIKey: "fake-tjupt-token"}
-			result, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", tc.trial, []string{"seeding", tjuptMockMarker, "starpt-tjupt"}, tjuptMockCategory, strings.ToUpper(hash))
+			result, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", tc.trial, []string{"seeding", tjuptMockMarker, "starpt-tjupt"}, tjuptMockCategory, strings.ToUpper(hash), tc.uploadLimitMBps)
 			if tc.wantUnconfirmed {
 				if !errors.Is(err, ErrTjuptFeedUnconfirmed) || result != nil {
 					t.Errorf("result = %+v, err = %v, want unconfirmed", result, err)
@@ -177,15 +191,15 @@ func TestTjuptFeedRejectsWritesBeforeDispatch(t *testing.T) {
 	}))
 	defer server.Close()
 	d := Downloader{Type: "qbittorrent", Enabled: true, Host: server.URL, APIKey: "unrelated-fixture-token"}
-	if _, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", strings.Repeat("a", 40)); err == nil || calls.Load() != 0 {
+	if _, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", strings.Repeat("a", 40), 0); err == nil || calls.Load() != 0 {
 		t.Fatalf("invalid metainfo hash reached qB: %v", err)
 	}
-	if _, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", hash); !errors.Is(err, ErrTjuptFeedAlreadyExists) || calls.Load() != 1 {
+	if _, err := d.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", hash, 0); !errors.Is(err, ErrTjuptFeedAlreadyExists) || calls.Load() != 1 {
 		t.Fatalf("manual qB task did not block add: %v", err)
 	}
 	deny := errors.New("schedule disabled")
 	guarded := d.WithEffectGuard(func() error { return deny })
-	if _, err := guarded.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", hash); !errors.Is(err, deny) || calls.Load() != 2 {
+	if _, err := guarded.AddTjuptFeedTorrent(context.Background(), meta, "fixture.torrent", "", false, nil, "", hash, 0); !errors.Is(err, deny) || calls.Load() != 2 {
 		t.Fatalf("disabled schedule did not prevent write: %v", err)
 	}
 }

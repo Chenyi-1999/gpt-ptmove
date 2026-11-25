@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.11"
+const forkVersion = "1.0.12"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-26",
+				"changes": []string{"北洋园插件增加站点上传限速开关，新加种可读取站点管理页的上传限速"},
+			},
+			{
+				"version": "1.0.11",
 				"date":    "2026-11-26",
 				"changes": []string{"北洋园插件支持不限在管任务数，保留总容量和单种体积规则", "超过 50 个种子也可以查询 H&R"},
 			},
