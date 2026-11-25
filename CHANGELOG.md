@@ -715,3 +715,10 @@
 - 修改 nexus/server/internal/service/migrationflow/tjupt_feed*.go、internal/repository/tjupt_feed_repository.go、internal/service/downloaderclient、internal/http/handler/tjupt_feed_handler.go 与 nexus/webui/src/components/plugins/TjuptRssPanel.vue。插件新增默认关闭的即时保存开关。启用时，正式运行和试运行向 qB 新加任务前读取设置中的北洋园上传限速。修改站点设置后下一次添加即使用新值。原有任务、下载限速和自动退种阈值保持。缺少唯一有效站点配置时阻止加种。同步 API、插件、发行文档、版本、Compose 和前端 dist。
 - Linux Go 1.23 全量测试、Vue 类型检查、定向 ESLint、Vite 构建和差异检查通过。模拟 qB 核对上传限速回读、无限速省略、失败不盲重试。桌面 1440 与手机 390 像素验证即时启停及状态回显。两地断网容器验证默认值、运行中独立保存、站点值实时回读、常规保存不覆盖开关及认证。
 - OVH 已部署 ptmove-nexus:1.0.12-ovh.1，公网版本、资源及插件页核对通过，当前设置 90 MB/s，开关保持默认关闭。RSS 循环和原清理设置恢复运行，原数据目录保持。腾讯 152 对 ptmove-nexus:1.0.12 做隔离验证与完整镜像归档，镜像 835693284 字节，SHA-256 280375fb2fc982b96e3975a17c91582004d16f7365d6ff32909d2d15ca75c190，生产容器未替换。未手工实际加种、重新发种或访问 81。记录时提交及双仓发行待完成。
+
+## PTM-20261126-TJUPT-V112-PUBLISHED — 2026-11-26T07:05:16+08:00 — Codex root，北洋园站点上传限速开关双仓发行回执
+
+- v1.0.12 在 Gitee 与 GitHub 私有仓库指向 5c2ebd7d28cde7883d99da79c70612d7f3d14ed5。GitHub 发行 458742314 已附腾讯 152 隔离验证过的完整镜像、Compose 与校验文件，均核对字节数与 SHA-256。Gitee 发行 1369176 的 Compose、校验文件重新下载核验一致，并提供 GitHub 完整镜像入口。
+- D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。已核对 77 个 OCI 对象并登记归档索引。ZIP SHA-256 f376f874ac18997f0259d9cd485e7c47497beb16d200c4256b60ed4ff00d5b28。
+- 腾讯 152 使用同一发行镜像的断网容器实测限速开关和已保存的站点设置，隔离实例的 RSS 循环保持关闭。
+- OVH 生产运行 v1.0.12，限速开关按默认关闭，页面读取现有站点值。腾讯 152 生产容器保持原部署。本条与 docs/DEPLOYMENT.json 为独立回执提交，标签不变。未访问 81，未重新发种。
