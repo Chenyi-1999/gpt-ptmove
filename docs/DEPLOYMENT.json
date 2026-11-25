@@ -42,7 +42,67 @@
       "verified_qb_tasks": 9
     },
     "server_binary_sha256": "8cb32090099aa50a82fc67678fe28ff4a27ea8f3fbe802ece84ad7643dac60e9",
-    "unlimited_count_verified": true
+    "unlimited_count_verified": true,
+    "publish_receipt": {
+      "released_at": "2026-11-26T06:37:41+08:00",
+      "tag": "v1.0.11",
+      "source_commit": "b86376946064e304d859d00291b49d6da57b19c8",
+      "isolated_saved_and_reread_active_limit": 2000,
+      "github": {
+        "id": 458723321,
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.11",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "size": 499,
+            "digest": "sha256:23fdc5124e88b46b8129a5119e4540c72473c49b6d1e88504758d2539b9eba8e",
+            "id": 793406611
+          },
+          {
+            "name": "starpt-v1.0.11-linux-amd64.tar.gz.sha256",
+            "size": 101,
+            "digest": "sha256:d981230c6b1d4be3f23881a7bf6f499269704c62c9d633900779733d8829cbd5",
+            "id": 793406612
+          },
+          {
+            "name": "starpt-v1.0.11-linux-amd64.tar.gz",
+            "size": 815289830,
+            "digest": "sha256:7204af4528d9507af36bf2ac4bab678fd274a9aafd278dd6c083778c0167ef02",
+            "id": 793406758
+          }
+        ],
+        "published_at": "2026-11-25T22:37:22Z"
+      },
+      "gitee": {
+        "id": 1369152,
+        "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.11",
+        "assets": [
+          {
+            "id": 3835463,
+            "name": "compose.starpt.yaml",
+            "size": 499,
+            "sha256": "23fdc5124e88b46b8129a5119e4540c72473c49b6d1e88504758d2539b9eba8e"
+          },
+          {
+            "id": 3835464,
+            "name": "starpt-v1.0.11-linux-amd64.tar.gz.sha256",
+            "size": 101,
+            "sha256": "d981230c6b1d4be3f23881a7bf6f499269704c62c9d633900779733d8829cbd5"
+          }
+        ]
+      },
+      "local_archive": {
+        "project": "GPT-PTMOVE",
+        "timestamp": "2026-11-26T06:34:10.441284+08:00",
+        "type": "历史发布",
+        "version": "v1.0.11",
+        "path": "GPT-PTMOVE__2026-11-26_063410__历史发布__STARPT-v1.0.11.zip",
+        "bytes": 832523558,
+        "sha256": "4a1748c4b288516d817314b9c161a471d9b632959b789828d19eb54dd2e52a04",
+        "oci_blobs_verified": 74,
+        "source_commit": "b86376946064e304d859d00291b49d6da57b19c8"
+      }
+    }
   },
   "release_v1_0_10": {
     "version": "1.0.10",
