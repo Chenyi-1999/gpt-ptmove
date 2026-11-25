@@ -17,7 +17,10 @@ import (
 	acquirefetch "github.com/pt-nexus/server/internal/service/acquire/fetch"
 )
 
-const tjuptFeedScopeTag = "starpt-tjupt"
+const (
+	tjuptFeedScopeTag      = "starpt-tjupt"
+	tjuptFeedHashBatchSize = 64
+)
 
 // ErrTjuptFeedAlreadyExists 表示提交前发现 qB 内已有此哈希，没有加种。
 var ErrTjuptFeedAlreadyExists = errors.New("qB 中已存在此种子")
@@ -40,6 +43,110 @@ func (d Downloader) TjuptFeedTorrent(ctx context.Context, hash string) (*TaggedQ
 	}
 	defer client.client.CloseIdleConnections()
 	return client.tjuptFeedTorrent(ctx, hash)
+}
+
+// TjuptFeedTorrents 按哈希分批读取 qB 状态。所有批次确认后才返回完整结果，键为小写哈希。
+func (d Downloader) TjuptFeedTorrents(ctx context.Context, hashes []string) (map[string]TaggedQBTorrent, error) {
+	normalized := make([]string, 0, len(hashes))
+	requested := make(map[string]int, len(hashes))
+	for i, hash := range hashes {
+		hash, valid := normalizeTjuptFeedHash(hash)
+		if !valid {
+			return nil, errors.New("北洋园种子哈希无效")
+		}
+		if _, exists := requested[hash]; exists {
+			return nil, errors.New("北洋园请求包含重复种子哈希")
+		}
+		requested[hash] = i / tjuptFeedHashBatchSize
+		normalized = append(normalized, hash)
+	}
+	matches := make(map[string]TaggedQBTorrent, len(hashes))
+	if len(normalized) == 0 {
+		return matches, nil
+	}
+	client, err := d.newPluginQB()
+	if err != nil {
+		return nil, err
+	}
+	defer client.client.CloseIdleConnections()
+	batchIndex := 0
+	for batch := range slices.Chunk(normalized, tjuptFeedHashBatchSize) {
+		query := url.Values{"hashes": {strings.Join(batch, "|")}}
+		rows, err := client.tjuptFeedTorrentRows(ctx, query, len(batch))
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			hash := strings.ToLower(row.Hash)
+			index, expected := requested[hash]
+			if !expected || index != batchIndex {
+				return nil, errors.New("qB 返回了当前批次之外的种子哈希")
+			}
+			if _, duplicate := matches[hash]; duplicate {
+				return nil, errors.New("qB 返回了重复的种子哈希")
+			}
+			matches[hash] = row
+		}
+		batchIndex++
+	}
+	return matches, nil
+}
+
+// TjuptFeedTaggedTorrents 分页读取指定标签的全部任务，保留用户手动打标的任务。
+// 相邻页多取一条核对分页边界。遇到重复、顺序变化或请求失败时不返回部分结果。
+func (d Downloader) TjuptFeedTaggedTorrents(ctx context.Context, tag string) ([]TaggedQBTorrent, error) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" || strings.ContainsRune(tag, ',') || strings.IndexFunc(tag, unicode.IsControl) >= 0 {
+		return nil, errors.New("qB 标签无效")
+	}
+	client, err := d.newPluginQB()
+	if err != nil {
+		return nil, err
+	}
+	defer client.client.CloseIdleConnections()
+	pageSize := tjuptFeedHashBatchSize
+	matches := make([]TaggedQBTorrent, 0, pageSize)
+	var previous, next string
+	for offset := 0; ; offset += pageSize {
+		query := url.Values{
+			"tag": {tag}, "sort": {"hash"},
+			"limit": {strconv.Itoa(pageSize + 1)}, "offset": {strconv.Itoa(offset)},
+		}
+		rows, err := client.tjuptFeedTorrentRows(ctx, query, pageSize+1)
+		if err != nil {
+			return nil, err
+		}
+		if next != "" && (len(rows) == 0 || !strings.EqualFold(rows[0].Hash, next)) {
+			return nil, errors.New("qB 标签列表在分页时发生变化，请重试")
+		}
+		last := previous
+		for _, row := range rows {
+			hash := strings.ToLower(row.Hash)
+			if len(hash) != 40 || !isTjuptFeedHex(hash) || hash <= last ||
+				!slices.Contains(compactStrings(strings.Split(row.Tags, ",")), tag) {
+				return nil, errors.New("qB 未确认标签列表的哈希或标签")
+			}
+			last = hash
+		}
+		if len(rows) <= pageSize {
+			return append(matches, rows...), nil
+		}
+		previous = strings.ToLower(rows[pageSize-1].Hash)
+		next = last
+		matches = append(matches, rows[:pageSize]...)
+	}
+}
+
+func (client *qbClient) tjuptFeedTorrentRows(ctx context.Context, query url.Values, maxRows int) ([]TaggedQBTorrent, error) {
+	body, err := client.pluginRequest(ctx, http.MethodGet, "torrents/info?"+query.Encode(), "", nil)
+	if err != nil {
+		return nil, err
+	}
+	var rows []TaggedQBTorrent
+	if json.Unmarshal(body, &rows) != nil || rows == nil || len(rows) > maxRows {
+		return nil, errors.New("qB 未确认种子列表查询结果")
+	}
+	return rows, nil
 }
 
 // AddTjuptFeedTorrent 通过原生 qB API 提交单个已验证的北洋园种子。试运行以停止状态入队。

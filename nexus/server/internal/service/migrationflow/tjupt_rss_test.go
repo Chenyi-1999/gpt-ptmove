@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -20,9 +21,10 @@ import (
 )
 
 type fakeTjuptSite struct {
-	record tjupt.Assessment
-	fail   bool
-	reads  int
+	record  tjupt.Assessment
+	fail    bool
+	reads   int
+	batches []int
 }
 
 func (f *fakeTjuptSite) Preview(context.Context, string, int) ([]tjupt.Candidate, error) {
@@ -31,10 +33,67 @@ func (f *fakeTjuptSite) Preview(context.Context, string, int) ([]tjupt.Candidate
 
 func (f *fakeTjuptSite) Status(_ context.Context, _ string, hashes []string) (map[string]tjupt.Assessment, error) {
 	f.reads++
+	f.batches = append(f.batches, len(hashes))
 	if f.fail {
 		return nil, errors.New("站点查询失败")
 	}
-	return map[string]tjupt.Assessment{hashes[0]: f.record}, nil
+	records := make(map[string]tjupt.Assessment, len(hashes))
+	for _, hash := range hashes {
+		records[hash] = f.record
+	}
+	return records, nil
+}
+
+func TestTjuptStatusPagesAllTaggedTasksAndBatchesHNR(t *testing.T) {
+	t.Setenv("AUTH_PASSWORD", "mock-ui-password")
+	const taskCount = 109
+	qb := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/torrents/info" ||
+			r.URL.Query().Get("tag") != tjuptTag {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil || offset < 0 || limit < 1 {
+			t.Error("qB tag request must provide a valid page")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		rows := make([]map[string]any, 0)
+		for i := offset; i < min(offset+limit, taskCount); i++ {
+			rows = append(rows, map[string]any{"hash": fmt.Sprintf("%040x", i+1), "tags": tjuptTag,
+				"state": "stalledUP", "progress": 1, "tracker": "https://tracker.tjupt.org/announce"})
+		}
+		_ = json.NewEncoder(w).Encode(rows)
+	}))
+	defer qb.Close()
+
+	cfg, err := config.NewManager(config.RuntimePaths{ConfigFile: filepath.Join(t.TempDir(), "config.json")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := cfg.Get()
+	settings["downloaders"] = []any{map[string]any{
+		"id": "qb", "name": "qB", "type": "qbittorrent", "host": qb.URL, "api_key": "mock-qb-token",
+	}}
+	if err := cfg.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	site := &fakeTjuptSite{record: tjupt.Assessment{Label: "做种考核中"}}
+	service := NewTjuptRSSService(cfg)
+	service.site = site
+
+	items, err := service.Status(context.Background(), "qb", "mock-token")
+	if err != nil || len(items) != taskCount || !slices.Equal(site.batches, []int{50, 50, 9}) {
+		t.Fatalf("expected all %d tasks in bounded batches, got %d, %v, %v", taskCount, len(items), site.batches, err)
+	}
+	for _, item := range items {
+		if item.Assessment.Label != site.record.Label {
+			t.Fatal("H&R record was lost across pages")
+		}
+	}
 }
 
 func TestTjuptPreviewStatusAndRetireUseDifferentEffects(t *testing.T) {

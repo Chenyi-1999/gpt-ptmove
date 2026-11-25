@@ -19,6 +19,8 @@ import (
 const (
 	maxRSSBytes = 2 << 20
 	maxItems    = 500
+	// MaxHNRHashes 是北洋园 API 对单次按哈希查询的限制。
+	MaxHNRHashes = 50
 )
 
 var hashPattern = regexp.MustCompile(`^[a-fA-F0-9]{40}$`)
@@ -130,7 +132,7 @@ func (c *Client) Status(ctx context.Context, token string, hashes []string) (map
 	if token == "" || strings.ContainsAny(token, "\r\n \t") || len(token) > 1024 {
 		return nil, errors.New("H&R API Token 格式无效")
 	}
-	if len(hashes) == 0 || len(hashes) > 50 {
+	if len(hashes) == 0 || len(hashes) > MaxHNRHashes {
 		return nil, errors.New("H&R 查询须包含 1 至 50 个哈希")
 	}
 	requested := make(map[string]bool, len(hashes))

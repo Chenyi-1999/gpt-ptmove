@@ -42,6 +42,7 @@ type TjuptFeedInput struct {
 	HNRToken           string `json:"hnr_token"`
 	ClearRSS           bool   `json:"clear_rss"`
 	ClearHNRToken      bool   `json:"clear_hnr_token"`
+	ActiveLimit        *int   `json:"active_limit"`
 	CleanupEnabled     *bool  `json:"cleanup_enabled"`
 	UploadThresholdKiB *int   `json:"upload_threshold_kib"`
 	LowSpeedMinutes    *int   `json:"low_speed_minutes"`
@@ -162,6 +163,10 @@ func (f *TjuptFeed) Save(ctx context.Context, input TjuptFeedInput) error {
 		return err
 	}
 	s := input.TjuptFeedSettings
+	s.ActiveLimit = current.ActiveLimit
+	if input.ActiveLimit != nil {
+		s.ActiveLimit = *input.ActiveLimit
+	}
 	s.CleanupEnabled, s.UploadThresholdKiB, s.LowSpeedMinutes = current.CleanupEnabled, current.UploadThresholdKiB, current.LowSpeedMinutes
 	if input.CleanupEnabled != nil {
 		s.CleanupEnabled = *input.CleanupEnabled
@@ -369,7 +374,7 @@ func (f *TjuptFeed) updateSecret(current []byte, value string, clear bool) ([]by
 
 func validateTjuptFeedSettings(s TjuptFeedSettings) error {
 	if s.IntervalMinutes < 1 || s.IntervalMinutes > 1440 || !validTjuptSizeRange(s.MinGiB, s.MaxGiB) ||
-		!tjuptNumberIn(s.TotalLimitGiB, 0.1, 20000) || s.ActiveLimit < 1 || s.ActiveLimit > 50 {
+		!tjuptNumberIn(s.TotalLimitGiB, 0.1, 20000) || s.ActiveLimit < 0 {
 		return tjuptFeedConfigError("请核对种子体积、容量、任务数和 RSS 获取间隔")
 	}
 	if s.UploadThresholdKiB < 1 || s.UploadThresholdKiB > 1048576 || s.LowSpeedMinutes < 1 || s.LowSpeedMinutes > 1440 {

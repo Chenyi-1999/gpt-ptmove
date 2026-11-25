@@ -44,7 +44,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-STARPT v1.0.10 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.10 发行说明](docs/RELEASE-v1.0.10.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
+STARPT v1.0.11 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.11 发行说明](docs/RELEASE-v1.0.11.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
 
 ## 初次配置
 

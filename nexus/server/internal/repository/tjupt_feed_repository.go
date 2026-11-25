@@ -201,7 +201,7 @@ func (r *TjuptFeedRepository) SeenSource(ctx context.Context, id string) (bool, 
 	return count > 0, err
 }
 
-// Reserve 在核对租约和容量后登记候选，来源 ID 和哈希均不能重复。
+// Reserve 在核对租约和容量后登记候选，来源 ID 和哈希均不能重复。任务数上限为零时只限制总容量。
 func (r *TjuptFeedRepository) Reserve(ctx context.Context, lease string, now int64, task TjuptFeedTask, limitBytes int64, activeLimit int) (bool, error) {
 	var inserted bool
 	err := r.inLease(ctx, lease, now, func(tx *gorm.DB) error {
@@ -215,7 +215,7 @@ func (r *TjuptFeedRepository) Reserve(ctx context.Context, lease string, now int
 		var occupied struct{ Count, Bytes int64 }
 		err := tx.Model(&TjuptFeedTask{}).Where("scope = ? AND state <> ?", task.Scope, TjuptFeedGone).
 			Select("COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS bytes").Scan(&occupied).Error
-		if err != nil || occupied.Count >= int64(activeLimit) || task.SizeBytes > limitBytes-occupied.Bytes {
+		if err != nil || (activeLimit != 0 && occupied.Count >= int64(activeLimit)) || task.SizeBytes > limitBytes-occupied.Bytes {
 			return err
 		}
 		result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&task)

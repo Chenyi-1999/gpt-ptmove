@@ -686,3 +686,15 @@
 - v1.0.10 在 Gitee 与 GitHub 私有仓库指向 1b863ab6710973307eff18ee463d028084e7c1b9。GitHub 发行 458449049 已附腾讯 152 隔离验证过的完整镜像、Compose 与校验文件，均核对字节数与 SHA-256。Gitee 发行 1368934 的 Compose、校验文件重新下载核验一致，并提供 GitHub 完整镜像入口。
 - D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。已核对 71 个 OCI 对象并登记归档索引。ZIP SHA-256 51a412e182bbce58846849dd8d4762ad4dd341dce05bbd7459ea989e02237f40。
 - OVH 生产持续运行 v1.0.10，腾讯 152 生产容器保持原部署。本条与 docs/DEPLOYMENT.json 为独立回执提交，标签不变。未访问 81 或运行真实加种、发种和退种。
+
+## PTM-20261126-OVH-TJUPT-UNCAP — 2026-11-26T06:33:01+08:00 — Codex root、uncap_feed_core、uncap_qb_bulk、uncap_feed_ui，北洋园 RSS 取消任务数硬上限
+
+- 修改 nexus/server/internal/service/migrationflow/tjupt_feed*.go、internal/repository/tjupt_feed_repository.go 与 nexus/webui/src/components/plugins/TjuptRssPanel.vue。原先允许 1 至 50 项，现接受任意非负整数，0 表示不限数量。省略该字段保留原设置。总容量原子校验、单种体积、重复拦截与 H&R 清理条件继续生效。区分任务数和总容量达到上限的提示。
+- internal/service/downloaderclient/tjupt_feed.go 对台账执行多哈希批量核对。写操作仍逐条重查。internal/service/migrationflow/tjupt_rss.go 和 internal/service/acquire/tjupt/client.go 分页读取 qB 标签内任务，并以每批最多 50 个哈希查询 H&R。批次错误和分页漂移不接受部分结果。同步 API、插件和发行文档、版本、Compose 及发布产物。
+- OVH 断网 Go 1.23 全量测试和编译、两地隔离容器的原生验证、Vue 类型检查、定向 ESLint、Vite 与差异检查通过。定向测试覆盖 0、80、负数、遗漏字段、容量竞争和批次错误，H&R 模拟 109 项分三次查询。Edge 桌面与手机模拟保存 0 和 100000 并验证重新加载。
+- OVH 已部署 ptmove-nexus:1.0.11-ovh.1，用户名凭据与 RSS 保留，原配置的 3 调整为 0 后恢复循环，原 400 GiB 总容量、19 GiB 单种上限及自动清理设置保持。北京时间 06:32 首轮新增 6、失败 0，qB 核对共有 9 项、在管 52.57 GiB。保留原暂停试运行任务。腾讯 152 已隔离验收 ptmove-nexus:1.0.11，未替换其生产容器。未手工添加种子、重新发种或访问 81。记录时发行和双仓更新待完成。
+
+## PTM-20261126-TJUPT-V111-ARTIFACT — 2026-11-26T06:33:36+08:00 — Codex root，北洋园不限任务数完整镜像校验
+
+- 打包腾讯 152 隔离验收的完整 AMD64 镜像和 Compose。镜像 815289830 字节，SHA-256 7204af4528d9507af36bf2ac4bab678fd274a9aafd278dd6c083778c0167ef02。重建归档的 Docker tar 原始哈希与 152 生成的字节一致。更新 docs/DEPLOYMENT.json 和 v1.0.11 发行说明。
+- OVH 已运行本次构建，腾讯 152 只做隔离验收。本版提交和双仓发行的结果另行记录。未访问 81。

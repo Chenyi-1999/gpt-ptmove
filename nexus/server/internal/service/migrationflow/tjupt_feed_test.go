@@ -55,6 +55,8 @@ type tjuptFeedFakeQB struct {
 	removes      []string
 	removeErr    error
 	beforeRemove func()
+	lookupCalls  [][]string
+	lookupErr    error
 }
 
 func (d *tjuptFeedFakeQB) TjuptFeedTorrent(_ context.Context, hash string) (*downloaderclient.TaggedQBTorrent, error) {
@@ -62,6 +64,17 @@ func (d *tjuptFeedFakeQB) TjuptFeedTorrent(_ context.Context, hash string) (*dow
 		return &row, nil
 	}
 	return nil, nil
+}
+
+func (d *tjuptFeedFakeQB) TjuptFeedTorrents(_ context.Context, hashes []string) (map[string]downloaderclient.TaggedQBTorrent, error) {
+	d.lookupCalls = append(d.lookupCalls, append([]string(nil), hashes...))
+	result := make(map[string]downloaderclient.TaggedQBTorrent)
+	for _, hash := range hashes {
+		if row, exists := d.rows[hash]; exists {
+			result[hash] = row
+		}
+	}
+	return result, d.lookupErr
 }
 
 func (d *tjuptFeedFakeQB) AddTjuptFeedTorrent(_ context.Context, _ []byte, _, savePath string, paused bool, tags []string, category, hash string) (*downloaderclient.TaggedQBTorrent, error) {
@@ -152,12 +165,13 @@ func newTjuptFeedTest(t *testing.T) (*gorm.DB, *TjuptRSSService, string) {
 
 func configureTjuptFeedTest(t *testing.T, feed *TjuptFeed) TjuptFeedInput {
 	t.Helper()
+	limit := 1
 	input := TjuptFeedInput{
 		TjuptFeedSettings: TjuptFeedSettings{
 			DownloaderID: "qb", IntervalMinutes: 1, MinGiB: 1, MaxGiB: 2, TotalLimitGiB: 2,
-			ActiveLimit: 1, Category: "RSS", Tags: "seed, personal, seed", SavePath: "/rss",
+			Category: "RSS", Tags: "seed, personal, seed", SavePath: "/rss",
 		},
-		RSSURL: mockTjuptRSS, HNRToken: mockTjuptHNR,
+		RSSURL: mockTjuptRSS, HNRToken: mockTjuptHNR, ActiveLimit: &limit,
 	}
 	if err := feed.Save(context.Background(), input); err != nil {
 		t.Fatal(err)
@@ -281,7 +295,8 @@ func TestTjuptFeedDoesNotRetryAmbiguousAddOrWriteAfterStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := configureTjuptFeedTest(t, feed)
-	input.ActiveLimit, input.TotalLimitGiB = 3, 10
+	limit := 3
+	input.ActiveLimit, input.TotalLimitGiB = &limit, 10
 	if err := feed.Save(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +377,8 @@ func TestTjuptFeedChangedLimitsKeepTrialPausedAndAllowOtherCandidates(t *testing
 	if result, err := feed.Trial(ctx); err != nil || result.Added != 1 {
 		t.Fatalf("cannot create trial: %#v, %v", result, err)
 	}
-	input.ActiveLimit, input.MaxGiB, input.TotalLimitGiB = 2, 1, 3
+	limit := 2
+	input.ActiveLimit, input.MaxGiB, input.TotalLimitGiB = &limit, 1, 3
 	if err := feed.Save(ctx, input); err != nil {
 		t.Fatal(err)
 	}

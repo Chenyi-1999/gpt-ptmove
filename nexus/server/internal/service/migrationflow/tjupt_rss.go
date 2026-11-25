@@ -137,7 +137,7 @@ func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.TaggedQBTorrents(ctx, tjuptTag, "")
+	rows, err := d.TjuptFeedTaggedTorrents(ctx, tjuptTag)
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +161,16 @@ func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string
 	if len(hashes) == 0 {
 		return items, nil
 	}
-	records, err := s.site.Status(ctx, token, hashes)
-	if err != nil {
-		return nil, err
+	records := make(map[string]tjupt.Assessment, len(hashes))
+	for first := 0; first < len(hashes); first += tjupt.MaxHNRHashes {
+		batch := hashes[first:min(first+tjupt.MaxHNRHashes, len(hashes))]
+		found, err := s.site.Status(ctx, token, batch)
+		if err != nil {
+			return nil, err
+		}
+		for hash, assessment := range found {
+			records[hash] = assessment
+		}
 	}
 	for index, hash := range hashes {
 		assessment := records[hash]

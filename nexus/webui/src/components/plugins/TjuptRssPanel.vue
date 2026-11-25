@@ -156,6 +156,10 @@ async function save() {
     configError.value = '最小种子体积不能高于最大种子体积。'
     return
   }
+  if (!Number.isSafeInteger(draft.value.active_limit) || draft.value.active_limit < 0) {
+    configError.value = '在管任务数上限必须是非负整数，填 0 表示不限数量。'
+    return
+  }
   if (
     draft.value.cleanup_enabled &&
     !feed.value?.hnr_configured &&
@@ -379,8 +383,9 @@ onUnmounted(() => window.clearInterval(pollTimer))
             </div>
           </div>
           <label class="field">
-            <span>在管任务数上限</span>
-            <input v-model.number="draft.active_limit" type="number" min="1" max="50" step="1" required />
+            <span>在管任务数上限（0 表示不限数量）</span>
+            <input v-model.number="draft.active_limit" type="number" min="0" step="1" required />
+            <small class="help-text">设置为 0 时不限制同时管理的任务数；正整数表示最多管理的任务数。</small>
           </label>
           <label class="field">
             <span>管理体积上限（GiB）</span>

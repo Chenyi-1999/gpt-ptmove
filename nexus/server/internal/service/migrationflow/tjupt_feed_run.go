@@ -23,7 +23,7 @@ const tjuptFeedMarkerPrefix = "starpt-tjupt-trial-"
 const tjuptFeedPendingSeconds = 600
 
 type tjuptFeedDownloader interface {
-	TjuptFeedTorrent(context.Context, string) (*downloaderclient.TaggedQBTorrent, error)
+	TjuptFeedTorrents(context.Context, []string) (map[string]downloaderclient.TaggedQBTorrent, error)
 	AddTjuptFeedTorrent(context.Context, []byte, string, string, bool, []string, string, string) (*downloaderclient.TaggedQBTorrent, error)
 	ResumeTjuptFeedTorrent(context.Context, string, int64, string, string) (*downloaderclient.TaggedQBTorrent, error)
 	RemoveTjuptFeedTorrent(context.Context, string, int64, string, int64) error
@@ -178,8 +178,12 @@ func (c *tjuptFeedCycle) execute(ctx context.Context, site tjuptAcquisition, fet
 	totalBytes := int64(c.cfg.TotalLimitGiB * tjuptGiB)
 	fetched := 0
 	for _, candidate := range candidates {
-		if c.active >= c.cfg.ActiveLimit || c.used >= totalBytes || totalBytes-c.used < minBytes {
-			result.Message = "已达到任务数或总容量上限"
+		if c.cfg.ActiveLimit > 0 && c.active >= c.cfg.ActiveLimit {
+			result.Message = "已达到在管任务数上限"
+			break
+		}
+		if c.used >= totalBytes || totalBytes-c.used < minBytes {
+			result.Message = "已达到在管总容量上限"
 			break
 		}
 		if fetched >= 8 || (c.trial && result.Added > 0) {
@@ -204,8 +208,13 @@ func (c *tjuptFeedCycle) execute(ctx context.Context, site tjuptAcquisition, fet
 			result.Failed++
 			continue
 		}
-		if meta.SizeBytes < minBytes || meta.SizeBytes > maxBytes || meta.SizeBytes > totalBytes-c.used {
+		if meta.SizeBytes < minBytes || meta.SizeBytes > maxBytes {
 			result.Skipped++
+			continue
+		}
+		if meta.SizeBytes > totalBytes-c.used {
+			result.Skipped++
+			result.Message = "在管总容量剩余额度不足以添加部分种子"
 			continue
 		}
 		notice, err := c.add(ctx, candidate.ID, meta, totalBytes, &result)
@@ -297,17 +306,26 @@ func (c *tjuptFeedCycle) add(ctx context.Context, sourceID string, meta tjupt.To
 
 func (c *tjuptFeedCycle) reconcile(ctx context.Context) error {
 	tasks, err := c.repo.LiveTasks(ctx, c.scope)
+	if err != nil || len(tasks) == 0 {
+		return err
+	}
+	hashes := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		hashes = append(hashes, task.Hash)
+	}
+	// 完整取得所有批次后，只有明确不存在的任务才进入释放额度判断。
+	receipts, err := c.downloader.TjuptFeedTorrents(ctx, hashes)
 	if err != nil {
 		return err
 	}
+	if receipts == nil {
+		return errors.New("qB 未确认任务列表")
+	}
 	for _, task := range tasks {
-		receipt, err := c.downloader.TjuptFeedTorrent(ctx, task.Hash)
-		if err != nil {
-			return err
-		}
+		receipt, exists := receipts[strings.ToLower(task.Hash)]
 		switch {
-		case receipt == nil && (task.AddedOn > 0 || (task.ReservedAt > 0 && time.Now().Unix()-task.ReservedAt >= tjuptFeedPendingSeconds)),
-			receipt != nil && task.State != repository.TjuptFeedRemoving && task.AddedOn > 0 && task.AddedOn != receipt.AddedOn:
+		case !exists && (task.AddedOn > 0 || (task.ReservedAt > 0 && time.Now().Unix()-task.ReservedAt >= tjuptFeedPendingSeconds)),
+			exists && task.State != repository.TjuptFeedRemoving && task.AddedOn > 0 && receipt.AddedOn > 0 && task.AddedOn != receipt.AddedOn:
 			task.State = repository.TjuptFeedGone
 			if err := c.saveTask(ctx, task); err != nil {
 				return err
@@ -317,14 +335,14 @@ func (c *tjuptFeedCycle) reconcile(ctx context.Context) error {
 			if c.cleanup != nil {
 				c.cleanup.uncertain++
 			}
-		case receipt == nil || !tjuptFeedReceiptMatches(task, receipt):
+		case !exists || !tjuptFeedReceiptMatches(task, &receipt):
 			c.held++
 		case task.State == repository.TjuptFeedStarted && c.cleanup != nil:
-			if err := c.observeCleanup(ctx, task, receipt, time.Now().Unix()); err != nil {
+			if err := c.observeCleanup(ctx, task, &receipt, time.Now().Unix()); err != nil {
 				return err
 			}
 		default:
-			if err := c.reconcileOwned(ctx, task, receipt); err != nil {
+			if err := c.reconcileOwned(ctx, task, &receipt); err != nil {
 				return err
 			}
 		}
