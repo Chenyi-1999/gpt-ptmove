@@ -52,14 +52,17 @@ type Snapshot struct {
 
 type Catalog struct {
 	root     string
+	builtins []Manifest
 	mu       sync.Mutex
 	snapshot Snapshot
 }
 
-func New(dataDir string) *Catalog {
+// New 创建清单目录索引，并保留内置插件的入口。
+func New(dataDir string, builtins ...Manifest) *Catalog {
 	return &Catalog{
 		root:     filepath.Join(dataDir, "plugins"),
-		snapshot: Snapshot{Items: []Manifest{}, Issues: []Issue{}},
+		builtins: builtins,
+		snapshot: Snapshot{Items: append([]Manifest{}, builtins...), Issues: []Issue{}},
 	}
 }
 
@@ -73,12 +76,15 @@ func (c *Catalog) List() Snapshot {
 func (c *Catalog) Reload() (Snapshot, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	next := Snapshot{Items: []Manifest{}, Issues: []Issue{}}
+	next := Snapshot{Items: append([]Manifest{}, c.builtins...), Issues: []Issue{}}
 	entries, err := manifestEntries(c.root)
 	if err != nil {
 		return c.snapshot, err
 	}
 	seen := make(map[string]bool)
+	for _, manifest := range c.builtins {
+		seen[manifest.ID] = true
+	}
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasSuffix(name, ".json") {

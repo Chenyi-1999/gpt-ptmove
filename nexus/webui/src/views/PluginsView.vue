@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ArrowRight, Box, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import TjuptRssPanel from '../components/plugins/TjuptRssPanel.vue'
 
 type Block = {
   kind: 'text' | 'link' | 'metric'
@@ -88,6 +89,7 @@ onMounted(() => void load())
           <span class="plugin-version">{{ current.version }}</span>
         </header>
         <p v-if="current.description" class="plugin-description">{{ current.description }}</p>
+        <TjuptRssPanel v-if="current.id === 'tjupt-rss'" />
         <div class="plugin-blocks">
           <article v-for="(block, index) in current.blocks" :key="index" class="plugin-block">
             <RouterLink v-if="block.kind === 'link' && block.target" :to="block.target">
@@ -132,6 +134,8 @@ onMounted(() => void load())
 
 <style scoped>
 .star-plugins {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 1180px;
   min-width: 0;
   margin: 0 auto;
@@ -204,7 +208,7 @@ onMounted(() => void load())
   background: var(--star-accent-soft, #251e42);
   color: var(--star-accent, #b8a4ff);
 }
-.plugin-content { padding: clamp(16px, 3vw, 28px); }
+.plugin-content { min-width: 0; padding: clamp(16px, 3vw, 28px); }
 .plugin-content h2, .plugin-block { overflow-wrap: anywhere; }
 .plugin-version { color: var(--star-muted, #a8b3cf); font-size: 0.82rem; }
 .plugin-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px; margin-top: 20px; }
@@ -235,7 +239,7 @@ onMounted(() => void load())
 :where(button, a, summary):focus-visible { outline: 2px solid var(--star-accent, #b8a4ff); outline-offset: 2px; }
 
 @media (max-width: 700px) {
-  .plugin-layout { grid-template-columns: 1fr; }
+  .plugin-layout { grid-template-columns: minmax(0, 1fr); }
   .plugin-heading { align-items: flex-start; }
 }
 </style>

@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.9"
+const forkVersion = "1.0.10"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-26",
+				"changes": []string{"北洋园插件集中配置 RSS、试运行和正式循环", "两次确认 H&R 达标且持续低速后，可自动移除 qB 任务并保留文件"},
+			},
+			{
+				"version": "1.0.9",
 				"date":    "2026-11-23",
 				"changes": []string{"候选预览结果保存在数据库中，刷新页面或重建 Docker 后恢复最近一次成功预览"},
 			},

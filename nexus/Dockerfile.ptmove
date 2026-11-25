@@ -28,7 +28,7 @@ RUN python fetch_native_assets.py /out/bdinfo
 FROM debian:bookworm-slim
 ARG APT_MIRROR=http://deb.debian.org
 LABEL org.opencontainers.image.title="STARPT" \
-      org.opencontainers.image.version="1.0.9" \
+      org.opencontainers.image.version="1.0.10" \
       org.opencontainers.image.source="https://gitee.com/star1999/starpt" \
       org.opencontainers.image.base.name="debian:bookworm-slim"
 RUN sed -i "s|http://deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \

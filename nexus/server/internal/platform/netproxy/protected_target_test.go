@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pt-nexus/server/internal/config"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -67,5 +68,27 @@ func TestProtectedRedirectNeverDialsDeniedTarget(t *testing.T) {
 	if response, err := client.Get(server.URL); err == nil {
 		response.Body.Close()
 		t.Fatal("redirect reached a protected target")
+	}
+}
+
+func TestShortLivedTransportKeepsProtectionWithoutRegistration(t *testing.T) {
+	originalDefault, originalManager := http.DefaultTransport, globalManager
+	t.Cleanup(func() {
+		http.DefaultTransport, globalManager = originalDefault, originalManager
+	})
+	if err := Install(config.NetworkProxyConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	start := len(globalManager.transports)
+	transport := ConfigureShortLivedTransport(&http.Transport{})
+	if len(globalManager.transports) != start {
+		t.Fatal("单次操作的 transport 被长期登记")
+	}
+	req, err := http.NewRequest(http.MethodGet, "http://81.70.24.5/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transport.Proxy(req); err == nil {
+		t.Fatal("单次操作 transport 未阻止受保护地址")
 	}
 }

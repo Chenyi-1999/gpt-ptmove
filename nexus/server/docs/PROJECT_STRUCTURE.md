@@ -46,6 +46,12 @@
 
 `NewApp()` 中将 `migrationflow.NewMigrateService(...)` 作为迁移能力入口注入到 Handler。
 
+北洋园刷流入口在 `internal/http/handler/tjupt_rss_handler.go`。编排由 `internal/service/migrationflow/tjupt_rss.go` 完成，RSS 和 H&R 的只读请求位于 `internal/service/acquire/tjupt`。手动暂停在站点复核后通过现有 qB 下载器调用飞牛领单通道。
+
+插件页的北洋园 RSS 循环由 `internal/http/handler/tjupt_feed_handler.go` 暴露，`internal/service/migrationflow/tjupt_feed*.go` 编排试运行与正式投种，`internal/repository/tjupt_feed_repository.go` 持久化配置、运行租约和任务记录。下载器使用现有的直连 qB 配置。旧版签名调度仍由 `internal/service/migrationflow/tjupt_automation*.go` 和独立台账提供兼容，两个调度入口互斥。
+
+正式循环可按插件配置判断低速退种。H&R 同一记录的二次达标确认及低速窗口由 `internal/service/migrationflow/tjupt_feed*.go` 编排和持久化，`internal/service/downloaderclient` 在调用原生 qB 移除前复查任务归属、Tracker 和实时速度，保留下载文件。
+
 ### 3.2 `internal/config`
 
 | 文件 | 说明 |

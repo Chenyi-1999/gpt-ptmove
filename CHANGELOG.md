@@ -615,3 +615,68 @@
 - GitHub 私有发行 455239570 已附 152 验证过的完整镜像、Compose 和校验文件，平台校验与本地一致。Gitee 发行 1358078 已上传并重新下载核验 Compose 和校验文件，完整镜像通过 GitHub 私有发行获取。
 - 两站 v1.0.9 标签同指 `d9bb190e4f2d25f1ad2ca7b0c8620f9295cde11c`。D 盘历史 ZIP 已登记项目索引，包含标签源码、Docker 镜像、Compose、校验文件及恢复说明，校验 68 个 OCI 对象。ZIP SHA-256 `62b073cb25f6b7b9659146527e39a0d6ae7ffcb89a90f21f8edfd81e7eb4df3b`。
 - 152 继续健康运行 v1.0.9。发行验证记入 `docs/DEPLOYMENT.json`，独立提交，标签保持不变。未运行生产预览、下载、发种或操作 81。
+
+## PTM-20261125-084 — 2026-11-25T12:22:31+08:00 — Codex root、site_client、plugin_ui、feiniu_proxy、tjupt_review，北洋园 RSS 与 H&R 插件
+
+- 在现有「插件」页注册内置北洋园刷流。修改 `nexus/webui/src/views/PluginsView.vue`、新增 `components/plugins/TjuptRssPanel.vue`，并在 `internal/bootstrap/app.go`、`internal/http/handler/plugins_handler.go`、`tjupt_rss_handler.go` 和 `internal/service/plugins/catalog.go` 接入管理员路由。RSS 预览按大小筛选并显示 H&R 基础时长，默认 10 GiB。RSS 和 Token 只保留在页面内存。浏览器在安全上下文才允许输入凭据。
+- `internal/service/acquire/tjupt`、`internal/service/migrationflow/tjupt_rss*.go` 和 `internal/service/downloaderclient/client.go` 读取 RSS、飞牛 qB 的 `starpt-tjupt` 标签和北洋园 H&R。预览与查询没有 qB 写操作。手动暂停默认关闭。退种时站点须重新确认当前考核达标或免考，独立签名绑定账号、种子哈希和加入时间。修改 `nexus/proxy/pull/{agent.go,hub.go,protocol.go,compose.agent.yaml,qb_tjupt.go,qb_tjupt_test.go}`，飞牛核对签名、任务、标签、完成状态及全部 Tracker passkey，仅暂停匹配任务并返回专用回执，保留文件。相关说明见 `docs/{STARPT_PLUGINS,API_CONTRACT}.md` 和 `nexus/server/docs/PROJECT_STRUCTURE.md`。
+- 本地北洋园相关 Go 包和代理测试、代理 go vet、Vue 类型检查、定向 ESLint、Vite 构建与差异检查通过。Edge 桌面及 390 px 验证预览、资格按钮、拒绝后清除旧操作和非安全页面禁止输入。模拟 Hub、TLS Agent、qB 验证重复添加、未达标、错误签名、过期签名、跨账号及旧代理回执等失败路径。Windows Go 全量有既有 SQLite 文件占用清理失败。152 断网隔离容器首次编译内存不足，复用本项目缓存并降低并发后，主服务与代理 Go 全量、代理 go vet、容器健康、管理员认证、默认只读、拒绝无效预览与退种和 SPA 资源检查全部通过。
+- 生产的 `ptmove-pull:0.3.1-pull.3` 已承载 qB 投种，发布分支基线缺少现网中转投种及飞牛管理界面改动。为保留既有能力，本次只在 152 验证隔离容器，未替换生产中转或主服务，无公网部署地址。待用保留现网能力的版本联调后再发布。未连接真实北洋园、飞牛 qB 或 81，未实际下载、发种、退种、提交、推送或发布。
+
+## PTM-20261125-085 — 2026-11-25T16:31:02+08:00 — Codex root、plugin_ui、site_client、feiniu_proxy、tjupt_review，北洋园自动投种与容量控制
+
+- `internal/service/acquire/tjupt` 适配 RSS 中携带站内下载地址的 enclosure，读取有界的 `.torrent` 元数据并校验 Tracker、v1 哈希与实际总大小，预览继续只读。更新 `internal/service/migrationflow/tjupt_rss.go`、`tjupt_automation*.go`、`internal/repository/tjupt_automation_repository*.go`、`internal/service/downloaderclient/client.go`、`internal/bootstrap/app.go` 与 `internal/http/handler/tjupt_rss_handler.go`。按可调单种体积区间和总在管容量进行去重、查 qB、持久预留和投种。默认单种 0–10 GiB、总量 50 GiB、最多 3 项、每 5 分钟检查、调度关闭。已有种子、待删及未确认预留均计入总量。qB 出现台账之外的自动任务时暂停整轮。
+- 按体积累计做种并加缓冲，默认 6 小时。站点确认达标或免考后观察瞬时上传及采样间累计字节增量，默认低于 100 KiB/s 持续 60 分钟。状态未知或上传恢复时重置观察。首次满足清理条件仅标记；实际删除须独立选择，使用专用 qB 和目录，并二次核对 H&R。未确认写入保持租约与容量，签名有效期先于租约结束。只对明确未执行的投种释放预留。
+- `nexus/proxy/pull/{agent.go,hub.go,protocol.go,qb_tjupt_auto*.go,qb_tjupt_delete.go,qb_tjupt_torrent.go,compose.tjupt-auto.yaml}` 增加受签名约束的加种、标记、撤销标记和删除。Agent 复核上传速度、累计做种、加入时间、账号、保存路径、文件与完整 qB 清单。只读挂载证明失败、共享或非插件任务出现时保留数据。前端 `nexus/webui/src/components/plugins/TjuptRssPanel.vue` 增加范围、总量、缓冲、速度窗口、模式和运行状态，移除原讨论中的长期保留档位。更新 `docs/{STARPT_PLUGINS,API_CONTRACT}.md` 和 `nexus/server/docs/PROJECT_STRUCTURE.md`。
+- 验证。仅对用户提供的真实 RSS 进行了只读格式检查，确认 10 条同站 enclosure，未记录订阅凭据。定向容量并发、租约超时、台账缺失、时间边界、首轮仅标记和 H&R 改变拒绝删除通过。代理全量 Go、5 轮定向及 go vet 通过；Windows 符号链接用例因系统权限跳过，152 Linux 全量测试另行运行通过。Vue 类型检查、定向 ESLint、Vite 构建、Edge 桌面及 390 px 的配置保存、体积显示和取消实际删除确认通过。152 断网隔离容器核对管理员权限、默认关闭及标记模式、规则持久化、配置缺失拒绝启用、预览退种保护和 SPA 资源通过。
+- 状态。生产现有中转基线仍含独立的投种能力，需在兼容该中转与专用飞牛 qB 后才能上线。152 仅隔离验证，无公网部署地址。未请求真实种子文件、未连接真实飞牛 qB 或 81，未实际投种、删除、提交、推送或发布。
+
+## PTM-20261125-086 — 2026-11-25T16:32:18+08:00 — Codex root，152 隔离验收后的生产健康复核
+
+- 关联 PTM-20261125-085。隔离资源均已清理。收尾时发现生产 `ptmove-nexus-ptmove-nexus-1` 于 16:31:24 自行重启。Docker 事件记录到 OOM，内核记录确认触发的是该生产容器自己的 768 MiB 内存 cgroup 限额。
+- 确认仍运行 v1.0.9，Docker 健康状态为 healthy，152 本地访问 18120 的健康接口返回 HTTP 200。未执行生产重启、配置或限额修改、代码提交、推送或部署。应用内导致内存增长的路径未调查。
+
+## PTM-20261125-087 — 2026-11-25T17:56:55+08:00 — Codex root、tjupt_review，北洋园新界面上线
+
+- 用户明确要求上线界面。以 152 已运行的 STARPT v1.0.9 镜像为运行时，使用 PTM-20261125-085 隔离验证的前后端源码与前端构建生成 `ptmove-nexus:1.0.9-ui.1`，镜像 ID 为 `sha256:c128a6464d595ee7d550e4655064e627128e7c0d19fc077e2dba496f68ccb52e`。只替换主服务。更新 152 的 `/opt/gpt-ptmove-nexus/compose.ptmove.yaml` 默认镜像和本地 `docs/DEPLOYMENT.json`。原数据挂载、限制及 Docker 网络经比对一致，Hub 容器 ID 与启动时间核对一致。
+- 切换前后确认发布队列、自动化任务和扫描计数均为零。停旧容器后生成通过 SQLite `quick_check` 的一致性快照，连同原 Compose 和回滚镜像 ID 保存在 152 项目私有目录 `releases/tjupt-ui.Dvqwer`。新版只新增北洋园表，调度关闭，清理模式为标记，北洋园写入凭据未启用。
+- 152 断网构建的主服务 Go 全量及候选镜像登录、插件目录与只读模式测试通过。生产验收核对公网 `/plugins` 新入口、主机上插件构建文件与生产响应逐字节一致、未登录接口 401、35 秒后健康与队列复核通过，最终容器重启计数为零。公网健康返回 HTTP 200。
+- 验收使用隔离管理员账号与生产公开入口，没有使用生产管理员凭据。真实北洋园下载、H&R、飞牛新增写入和删除未执行。现网 URL 为 `http://152.136.236.238:18120/plugins`。本次上线仅 STARPT UI 和配套 API，无 81、Git 提交、推送或双仓发行。
+
+## PTM-20261125-TJUPT-HTTP-SYNC — 2026-11-25T21:31:51+08:00 — Codex root，北洋园插件 HTTP 管理同步
+
+- 与 PTM-20261125-TJUPT-HTTP 同步 `nexus/webui/src/components/plugins/TjuptRssPanel.vue`，登录后可直接从现有 HTTP 管理页使用 RSS、H&R 与设置保存。更新 `docs/STARPT_PLUGINS.md`。未修改插件服务端规则。
+- Vue 类型检查、插件 ESLint、Vite、Edge HTTP 浏览器交互及 152 断网原生 API 验证通过。组合部署已在 152 运行 `1.0.9-ui.3`，公网验证通过。未提交、推送、发布、执行生产种子操作或访问 81。
+
+## PTM-20261125-TJUPT-HR-HINT-SYNC — 2026-11-25T21:39:49+08:00 — Codex root、tjupt_hr_hint_qa，北洋园体积旁显示考核时长
+
+- 在两个工作区同步 `TjuptRssPanel.vue` 和 `TjuptHrDurationHint.vue`。RSS 选种预览的体积范围和自动投种设置的最小体积旁各有一个提示按钮。浮层显示六档基础做种时长，并说明自动清理另计缓冲。仅前端展示。
+- Vue 类型检查、定向 ESLint、Vite 构建及 `git diff --check` 通过。六档体积阈值和时长与北洋园预览及自动投种后端实现核对一致。Edge 模拟接口验证桌面两处悬停、键盘 Enter，以及 390 和 320 像素手机视口各两处点按和点外关闭。各浮层完整且没有触发表单提交或写请求。
+- 152 断网隔离镜像验证通过，生产更新为 `ptmove-nexus:1.0.9-ui.4`（`sha256:52ab158cdb7d816e9b8a63aa8747afbbc18712e4500214ac6f4bb4911ee005bc`），回滚镜像 `1.0.9-ui.3`。公网插件入口与 9 个入口和资源哈希核对匹配，健康正常。回执位于 `releases/tjupt-hr-hint.2q6DD7`。源码未提交、推送或双仓发布。未执行下载、发种、qB 操作或访问 81。
+
+## PTM-20261125-TJUPT-HR-REMAINING-SYNC — 2026-11-25T22:42:00+08:00 — Codex root、tjupt_remaining_review、tjupt_remaining_browser，RSS 结果精简与真实 H&R 剩余时间
+
+- 两个工作区的 `TjuptRssPanel.vue` 合并 RSS 考核与筛选列。达体积条件显示 `HR 48H` 等时长，超出上限显示「体积超限」，保留低于最小体积与体积未知状态。
+- 将现有 H&R 查询和任务表移入「做种任务的 H&R」折叠栏。北洋园官方仓库的接口说明确认 `status.need_seed_time` 与 `statistics.seed_time`，展示以站点两者之差为准，不加本地自动清理缓冲。显示站点达标、结束、等待确认和记录不足状态。覆盖所选 qB 的现有 `starpt-tjupt` 标签查询，包括自动投种。现有查询和暂停接口保持。
+- Vue 类型检查、插件 ESLint、Vite 和 `git diff --check` 通过。Edge 桌面及 390 像素手机用模拟数据验证折叠、体积边界、加载、错误重试与各考核状态。48 小时要求、36 小时站点已累计、6 小时缓冲时，显示剩余 12 小时。没有测试真实北洋园账号或真实 qB 任务。
+- 152 断网 Docker 隔离验收通过，生产镜像 `ptmove-nexus:1.0.9-ui.5`（`sha256:16d43f3911fecc7f230e707aab785b1343c8632d5f65d55e1270761e051dc29e`），回滚镜像 `1.0.9-ui.4`。公网健康与 9 项入口和资源哈希核对通过，回执位于 `releases/tjupt-hr-remaining.E3qgTj`。未提交、推送、发布、下载、发种、操作 qB 或访问 81。
+
+## PTM-20261126-OVH-TJUPT-FEED — 2026-11-26T01:03:10+08:00 — Codex root、rss_feed_core、rss_feed_qb、rss_feed_ui，北洋园插件集中配置及 RSS 循环
+
+- 在 `nexus/webui/src/components/plugins/{TjuptRssPanel,TjuptHrDurationHint}.vue` 集中保存 RSS、H&R Token、qB、间隔、标签、分类、目录和体积规则。旧版页面凭据属于临时查询。新版凭据由服务端持久保存，刷新后显示已配置状态。页面用「保存」「试运行一次」「正式启动」「停止循环」控制，保留 RSS 预览、体积提示和实际 H&R 剩余查询。
+- 接入 `nexus/server/internal/bootstrap/app.go`、`internal/http/handler/{plugins_handler,tjupt_rss_handler,tjupt_feed_handler}.go`、`internal/repository/tjupt_feed_repository.go`、`internal/service/migrationflow/tjupt_feed*.go` 及 `internal/service/downloaderclient/{client.go,tjupt_feed*.go}`。保存不启动，默认停用、间隔 1 分钟。试运行最多暂停添加 1 条。正式循环只接续身份、配置和零进度均一致的试运行任务，按订阅继续获取，使用 qB 原生接口应用标签和分类。保留去重、容量预留和写入回执保护，旧签名接口与新调度互斥。更新 `docs/{STARPT_PLUGINS,API_CONTRACT}.md` 与 `nexus/server/docs/PROJECT_STRUCTURE.md`。
+- OVH 断网 Go 1.23 全量测试与 Linux 编译、隔离 Docker API 验收、Vue 类型检查、定向 ESLint、Vite 构建、差异检查通过。Edge 在 1440 和 390 像素用模拟接口核对保存、暂停添加入口、启停、标签分类、配置脱敏和 H&R 显示。原生 qB 模拟覆盖 5.3.1、4.x、重复、暂停及未知回执。最初本机抢先运行的旧测试夹具未包含新增的进度字段，合入修正夹具后的定向测试及最终 Linux 全量通过。
+- 已部署 OVH `ptmove-nexus:1.0.9-ui.7`，镜像 ID `sha256:6cd22b3324641d3af179cea7574687a2d92fc4c9d107c79f16a9d1f5e95f03ed`。保留已停止的 `starpt-ui6-rollback`，数据库一致性快照和回执位于 `/project/GPT-PTMOVE/releases/rss-feed-261126`，生产数据挂载保持一致。公网 https://starpt.star1999.de/plugins 健康，5 项资源及入口匹配，匿名接口 401，OVH qB 只读连接复核通过。新版插件尚待用户保存首份 RSS 和 Token，循环为关闭。未执行生产试运行、实际下载、发种、Git 提交、推送或发行，未访问 81 或修改腾讯 152。
+
+## PTM-20261126-OVH-TJUPT-HR-CLEANUP — 2026-11-26T01:48:45+08:00 — Codex root、tjupt_cleanup_core、tjupt_cleanup_qb、tjupt_cleanup_ui、tjupt_cleanup_review，北洋园达标后低速退种
+
+- 原插件配置增加清理开关和两个数值，默认清理关闭、100 KiB/s、连续 60 分钟低速。旧配置可直接读取，旧 API 客户端省略新字段时保留已保存值。启用清理需保存北洋园 H&R Token。正式循环约每分钟采样 qB，RSS 仍使用设置的间隔。速率达到阈值、采样断档或进程重启时重置低速计时。
+- 在 nexus/server/internal/service/migrationflow/tjupt_feed*.go 与 internal/repository/tjupt_feed_repository.go 持久化观察状态、H&R 双重确认和移除意图。仅处理已完成、正在做种且插件所有权匹配的 qB 任务。考核必须是和本次加入记录对应的同一条站点记录，两次明确达标或后达标至少相隔 15 分钟。站点错误、记录缺失和身份不符均保留。未确认的 qB 写入保留待核对，不自动重发，只在确认任务消失时释放在管额度。
+- internal/service/acquire/tjupt/client.go 保留站点记录标识。downloaderclient/tjupt_feed*.go 在原生 qB 移除请求前核对全部 Tracker、身份、速率及租约，移除任务时保留下载文件。internal/platform/netproxy 为短期 qB 连接保留保护并避免在全局长期登记。同步北洋园面板、版本、Compose、发行说明、docs/API_CONTRACT.md、docs/STARPT_PLUGINS.md、docs/DEPLOYMENT.json 和服务端结构文档。
+- Windows 定向 Go 测试及 go vet、OVH 断网 Go 1.23 全量与编译、Vue 类型检查、组件 ESLint、Vite 构建和差异检查通过。独立审查发现长 RSS 间隔可能把疏采样视为连续低速，已改成独立采样并补测。浏览器以 1440 和 390 像素验证默认值、凭据提示、保存、刷新恢复与原有试运行。OVH 和腾讯 152 隔离容器均验证原生 API、持久配置、认证和部署静态资源。152 首次校验脚本误触发 OVH 入口，随后修正脚本的模块入口与基础镜像清单，隔离验收通过。
+- OVH 生产部署 ptmove-nexus:1.0.10-ovh.1，原 RSS 和 H&R Token 保留、RSS 与自动清理保持关闭。公网 5 项入口及资产匹配，OVH qB 只读连通，回滚容器 starpt-ui7-rollback。腾讯 152 用断网容器验证 ptmove-nexus:1.0.10，保留原生产容器。未执行生产加种、发种、退种、数据文件删除或访问 81。记录时正打包发行镜像，Git 提交、推送和发行待核对。
+
+## PTM-20261126-TJUPT-V110-ARTIFACT — 2026-11-26T01:49:21+08:00 — Codex root，v1.0.10 发行镜像校验
+
+- 腾讯 152 隔离验收的 linux/amd64 完整镜像已打包。镜像包含所有层，归档 794893290 字节，SHA-256 45eb975030a3dc19e5518e363f7bc03b36dd5491f73f9a6db3293240c1120693。回读校验原始 Docker tar 的 SHA-256 与 152 生成文件一致。新的发布说明、Compose 和可回滚版本已记录。OVH 生产仍运行 v1.0.10，未操作 81 或真实退种。
+- 本次提交计划随标签 v1.0.10 推送至 Gitee 与 GitHub 私有仓库；提交、推送、发行与历史归档的实际结果另记回执。

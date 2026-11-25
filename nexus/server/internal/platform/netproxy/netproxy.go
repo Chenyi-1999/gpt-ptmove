@@ -63,6 +63,15 @@ func Update(cfg config.NetworkProxyConfig) error {
 // 失败场景：transport 为空或全局代理尚未初始化时直接返回原对象。
 // 副作用：覆盖 transport.Proxy，并纳入热更新的空闲连接清理集合。
 func ConfigureTransport(transport *http.Transport) *http.Transport {
+	return configureTransport(transport, true)
+}
+
+// ConfigureShortLivedTransport 为单次操作应用相同的网络限制。调用方负责关闭该 transport 的空闲连接。
+func ConfigureShortLivedTransport(transport *http.Transport) *http.Transport {
+	return configureTransport(transport, false)
+}
+
+func configureTransport(transport *http.Transport, trackIdleConnections bool) *http.Transport {
 	if transport == nil {
 		return transport
 	}
@@ -75,7 +84,11 @@ func ConfigureTransport(transport *http.Transport) *http.Transport {
 	if manager == nil {
 		return transport
 	}
-	manager.configureTransport(transport)
+	if trackIdleConnections {
+		manager.configureTransport(transport)
+	} else {
+		transport.Proxy = manager.proxy
+	}
 	return transport
 }
 

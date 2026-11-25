@@ -585,6 +585,10 @@ type qbClient struct {
 }
 
 func newQBClient(d Downloader) (*qbClient, error) {
+	return newQBClientWithTransport(d, netproxy.ConfigureTransport(&http.Transport{ForceAttemptHTTP2: true}))
+}
+
+func newQBClientWithTransport(d Downloader, transport http.RoundTripper) (*qbClient, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -598,7 +602,7 @@ func newQBClient(d Downloader) (*qbClient, error) {
 		client: &http.Client{
 			Jar:           jar,
 			Timeout:       90 * time.Second,
-			Transport:     NewBearerTransport(d.APIKey, netproxy.ConfigureTransport(&http.Transport{ForceAttemptHTTP2: true})),
+			Transport:     NewBearerTransport(d.APIKey, transport),
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 	}, nil
@@ -1116,6 +1120,212 @@ type AutomationTracker struct {
 	Status int    `json:"status"`
 }
 
+// TaggedQBTorrent 是刷流插件使用的 qB 状态。含凭据的 Tracker 地址仅在服务端使用。
+type TaggedQBTorrent struct {
+	Hash        string   `json:"hash"`
+	Name        string   `json:"name"`
+	State       string   `json:"state"`
+	Progress    *float64 `json:"progress"`
+	AddedOn     int64    `json:"added_on"`
+	Tracker     string   `json:"tracker"`
+	Tags        string   `json:"tags"`
+	Category    string   `json:"category"`
+	SavePath    string   `json:"save_path"`
+	UploadBPS   *int64   `json:"upspeed"`
+	Uploaded    *int64   `json:"uploaded"`
+	SeedingTime *int64   `json:"seeding_time"`
+}
+
+// TaggedQBTorrents 查询指定标签和可选哈希，再检查响应的实际标签，最多返回 50 条。
+// 请求只读取 qB 状态，超限或响应错误时拒绝返回部分结果。
+func (d Downloader) TaggedQBTorrents(ctx context.Context, tag, hash string) ([]TaggedQBTorrent, error) {
+	params := url.Values{"tag": {tag}, "limit": {"51"}}
+	if hash != "" {
+		params.Set("hashes", hash)
+	}
+	body, err := d.pluginQBRequest(ctx, http.MethodGet, "torrents/info?"+params.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	var rows []TaggedQBTorrent
+	if json.Unmarshal(body, &rows) != nil || rows == nil || len(rows) > 51 ||
+		(hash != "" && len(rows) > 1) {
+		return nil, errors.New("qB 列表响应无法确认")
+	}
+	matches := make([]TaggedQBTorrent, 0, len(rows))
+	for _, row := range rows {
+		if hash != "" && !strings.EqualFold(row.Hash, hash) {
+			return nil, errors.New("qB 响应的种子哈希与查询不一致")
+		}
+		for _, current := range strings.Split(row.Tags, ",") {
+			if strings.TrimSpace(current) == tag {
+				matches = append(matches, row)
+				break
+			}
+		}
+	}
+	if len(matches) > 50 {
+		return nil, errors.New("北洋园标签下超过 50 条任务，请分批管理")
+	}
+	return matches, nil
+}
+
+// QBHasTorrent 以只读方式确认 qB 是否已持有该哈希，包含手工及第三方任务。
+func (d Downloader) QBHasTorrent(ctx context.Context, hash string) (bool, error) {
+	query := url.Values{"hashes": {hash}, "limit": {"2"}}
+	body, err := d.pluginQBRequest(ctx, http.MethodGet, "torrents/info?"+query.Encode(), nil)
+	if err != nil {
+		return false, err
+	}
+	var rows []struct {
+		Hash string `json:"hash"`
+	}
+	if json.Unmarshal(body, &rows) != nil || rows == nil || len(rows) > 1 ||
+		(len(rows) == 1 && !strings.EqualFold(rows[0].Hash, hash)) {
+		return false, errors.New("qB 未确认哈希查重结果")
+	}
+	return len(rows) == 1, nil
+}
+
+// RetireTJUPTTorrent 将已通过 H&R 核对的任务交给飞牛领单组件暂停。
+// 领单组件检查标签、Tracker 和添加时间，组件拒绝或请求失败时不尝试其它写接口。
+func (d Downloader) RetireTJUPTTorrent(ctx context.Context, hash string, addedOn, expiresAt int64, account, proof string) error {
+	values := url.Values{
+		"hashes": {hash}, "added_on": {strconv.FormatInt(addedOn, 10)},
+		"expires_at": {strconv.FormatInt(expiresAt, 10)}, "account": {account}, "proof": {proof},
+	}
+	body, err := d.pluginQBRequest(ctx, http.MethodPost, "starpt/tjupt/retire", strings.NewReader(values.Encode()))
+	if err != nil {
+		return err
+	}
+	var receipt struct {
+		Operation string `json:"operation"`
+		Hash      string `json:"hash"`
+		AddedOn   int64  `json:"added_on"`
+	}
+	if json.Unmarshal(body, &receipt) != nil || receipt.Operation != "starpt-tjupt-retired-v1" ||
+		receipt.Hash != hash || receipt.AddedOn != addedOn {
+		return errors.New("飞牛未返回匹配的暂停回执，请刷新 qB 状态")
+	}
+	return nil
+}
+
+// TjuptAutoEffect 是控制端签名的单种自动化操作。
+type TjuptAutoEffect struct {
+	Action            string `json:"action"`
+	Hash              string `json:"hash"`
+	AddedOn           int64  `json:"added_on"`
+	ExpiresAt         int64  `json:"expires_at"`
+	Account           string `json:"account"`
+	Root              string `json:"root"`
+	Torrent           []byte `json:"torrent"`
+	Proof             string `json:"proof"`
+	MaxUploadBPS      int64  `json:"max_upload_bps"`
+	MinSeedingSeconds int64  `json:"min_seeding_seconds"`
+}
+
+// ErrTjuptAutoNotApplied 仅表示飞牛明确回执其投种在写入 qB 前已拒绝。
+var ErrTjuptAutoNotApplied = errors.New("飞牛在投种前拒绝了本次操作")
+
+// RunTjuptAutoEffect 只调用飞牛北洋园通道，并要求与操作及哈希对应的回执。
+func (d Downloader) RunTjuptAutoEffect(ctx context.Context, effect TjuptAutoEffect) error {
+	payload, err := json.Marshal(effect)
+	if err != nil {
+		return errors.New("北洋园操作编码失败")
+	}
+	reply, err := d.pluginQBRequest(ctx, http.MethodPost, "starpt/tjupt/auto", bytes.NewReader(payload))
+	var receipt struct {
+		Operation string `json:"operation"`
+		Action    string `json:"action"`
+		Hash      string `json:"hash"`
+		Outcome   string `json:"outcome"`
+	}
+	matches := json.Unmarshal(reply, &receipt) == nil && receipt.Operation == "starpt-tjupt-auto-v1" &&
+		receipt.Action == effect.Action && receipt.Hash == effect.Hash
+	if err != nil {
+		var status *pluginQBHTTPError
+		if effect.Action == "add" && errors.As(err, &status) && status.code == http.StatusConflict &&
+			matches && receipt.Outcome == "not_applied" {
+			return ErrTjuptAutoNotApplied
+		}
+		return err
+	}
+	if !matches || receipt.Outcome != "" {
+		return errors.New("飞牛未返回匹配的自动化回执")
+	}
+	return nil
+}
+
+type pluginQBHTTPError struct{ code int }
+
+func (e *pluginQBHTTPError) Error() string {
+	return fmt.Sprintf("qB 通道拒绝请求（HTTP %d）", e.code)
+}
+
+// pluginQBRequest 复用已配置的 qB 认证，限制插件请求的响应大小并统一过滤上游错误。
+func (d Downloader) pluginQBRequest(ctx context.Context, method, path string, payload io.Reader) ([]byte, error) {
+	client, err := d.newPluginQB()
+	if err != nil {
+		return nil, err
+	}
+	defer client.client.CloseIdleConnections()
+	var contentType string
+	if method == http.MethodPost {
+		if path == "starpt/tjupt/auto" {
+			contentType = "application/json"
+		} else {
+			contentType = "application/x-www-form-urlencoded"
+		}
+	}
+	return client.pluginRequest(ctx, method, path, contentType, payload)
+}
+
+func (d Downloader) newPluginQB() (*qbClient, error) {
+	if d.Type != "qbittorrent" || !d.Enabled {
+		return nil, errors.New("请选择已启用的 qBittorrent 下载器")
+	}
+	transport := netproxy.ConfigureShortLivedTransport(&http.Transport{ForceAttemptHTTP2: true})
+	client, err := newQBClientWithTransport(d, transport)
+	if err != nil {
+		return nil, errors.New("qB 连接配置无效")
+	}
+	client.client.Timeout = 25 * time.Second
+	if d.APIKey == "" && client.Login() != nil {
+		client.client.CloseIdleConnections()
+		return nil, errors.New("qB 认证失败")
+	}
+	return client, nil
+}
+
+func (client *qbClient) pluginRequest(ctx context.Context, method, path, contentType string, payload io.Reader) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, client.host+"/api/v2/"+path, payload)
+	if err != nil {
+		return nil, errors.New("qB 请求地址无效")
+	}
+	req.Header.Set("Referer", client.host)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := client.client.Do(req)
+	if err != nil {
+		return nil, errors.New("qB 通道未确认操作结果")
+	}
+	defer resp.Body.Close()
+	var statusErr error
+	if resp.StatusCode != http.StatusOK && (method != http.MethodPost || resp.StatusCode != http.StatusNoContent) {
+		statusErr = &pluginQBHTTPError{code: resp.StatusCode}
+		if path != "starpt/tjupt/auto" || method != http.MethodPost || resp.StatusCode != http.StatusConflict {
+			return nil, statusErr
+		}
+	}
+	const limit = 4 << 20
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil || len(body) > limit {
+		return nil, errors.New("qB 响应不可用")
+	}
+	return body, statusErr
+}
+
 // WithEffectGuard 返回附带即时授权检查的副本；每次qB写请求发送前重新核验。
 // guard拒绝时不发请求，不更改原配置，其他普通下载器操作不受影响。
 func (d Downloader) WithEffectGuard(guard func() error) Downloader { d.effectGuard = guard; return d }
@@ -1140,6 +1350,13 @@ func (t *bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		copy.Header.Set("Authorization", "Bearer "+t.key)
 	}
 	return t.base.RoundTrip(copy)
+}
+
+// CloseIdleConnections 转发空闲连接回收，已发送的请求仍可正常完成。
+func (t *bearerTransport) CloseIdleConnections() {
+	if transport, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		transport.CloseIdleConnections()
+	}
 }
 func (d Downloader) automationQB() (*qbClient, error) {
 	if d.Type != "qbittorrent" {
@@ -1234,30 +1451,39 @@ func automationValidate(data []byte, expected string) error {
 	}
 	return nil
 }
-func automationAdd(c *qbClient, data []byte, name, path string, paused bool, ownershipTag string) error {
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
+
+// qbTorrentMultipart 编码上传所用的种子文件及选项，无外部副作用。
+func qbTorrentMultipart(data []byte, name string, fields map[string]string) (*bytes.Buffer, string, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("torrents", filepath.Base(name))
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	if _, err = part.Write(data); err != nil {
-		return err
+		return nil, "", err
 	}
-	for key, val := range map[string]string{"savepath": path, "paused": strconv.FormatBool(paused), "stopped": strconv.FormatBool(paused), "skip_checking": "false", "autoTMM": "false"} {
+	for key, val := range fields {
 		if err = writer.WriteField(key, val); err != nil {
-			return err
-		}
-	}
-	if ownershipTag != "" {
-		if err = writer.WriteField("tags", ownershipTag); err != nil {
-			return err
+			return nil, "", err
 		}
 	}
 	if err = writer.Close(); err != nil {
+		return nil, "", err
+	}
+	return body, writer.FormDataContentType(), nil
+}
+
+func automationAdd(c *qbClient, data []byte, name, path string, paused bool, ownershipTag string) error {
+	fields := map[string]string{"savepath": path, "paused": strconv.FormatBool(paused), "stopped": strconv.FormatBool(paused), "skip_checking": "false", "autoTMM": "false"}
+	if ownershipTag != "" {
+		fields["tags"] = ownershipTag
+	}
+	body, contentType, err := qbTorrentMultipart(data, name, fields)
+	if err != nil {
 		return err
 	}
-	response, err := c.PostMultipart("torrents/add", &body, writer.FormDataContentType())
+	response, err := c.PostMultipart("torrents/add", body, contentType)
 	if err != nil {
 		return errors.New("qB加种结果未知，必须按hash核实，不会盲目重发")
 	}

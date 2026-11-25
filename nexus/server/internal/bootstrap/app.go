@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -187,7 +188,18 @@ func NewApp() (*App, error) {
 	engine.Use(middleware.JWTGuard(authService))
 	registerForkUpdateRoutes(engine)
 	handler.NewSiteProfilesHandler(profilesService).RegisterRoutes(engine.Group("/api"))
-	handler.RegisterPlugins(engine.Group("/api/plugins"), paths.DataDir, store.DB)
+	pluginsAPI := engine.Group("/api/plugins")
+	handler.RegisterPlugins(pluginsAPI, paths.DataDir, store.DB)
+	tjuptPlugin := migrationflow.NewTjuptRSSService(cfgManager)
+	tjuptAutomation, err := migrationflow.NewTjuptAutomation(store.DB, tjuptPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("初始化北洋园刷流状态失败: %w", err)
+	}
+	tjuptFeed, err := migrationflow.NewTjuptFeed(store.DB, tjuptPlugin, paths.DataDir)
+	if err != nil {
+		return nil, fmt.Errorf("初始化北洋园 RSS 插件失败: %w", err)
+	}
+	handler.RegisterTjuptRSS(pluginsAPI.Group("/tjupt"), tjuptPlugin, tjuptAutomation, tjuptFeed)
 	engine.GET("/api/migrate/source-restriction", func(c *gin.Context) {
 		result, status := migrateService.CheckSourceRestriction(strings.TrimSpace(c.Query("task_id")))
 		c.JSON(status, result)
@@ -215,6 +227,8 @@ func NewApp() (*App, error) {
 	)
 
 	automationService.Start()
+	tjuptAutomation.Start(context.Background())
+	tjuptFeed.Start(context.Background())
 	return &App{Engine: engine, trackerWorker: trackerService}, nil
 }
 
