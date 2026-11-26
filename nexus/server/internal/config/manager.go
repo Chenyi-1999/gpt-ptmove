@@ -13,9 +13,11 @@ import (
 )
 
 type Manager struct {
-	mu     sync.RWMutex
-	path   string
-	config map[string]any
+	mu              sync.RWMutex
+	path            string
+	config          map[string]any
+	ptgenSources    []PTGenSource
+	ptgenLoadFailed bool
 }
 
 func NewManager(paths RuntimePaths) (*Manager, error) {
@@ -23,6 +25,7 @@ func NewManager(paths RuntimePaths) (*Manager, error) {
 	if err := manager.load(); err != nil {
 		return nil, err
 	}
+	manager.loadPTGenSources()
 	manager.ensureAuthBootstrap()
 	return manager, nil
 }

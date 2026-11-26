@@ -2,6 +2,7 @@
   <div class="settings-container">
     <h2 class="settings-section-title">{{ transferOnly ? '转种设置' : '通用设置' }}</h2>
     <div class="settings-grid">
+      <PTGenSourcesSettings v-if="transferOnly" class="ptgen-settings-card" />
       <!-- 用户信息设置卡片 -->
       <div
         v-if="!transferOnly"
@@ -551,53 +552,6 @@
               </el-text>
             </div>
             <div class="form-item" style="margin-bottom: 16px">
-              <div
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  margin-bottom: 6px;
-                "
-              >
-                <span
-                  style="font-weight: 500; color: var(--el-text-color-regular); font-size: 13px"
-                >
-                  财神 PTGen API Token（每日100次）
-                </span>
-                <el-button
-                  type="primary"
-                  link
-                  @click="openCsptPtgenPage"
-                  style="white-space: nowrap"
-                >
-                  <el-icon style="margin-right: 4px">
-                    <Link />
-                  </el-icon>
-                  获取Token
-                </el-button>
-              </div>
-              <el-input
-                v-model="uploadForm.cspt_ptgen_token"
-                type="password"
-                placeholder="请输入财神 PTGen API Token"
-                show-password
-              >
-                <template #prefix>
-                  <el-icon>
-                    <Key />
-                  </el-icon>
-                </template>
-              </el-input>
-              <el-text type="info" size="small" style="display: block; margin-top: 8px">
-                <el-icon size="12" style="vertical-align: middle; margin-right: 4px">
-                  <InfoFilled />
-                </el-icon>
-                配置后优先使用该 API 获取影片信息，每日限量 100+
-                次，上限随等级提升，使用完会自动切换内置的其他 PTGen API
-              </el-text>
-            </div>
-
-            <div class="form-item" style="margin-bottom: 16px">
               <div style="display: flex; align-items: center; gap: 12px">
                 <span
                   style="font-weight: 500; color: var(--el-text-color-regular); font-size: 13px"
@@ -1011,6 +965,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from '@/utils/uiNotify'
 import { useContentFiltersStore } from '@/stores/contentFilters'
+import PTGenSourcesSettings from './PTGenSourcesSettings.vue'
 
 const props = defineProps<{ transferOnly?: boolean }>()
 const router = useRouter()
@@ -1190,7 +1145,6 @@ type DesktopRuntimeWindow = Window & {
 const savingUpload = ref(false)
 const uploadForm = reactive({
   anonymous_upload: true, // 默认启用匿名上传
-  cspt_ptgen_token: '', // 财神ptgen token
   ratio_limiter_interval_seconds: 1800,
 })
 
@@ -1208,11 +1162,6 @@ const ratioLimiterIntervalMinutes = computed({
     uploadForm.ratio_limiter_interval_seconds = val * 60
   },
 })
-
-// 打开财神PTGen网页获取Token
-const openCsptPtgenPage = () => {
-  window.open('https://cspt.top/ptgen.php', '_blank')
-}
 
 const getDesktopAppBridge = (): DesktopAppBridge | null => {
   const bridge = (window as DesktopRuntimeWindow).go?.main?.App
@@ -1331,8 +1280,6 @@ const autoSaveCrossSeedSettings = async () => {
       auto_add_existing_to_downloader: settingsForm.auto_add_existing_to_downloader,
       publish_batch_concurrency_mode: settingsForm.publish_batch_concurrency_mode,
       publish_batch_concurrency_manual: settingsForm.publish_batch_concurrency_manual,
-      // 同步带上 ptgen token，避免后端覆盖时丢失（后端已做 merge，但这里也保持完整）
-      cspt_ptgen_token: uploadForm.cspt_ptgen_token,
     }
 
     await axios.post('/api/settings/cross_seed', crossSeedSettings)
@@ -1439,11 +1386,6 @@ const fetchSettings = async () => {
       uploadForm.anonymous_upload = config.upload_settings.anonymous_upload !== false // 默认为true
       uploadForm.ratio_limiter_interval_seconds =
         Number(config.upload_settings.ratio_limiter_interval_seconds) || 1800
-    }
-
-    // 获取财神ptgen token（从cross_seed配置中读取）
-    if (config.cross_seed && config.cross_seed.cspt_ptgen_token) {
-      uploadForm.cspt_ptgen_token = config.cross_seed.cspt_ptgen_token
     }
 
     // 获取标签设置
@@ -1820,20 +1762,6 @@ const saveUploadSettings = async () => {
     }
     await axios.post('/api/upload_settings', uploadSettings)
 
-    // 保存财神ptgen token到cross_seed配置
-    // 需要包含完整的cross_seed配置，因为后端API要求必须有image_hoster字段
-    const crossSeedSettings = {
-      image_hoster: settingsForm.image_hoster,
-      agsv_email: settingsForm.agsv_email,
-      agsv_password: settingsForm.agsv_password,
-      default_downloader: settingsForm.default_downloader,
-      auto_add_existing_to_downloader: settingsForm.auto_add_existing_to_downloader,
-      cspt_ptgen_token: uploadForm.cspt_ptgen_token,
-      publish_batch_concurrency_mode: settingsForm.publish_batch_concurrency_mode,
-      publish_batch_concurrency_manual: settingsForm.publish_batch_concurrency_manual,
-    }
-    await axios.post('/api/settings/cross_seed', crossSeedSettings)
-
     ElMessage.success('上传设置已保存！')
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error, '保存失败。')
@@ -1944,6 +1872,10 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 375px), 1fr));
   align-items: start;
   gap: 14px;
+}
+
+.ptgen-settings-card {
+  grid-column: 1 / -1;
 }
 
 .settings-card {

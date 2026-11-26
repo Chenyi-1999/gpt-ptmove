@@ -2,12 +2,15 @@ package repair
 
 import (
 	"strings"
+
+	"github.com/pt-nexus/server/internal/config"
 )
 
 // MediaValidateEntryDeps 定义媒体校验入口流程依赖。
 type MediaValidateEntryDeps struct {
 	GetRootConfig      func() map[string]any
 	GetCSPTToken       func() string
+	GetPTGenSources    func() []config.PTGenSource
 	GetSeedMedia       func(seedID string) string
 	ScreenshotProgress func(stage string, completed, total int)
 }
@@ -27,8 +30,12 @@ func MediaValidateEntry(payload map[string]any, deps MediaValidateEntryDeps) (ma
 	if deps.GetCSPTToken != nil {
 		csptToken = strings.TrimSpace(deps.GetCSPTToken())
 	}
+	var sources []config.PTGenSource
+	if deps.GetPTGenSources != nil {
+		sources = deps.GetPTGenSources()
+	}
 	return ValidateMediaPayload(payload, rootConfig, csptToken, MediaValidateDeps{
 		GetSeedMediaInfo:   deps.GetSeedMedia,
 		ScreenshotProgress: deps.ScreenshotProgress,
-	})
+	}, sources...)
 }

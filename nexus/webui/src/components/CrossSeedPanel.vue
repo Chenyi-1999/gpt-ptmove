@@ -182,6 +182,7 @@ import { openSSE, type EventSourceLike } from '@/desktop/sse'
 import LogProgress from './LogProgress.vue'
 import LogViewerCard from './LogViewerCard.vue'
 import { redactPrivateText } from '@/utils/publishPresentation'
+import { parsePreviewImageUrls, renderPreviewBBCode } from '@/utils/crossSeedPreview'
 import CrossSeedStepsHeader from './cross-seed/CrossSeedStepsHeader.vue'
 import CrossSeedStepDetails from './cross-seed/CrossSeedStepDetails.vue'
 import CrossSeedStepPublishPreview from './cross-seed/CrossSeedStepPublishPreview.vue'
@@ -288,49 +289,8 @@ const normalizeIntroBodyAndMediainfo = (
   }
 }
 
-// BBCode 解析函数
-const parseBBCode = (text?: string | null): string => {
-  if (!text) return ''
-
-  // 过滤掉多余的空行，只保留单个空行
-  text = filterExtraEmptyLines(text)
-
-  // 处理 [quote] 标签
-  text = text.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote>$1</blockquote>')
-
-  // 处理 [b] 标签
-  text = text.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
-
-  // 处理 [color] 标签
-  text = text.replace(
-    /\[color=(\w+|#[0-9a-fA-F]{3,6})\]([\s\S]*?)\[\/color\]/gi,
-    '<span style="color: $1;">$2</span>',
-  )
-
-  // 处理 [size] 标签，映射到具体的像素值
-  text = text.replace(
-    /\[size=(\d+)\]([\s\S]*?)\[\/size\]/gi,
-    (match: string, size: string, content: string): string => {
-      // 根据 size 值映射到具体的像素值
-      const sizeMap: { [key: string]: string } = {
-        '1': '12',
-        '2': '14',
-        '3': '16',
-        '4': '18',
-        '5': '24',
-        '6': '32',
-        '7': '48',
-      }
-      const pixelSize = sizeMap[size] || parseInt(size) * 4
-      return `<span style="font-size: ${pixelSize}px;">${content}</span>`
-    },
-  )
-
-  // 处理换行符
-  text = text.replace(/\n/g, '<br>')
-
-  return text
-}
+const parseBBCode = (text?: string | null): string =>
+  renderPreviewBBCode(filterExtraEmptyLines(text ?? ''))
 
 const handleApiError = (error: unknown, defaultMessage: string) => {
   const message = extractApiErrorMessage(error, defaultMessage)
@@ -439,30 +399,6 @@ const getInitialTorrentData = (): TorrentData => ({
   raw_params_for_preview: {},
 })
 
-const parseImageUrls = (value: string | string[] | null | undefined) => {
-  if (!value) return []
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => String(item || '').trim())
-      .filter((item) => item.startsWith('http://') || item.startsWith('https://'))
-  }
-
-  const text = String(value).trim()
-  if (!text) return []
-
-  const bbcodeRegex = /\[img\](https?:\/\/[^\s[\]]+)\[\/img\]/gi
-  const bbcodeMatches = [...text.matchAll(bbcodeRegex)].map((match) => match[1])
-  if (bbcodeMatches.length > 0) {
-    return bbcodeMatches
-  }
-
-  return text
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter((item) => item.startsWith('http://') || item.startsWith('https://'))
-}
-
 // 图片代理URL处理
 const imageProxyMap = ref(new Map<string, string>())
 
@@ -485,14 +421,8 @@ const handleImageErrorWithProxy = (url: string, type: 'poster' | 'screenshot', i
     const proxyUrl = `http://pt-nexus-proxy.sqing33.dpdns.org/${url}`
     imageProxyMap.value.set(url, proxyUrl)
 
-    // 强制更新图片显示
-    const imgElements = document.querySelectorAll(`img[src="${currentUrl}"]`)
-    imgElements.forEach((img) => {
-      img.setAttribute('src', proxyUrl)
-    })
-
-    console.log(`图片加载失败，尝试使用代理URL: ${proxyUrl}`)
-    return // 不调用原有的错误处理，给代理URL一次机会
+    // Vue updates the bound image src when the reactive map changes.
+    return
   }
 
   // 如果代理URL也失败了，调用原有的错误处理
@@ -918,8 +848,8 @@ const reverseMappings = ref<ReverseMappings>({
   tags: {},
 })
 
-const posterImages = computed(() => parseImageUrls(torrentData.value.intro.poster))
-const screenshotImages = computed(() => parseImageUrls(torrentData.value.intro.screenshots))
+const posterImages = computed(() => parsePreviewImageUrls(torrentData.value.intro.poster))
+const screenshotImages = computed(() => parsePreviewImageUrls(torrentData.value.intro.screenshots))
 const needsScreenshots = computed(() => !screenshotValid.value || !screenshotImages.value.length)
 const needsMediaInfo = computed(
   () => !publishFlow.hasUsableDraftMediaReport(String(torrentData.value.mediainfo || '')),
@@ -1447,7 +1377,7 @@ const confirmScreenshotPreviewSelection = async () => {
         draft.screenshot_review_status !== previousReviewStatus
       )
         return
-      const urls = parseImageUrls(response.data.screenshots)
+      const urls = parsePreviewImageUrls(response.data.screenshots)
       const verified = countDistinctScreenshotURLs(urls)
       if (urls.length !== selectedTimes.length || verified !== selectedTimes.length) {
         ElNotification.warning(
@@ -2075,7 +2005,7 @@ const fillMissingMedia = async () => {
         controller.signal,
       )
       const screenshots = typeof finalized.screenshots === 'string' ? finalized.screenshots : ''
-      const urls = parseImageUrls(screenshots)
+      const urls = parsePreviewImageUrls(screenshots)
       if (!finalized.success) throw new Error(finalized.error || '正式截图生成失败')
       if (
         urls.length !== autoScreenshotCount ||

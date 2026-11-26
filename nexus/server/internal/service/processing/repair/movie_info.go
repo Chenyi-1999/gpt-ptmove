@@ -2,6 +2,7 @@ package repair
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pt-nexus/server/internal/config"
 	"github.com/pt-nexus/server/internal/platform/logx"
 )
 
@@ -42,10 +44,40 @@ var (
 // 失败场景：所有来源都无法返回有效数据时返回错误文案。
 // 副作用：会访问 PTGen、豆瓣、TMDb 等外部网络接口。
 func FetchMovieInfo(mediaType, contentName, subtitle string, sourceInfo map[string]any, csptToken string) (MovieInfoResult, string) {
+	return fetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, csptToken, nil)
+}
+
+// FetchMovieInfoWithPTGen 按顺序查询用户选定的 PTGen 来源，再使用内置回退。
+func FetchMovieInfoWithPTGen(mediaType, contentName, subtitle string, sourceInfo map[string]any, sources []config.PTGenSource) (MovieInfoResult, string) {
+	return fetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, "", sources)
+}
+
+func fetchMovieInfo(mediaType, contentName, subtitle string, sourceInfo map[string]any, csptToken string, sources []config.PTGenSource) (MovieInfoResult, string) {
+	return fetchMovieInfoUsingClient(mediaType, contentName, subtitle, sourceInfo, csptToken, sources, configuredPTGenClient)
+}
+
+func fetchMovieInfoUsingClient(mediaType, contentName, subtitle string, sourceInfo map[string]any, csptToken string, sources []config.PTGenSource, client *http.Client) (MovieInfoResult, string) {
 	result := MovieInfoResult{
 		IMDb:   NormalizeExternalLink(toStringAny(sourceInfo["imdb_link"], ""), reIMDbLink),
 		Douban: NormalizeExternalLink(toStringAny(sourceInfo["douban_link"], ""), reDoubanLink),
 		TMDb:   NormalizeExternalLink(toStringAny(sourceInfo["tmdb_link"], ""), reTMDbLink),
+	}
+	searchedTitle := false
+	if len(sources) != 0 {
+		// When already given a known movie link, query the user's list before
+		// any external ID bridge, title search or TMDb request.
+		if !hasPTGenMediaLink(result) && subtitle != "" {
+			searchedTitle = true
+			imdb, douban := searchByName(subtitle)
+			result.IMDb = firstNonEmpty(knownPTGenLink(imdb, reIMDbLink), result.IMDb)
+			result.Douban = firstNonEmpty(knownPTGenLink(douban, reDoubanLink), result.Douban)
+		}
+		if found, ok := fetchConfiguredPTGen(mediaType, result, sources, client); ok {
+			resolved := mergePTGenResult(mediaType, knownPTGenMediaLinks(result), found)
+			resolved.ConfiguredPoster = mediaType == "poster"
+			logFetchMovieInfoResult(mediaType, "ptgen_configured", resolved, "已使用配置来源")
+			return resolved, ""
+		}
 	}
 	tmdbBackfillAttempted := false
 
@@ -71,7 +103,7 @@ func FetchMovieInfo(mediaType, contentName, subtitle string, sourceInfo map[stri
 		}
 	}
 
-	if result.Douban == "" && subtitle != "" {
+	if !searchedTitle && result.Douban == "" && subtitle != "" {
 		if imdb, douban := searchByName(subtitle); imdb != "" || douban != "" {
 			if result.IMDb == "" {
 				result.IMDb = imdb
@@ -86,27 +118,15 @@ func FetchMovieInfo(mediaType, contentName, subtitle string, sourceInfo map[stri
 		backfillTMDbByIMDbIfNeeded(result.TMDb, result.IMDb, &tmdbBackfillAttempted, movieInfoLogModule, "初始外链互补后"),
 	)
 
-	format, formatIMDb, formatDouban, formatTMDb, errMsg := fetchPTGenFormat(result, csptToken)
-	if errMsg == "" && strings.TrimSpace(format) != "" {
-		poster, intro, imdb, douban, tmdb := parseFormatContent(format, formatIMDb, formatDouban, formatTMDb)
-		result.IMDb = firstNonEmpty(imdb, result.IMDb)
-		result.Douban = firstNonEmpty(douban, result.Douban)
-		result.TMDb = firstNonEmpty(tmdb, result.TMDb)
-		result.TMDb = firstNonEmpty(
-			result.TMDb,
-			backfillTMDbByIMDbIfNeeded(result.TMDb, result.IMDb, &tmdbBackfillAttempted, movieInfoLogModule, "PTGen解析后"),
+	found, errMsg := fetchPTGenFormat(mediaType, result, csptToken)
+	if hasPTGenContent(mediaType, found) {
+		found.TMDb = firstNonEmpty(
+			found.TMDb, result.TMDb,
+			backfillTMDbByIMDbIfNeeded(firstNonEmpty(found.TMDb, result.TMDb), firstNonEmpty(found.IMDb, result.IMDb), &tmdbBackfillAttempted, movieInfoLogModule, "PTGen解析后"),
 		)
-		if mediaType == "poster" && strings.TrimSpace(poster) != "" {
-			result.Poster = poster
-			logFetchMovieInfoResult(mediaType, "ptgen", result, "PTGen格式返回海报")
-			return result, ""
-		}
-		if mediaType == "intro" && strings.TrimSpace(intro) != "" {
-			result.Intro = ensureTMDbLinkLineForPTGenIntro(intro, result.TMDb)
-			logFetchMovieInfoResult(mediaType, "ptgen", result, "PTGen格式返回简介")
-			return result, ""
-		}
-		logx.Infof(movieInfoLogModule, "PTGen命中但未返回目标内容 media_type=%s poster_non_empty=%t intro_non_empty=%t", mediaType, strings.TrimSpace(poster) != "", strings.TrimSpace(intro) != "")
+		result = mergePTGenResult(mediaType, result, found)
+		logFetchMovieInfoResult(mediaType, "ptgen", result, "已使用内置 PTGen")
+		return result, ""
 	}
 
 	if result.Douban != "" {
@@ -198,6 +218,18 @@ func FetchMovieInfo(mediaType, contentName, subtitle string, sourceInfo map[stri
 	return result, "未能获取有效简介，请检查豆瓣/IMDb/TMDb链接或网络连通性。"
 }
 
+func mergePTGenResult(mediaType string, original, found MovieInfoResult) MovieInfoResult {
+	original.IMDb = firstNonEmpty(found.IMDb, original.IMDb)
+	original.Douban = firstNonEmpty(found.Douban, original.Douban)
+	original.TMDb = firstNonEmpty(found.TMDb, original.TMDb)
+	if mediaType == "poster" {
+		original.Poster = found.Poster
+	} else {
+		original.Intro = ensureTMDbLinkLineForPTGenIntro(found.Intro, original.TMDb)
+	}
+	return original
+}
+
 func logFetchMovieInfoResult(mediaType, source string, result MovieInfoResult, note string) {
 	hasPayload := false
 	switch strings.ToLower(strings.TrimSpace(mediaType)) {
@@ -222,7 +254,7 @@ func logFetchMovieInfoResult(mediaType, source string, result MovieInfoResult, n
 	)
 }
 
-func fetchPTGenFormat(links MovieInfoResult, csptToken string) (string, string, string, string, string) {
+func fetchPTGenFormat(mediaType string, links MovieInfoResult, csptToken string) (MovieInfoResult, string) {
 	resource := firstNonEmpty(links.Douban, links.TMDb, links.IMDb)
 	traceID := fmt.Sprintf("ptgen-%d", time.Now().UnixNano())
 	if resource == "" {
@@ -234,7 +266,7 @@ func fetchPTGenFormat(links MovieInfoResult, csptToken string) (string, string, 
 			CompactLogText(links.Douban, 120),
 			CompactLogText(links.TMDb, 120),
 		)
-		return "", "", "", "", ""
+		return MovieInfoResult{}, ""
 	}
 
 	candidates := buildPTGenCandidates(resource, links.Douban, csptToken)
@@ -259,9 +291,10 @@ func fetchPTGenFormat(links MovieInfoResult, csptToken string) (string, string, 
 			logx.Warnf(ptgenLogModule, "PTGen 请求失败 流程ID=%s 候选=%d/%d 耗时=%dms 地址=%s 错误=%v", traceID, idx+1, len(candidates), costMs, logURL, err)
 			continue
 		}
-		format = strings.TrimSpace(format)
-		if format == "" {
-			logx.Warnf(ptgenLogModule, "PTGen 请求返回空格式 流程ID=%s 候选=%d/%d 耗时=%dms 地址=%s", traceID, idx+1, len(candidates), costMs, logURL)
+		poster, intro, imdb, douban, tmdb := parseFormatContent(format, imdb, douban, tmdb)
+		found := MovieInfoResult{Poster: poster, Intro: intro, IMDb: imdb, Douban: douban, TMDb: tmdb}
+		if !hasPTGenContent(mediaType, found) {
+			logx.Warnf(ptgenLogModule, "PTGen 缺少目标内容 流程ID=%s 候选=%d/%d 类型=%s", traceID, idx+1, len(candidates), mediaType)
 			continue
 		}
 		logx.Infof(
@@ -277,7 +310,7 @@ func fetchPTGenFormat(links MovieInfoResult, csptToken string) (string, string, 
 			CompactLogText(douban, 120),
 			CompactLogText(tmdb, 120),
 		)
-		return format, imdb, douban, tmdb, ""
+		return found, ""
 	}
 
 	if strings.TrimSpace(lastErr) != "" {
@@ -285,7 +318,7 @@ func fetchPTGenFormat(links MovieInfoResult, csptToken string) (string, string, 
 	} else {
 		logx.Warnf(ptgenLogModule, "PTGen 候选全部未返回有效格式，转入后续回退逻辑 流程ID=%s", traceID)
 	}
-	return "", "", "", "", lastErr
+	return MovieInfoResult{}, lastErr
 }
 
 func buildPTGenCandidates(resourceURL, doubanURL, csptToken string) []string {
@@ -341,7 +374,7 @@ func fetchPTGenData(url string) (string, string, string, string, error) {
 	}
 
 	if len(errMessages) > 0 {
-		return "", "", "", "", fmt.Errorf(strings.Join(errMessages, " | "))
+		return "", "", "", "", errors.New(strings.Join(errMessages, " | "))
 	}
 	return "", "", "", "", fmt.Errorf("no request method available")
 }

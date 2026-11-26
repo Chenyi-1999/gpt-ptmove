@@ -36,6 +36,14 @@ func NewSettingsServiceWithDataDir(cfg *config.Manager, dataDir string) *Setting
 	return service
 }
 
+func (s *SettingsService) GetPTGenSettings() (config.PTGenSettings, error) {
+	return s.cfg.GetPTGenSettings()
+}
+
+func (s *SettingsService) SavePTGenSettings(rows []config.PTGenSourceInput) (config.PTGenSettings, error) {
+	return s.cfg.SavePTGenSettings(rows)
+}
+
 func (s *SettingsService) SetIYUUTrigger(trigger func() map[string]any) {
 	s.logMu.Lock()
 	s.iyuuTrigger = trigger

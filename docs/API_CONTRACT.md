@@ -47,6 +47,8 @@ Settings keys: `source_cookie`, `target_cookie`, `source_rss_url`, `qb_url`, `qb
 
 ## v0.2 administrative and machine interfaces
 
+- Admin PTGen settings use GET and PUT `/api/settings/ptgen`. GET and PUT return `{sources,legacy_cspt_configured}`. Each returned row includes `id,type,resolved_type,url,token_configured`.
+- PUT accepts `{sources:[{id?,type,url,token?,clear_token?,use_legacy_cspt_token?}]}`. List order is query priority. Omit the ID for a new row or send an empty list to clear the configuration. Allowed types are `auto`, `cspt`, `universal`, `ourbits` and `generic`. Endpoints use public HTTPS. Providing a blank token retains the token for the same saved address and protocol. Set `clear_token` to clear it. Only an explicit `cspt` row may reuse the existing legacy token. Responses exclude token values.
 - Admin site management: GET `/api/sites`, `/api/sites/schema`, `/api/sites/template`, `/api/sites/{id}/export`; POST `/api/sites/preview` profile object; POST `/api/sites/import` {profile,update}; PUT `/api/sites/{id}/credentials` {cookie?,rss_url?}.
 - Admin API keys: GET/POST `/api/api-keys`; DELETE `/api/api-keys/{id}`. Creation {name,scopes:[read],expires_days:30} returns {token,key}; token is never returned again. GET `/api/ai-guide` returns copyable integration guide.
 - AI Bearer endpoints and scope/idempotency rules are documented in AI_API.md. Authenticated `/api/v1/openapi.json` contains only machine routes. Global `/openapi.json` is disabled.

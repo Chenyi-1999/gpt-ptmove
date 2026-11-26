@@ -66,7 +66,7 @@ func (s *MigrateService) fetchAndStore(payload map[string]any, automationRepo *a
 	fetchRepairDeps := processingrepair.FetchRepairDeps{
 		EmitLog:          s.emitLog,
 		RefreshMediainfo: s.refreshMediainfoAsync,
-		CSPTToken:        s.csptToken(),
+		PTGenSources:     s.ptgenSources(),
 		RootConfig:       rootConfig,
 	}
 	var fetchRepo processingpersist.FetchAndStoreEntryRepo = s.repo

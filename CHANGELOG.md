@@ -833,3 +833,10 @@
 - 桌面与移动端的匿名发布滑块通过浏览器验收，截图与验证记录保存在 D 盘本次 QA 目录。
 - 两仓库同一标签源码提交 fbfcba7df60b42697aba3dd0744ddf2ef8dd6a1b。GitHub 公开发行 459545849 附 152 验证的完整 Docker 镜像、Compose、SHA-256 校验与下载器统计示例。Gitee 私有发行 1372814 附 Compose、校验与示例，逐一授权读取核对，并提供同版完整镜像入口。
 - 完整镜像 SHA-256 d72b98f90092412208b2e932e584ee83d447e7bdebc3e0f947d32f41832bfda0，D 盘历史归档通过 99 个 OCI 对象、ZIP 内容及归档 SHA-256 3315b3cd2d7fdbc65d2070d1cc7e8736ebe3cf9dfc72ca98337058119cec8dcc 核对，归档索引已登记。更新 docs/DEPLOYMENT.json，152 与 OVH 继续运行 v1.1.3。版本标签保持，回执单独同步两仓。
+
+## PTM-20261126-V114-PTGEN-PROVIDERS — 2026-11-26T23:27:30+08:00 — Codex root、ptgen_runtime、ptgen_settings_ui、ptgen_review，PTGen 来源可排序配置
+
+- 修改 nexus/server/internal/config、service/settings、http/handler/settings、bootstrap、migrationflow 和 service/processing/repair。新增有序来源持久化和 GET/PUT 设置接口，响应隐藏令牌。设置页空列表，原财神令牌仅用户主动选用才迁入。查询依用户排序，命中所需资料即返回，失败或缺目标资料时试下一条，内置来源在自选来源后。支持自动识别、财神、PT-Gen Universal、OurBits 和通用接口。自定义接口使用对应凭据、校验公网 HTTPS、限制跳转，简介过滤上游 HTML 与主动嵌入。自定义海报使用核验过的直链。
+- 修改 nexus/webui/src 的转种设置及来源组件、发布预览渲染与对应 dist。加号新增首列类型下拉，可上下排序、删除及独立保存。预览转义旧正文中的原始 HTML，再渲染受支持的 BBCode。更新 API 合同、版本、发行说明、Compose 与 Dockerfile。
+- 本机 Go 定向与 repair 全包、Go vet、Vue 类型检查、定向 ESLint、Vite 和差异检查通过。模拟异常、目标不全、令牌隔离、地址限制、优先顺序及恶意简介回归通过。桌面与手机本机 14 项浏览器模拟验收通过，截图与记录保存在 D 盘本次 QA 目录。152 Linux Go 全量、152 和 OVH 同镜像断网回归 19 项及生产 11 份页面和资源验证通过，新接口匿名返回 401。
+- 两台服务已运行 v1.1.4，OVH 旧 PTGen 配置和转种选项字节或结构比对一致，保留登录、下载器、站点配置、已有插件和北洋园轮询。恢复后正常循环新增 1、失败 0，容器重启次数 0。保留前版容器或镜像及 SQLite 快照。本次用模拟来源验证，没有真实 PTGen 服务联调、手工下载或发种，未操作 81。记录时 Git 提交、两仓推送、发行和归档待完成。

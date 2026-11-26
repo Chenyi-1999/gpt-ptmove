@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pt-nexus/server/internal/config"
 	processingpersist "github.com/pt-nexus/server/internal/service/processing/persist"
 	processingrepair "github.com/pt-nexus/server/internal/service/processing/repair"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
@@ -43,7 +44,7 @@ func (s *MigrateService) MediaValidate(payload map[string]any) (map[string]any, 
 			}
 			return s.cfg.Get()
 		},
-		GetCSPTToken: s.csptToken,
+		GetPTGenSources: s.ptgenSources,
 		GetSeedMedia: func(seedID string) string {
 			hash, torrentID, siteName, parseErr := processingpersist.ParseSeedID(seedID)
 			if parseErr != nil {
@@ -109,16 +110,11 @@ func screenshotTaskProgress(stage string, completed, total int) (string, string)
 	return "", ""
 }
 
-func (s *MigrateService) csptToken() string {
+func (s *MigrateService) ptgenSources() []config.PTGenSource {
 	if s == nil || s.cfg == nil {
-		return ""
+		return nil
 	}
-	root := s.cfg.Get()
-	crossSeed, ok := root["cross_seed"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(processingshared.ToString(crossSeed["cspt_ptgen_token"], ""))
+	return s.cfg.PTGenSources()
 }
 
 func (s *MigrateService) RefreshMediainfoAsync(payload map[string]any) (map[string]any, int) {

@@ -3,6 +3,8 @@ package repair
 import (
 	"strings"
 
+	"github.com/pt-nexus/server/internal/config"
+
 	parser "github.com/pt-nexus/server/internal/service/acquire/extract"
 	processingtagging "github.com/pt-nexus/server/internal/service/processing/tagging"
 )
@@ -19,7 +21,7 @@ type MediaValidateDeps struct {
 // 参数/返回：payload 为前端提交参数；rootConfig 为运行配置；csptToken 为 PTGen 令牌；deps 为外部依赖回调。
 // 失败场景：参数缺失、外部信息获取失败、自动修复失败会返回对应错误状态码。
 // 副作用：可能触发截图生成上传与外部站点请求。
-func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csptToken string, deps MediaValidateDeps) (map[string]any, int) {
+func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csptToken string, deps MediaValidateDeps, sources ...config.PTGenSource) (map[string]any, int) {
 	mediaType := strings.TrimSpace(toStringAny(payload["type"], ""))
 	contentName := strings.TrimSpace(toStringAny(payload["content_name"], ""))
 	sourceInfo, _ := payload["source_info"].(map[string]any)
@@ -93,11 +95,13 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 		return map[string]any{"success": true, "screenshots": ToBBCodeImages(urls)}, 200
 
 	case "poster":
-		result, errMsg := FetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, csptToken)
+		result, errMsg := fetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, csptToken, sources)
 		if errMsg != "" {
 			return map[string]any{"success": false, "error": errMsg}, 400
 		}
-		result.Poster = NormalizePosterBBCode(result.Poster)
+		if !result.ConfiguredPoster {
+			result.Poster = NormalizePosterBBCode(result.Poster)
+		}
 		return map[string]any{
 			"success":               true,
 			"posters":               result.Poster,
@@ -108,7 +112,7 @@ func ValidateMediaPayload(payload map[string]any, rootConfig map[string]any, csp
 		}, 200
 
 	case "intro":
-		result, errMsg := FetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, csptToken)
+		result, errMsg := fetchMovieInfo(mediaType, contentName, subtitle, sourceInfo, csptToken, sources)
 		if errMsg != "" {
 			return map[string]any{"success": false, "error": errMsg}, 400
 		}

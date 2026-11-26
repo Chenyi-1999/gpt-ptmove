@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pt-nexus/server/internal/config"
 	"github.com/pt-nexus/server/internal/platform/logx"
 	parser "github.com/pt-nexus/server/internal/service/acquire/extract"
 	processingshared "github.com/pt-nexus/server/internal/service/processing/shared"
@@ -38,6 +39,7 @@ type FetchRepairDeps struct {
 	EmitLog          func(taskID, step, message, status string)
 	RefreshMediainfo func(payload map[string]any) (map[string]any, int)
 	CSPTToken        string
+	PTGenSources     []config.PTGenSource
 	RootConfig       map[string]any
 	DeferMediaRepair bool
 }
@@ -418,7 +420,7 @@ func repairPosterDuringFetch(
 		CompactLogText(strings.TrimSpace(stringValue(doubanLink)), 120),
 		CompactLogText(strings.TrimSpace(stringValue(tmdbLink)), 120),
 	)
-	posterResult, posterErr := FetchMovieInfo("poster", torrentName, subtitle, posterSource, strings.TrimSpace(deps.CSPTToken))
+	posterResult, posterErr := fetchMovieInfo("poster", torrentName, subtitle, posterSource, strings.TrimSpace(deps.CSPTToken), deps.PTGenSources)
 	if posterErr != "" {
 		logx.Warnf(fetchRepairPosterLogModule, "海报自动修复失败 title=%s err=%s", torrentName, posterErr)
 		emitLog(deps, taskID, "修复海报", "海报自动修复失败："+posterErr, "warning")
@@ -435,10 +437,13 @@ func repairPosterDuringFetch(
 	)
 
 	if strings.TrimSpace(posterResult.Poster) != "" {
-		reviewData.Poster = NormalizePosterBBCode(posterResult.Poster)
+		reviewData.Poster = posterResult.Poster
+		if !posterResult.ConfiguredPoster {
+			reviewData.Poster = NormalizePosterBBCode(reviewData.Poster)
+		}
 		normalizedPosterURLs := ExtractImageURLsFromText(reviewData.Poster)
 		firstURL := ""
-		if len(normalizedPosterURLs) > 0 {
+		if len(normalizedPosterURLs) > 0 && !posterResult.ConfiguredPoster {
 			firstURL = strings.TrimSpace(normalizedPosterURLs[0])
 		}
 		logx.Infof(
@@ -454,7 +459,11 @@ func repairPosterDuringFetch(
 	*tmdbLink = firstNonEmpty(strings.TrimSpace(stringValue(tmdbLink)), strings.TrimSpace(posterResult.TMDb))
 
 	if urls := ExtractImageURLsFromText(reviewData.Poster); len(urls) > 0 {
-		logx.Infof(fetchRepairPosterLogModule, "海报自动修复成功 url=%s", urls[0])
+		if posterResult.ConfiguredPoster {
+			logx.Infof(fetchRepairPosterLogModule, "配置来源海报自动修复成功")
+		} else {
+			logx.Infof(fetchRepairPosterLogModule, "海报自动修复成功 url=%s", urls[0])
+		}
 		emitLog(deps, taskID, "修复海报", "海报自动修复成功", "success")
 		return
 	}
@@ -520,7 +529,7 @@ func repairIntroBodyDuringFetch(
 		"douban_link": strings.TrimSpace(stringValue(doubanLink)),
 		"tmdb_link":   strings.TrimSpace(stringValue(tmdbLink)),
 	}
-	introResult, introErr := FetchMovieInfo("intro", torrentName, subtitle, introSource, strings.TrimSpace(deps.CSPTToken))
+	introResult, introErr := fetchMovieInfo("intro", torrentName, subtitle, introSource, strings.TrimSpace(deps.CSPTToken), deps.PTGenSources)
 	if introErr != "" {
 		logx.Warnf(fetchRepairIntroLogModule, "简介自动补全失败 title=%s err=%s", torrentName, introErr)
 		emitLog(deps, taskID, "修复简介", "简介自动补全失败："+introErr, "warning")

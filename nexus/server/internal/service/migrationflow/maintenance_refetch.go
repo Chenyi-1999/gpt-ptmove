@@ -95,7 +95,7 @@ func (s *MigrateService) RefetchMaintenanceSeed(payload map[string]any) (map[str
 		TaskID: taskID, SearchTerm: sourceID, AcquireResult: acquired, ExtractorEngine: s.extractorEngine,
 	}, processingpersist.FetchStoreProcessDeps{
 		Repo: s.repo, EmitLog: emit, Now: time.Now(), BuildSimpleTitleComponents: processingtitle.BuildSimpleTitleComponentsWithMediaInfo,
-		FetchRepairDeps: processingrepair.FetchRepairDeps{EmitLog: s.emitLog, RootConfig: rootConfig, CSPTToken: s.csptToken()},
+		FetchRepairDeps: processingrepair.FetchRepairDeps{EmitLog: s.emitLog, RootConfig: rootConfig, PTGenSources: s.ptgenSources()},
 	}, previous)
 	if err != nil {
 		return maintenanceError(http.StatusUnprocessableEntity, err.Error())

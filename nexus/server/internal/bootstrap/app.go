@@ -311,6 +311,8 @@ func registerRoutes(
 		api.POST("/ui_settings/publish_logs", settingsHandler.SavePublishLogsUISettings)
 		api.GET("/upload_settings", settingsHandler.GetUploadSettings)
 		api.POST("/upload_settings", settingsHandler.SaveUploadSettings)
+		api.GET("/settings/ptgen", settingsHandler.GetPTGenSettings)
+		api.PUT("/settings/ptgen", settingsHandler.SavePTGenSettings)
 		api.GET("/iyuu/settings", settingsHandler.GetIYUUSettings)
 		api.POST("/iyuu/settings", settingsHandler.SaveIYUUSettings)
 		api.POST("/iyuu/trigger_query", settingsHandler.TriggerIYUUQuery)

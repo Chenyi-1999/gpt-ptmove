@@ -7,6 +7,9 @@ type MovieInfoResult struct {
 	IMDb   string
 	Douban string
 	TMDb   string
+
+	// 配置来源已校验海报 URL，直接使用并跳过旧转存通道。
+	ConfiguredPoster bool
 }
 
 // ScreenshotGenerateInput 描述截图自动生成与上传所需的输入参数。
