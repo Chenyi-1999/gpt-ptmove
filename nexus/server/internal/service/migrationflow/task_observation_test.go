@@ -7,7 +7,7 @@ import (
 
 func TestTaskObservationKeepsConcurrentWorkAndTerminalEvidence(t *testing.T) {
 	s := NewMigrateService(nil, nil)
-	preview := s.observeTask("candidate_preview", "获取预览候选", "/settings/automation")
+	preview := s.observeTask("candidate_preview", "获取预览候选", automationPluginRoute)
 	media := s.observeTask("screenshot", "生成截图", "")
 	if preview.id == media.id {
 		t.Fatal("concurrent operations share an identifier")
@@ -24,6 +24,11 @@ func TestTaskObservationKeepsConcurrentWorkAndTerminalEvidence(t *testing.T) {
 	preview.update("迟到更新", "")
 	if len(s.observations.snapshot()) != 2 || s.observations.rows[preview.id].status != "success" || s.observations.rows[media.id].status != "running" {
 		t.Fatal("completion overwrote another task or was overwritten by a late update")
+	}
+	for _, row := range s.observations.snapshot() {
+		if row["kind"] == "candidate_preview" && row["route_target"].(map[string]string)["path"] != "/plugins?plugin=automation" {
+			t.Fatal("candidate preview must open the automatic transfer plugin")
+		}
 	}
 	s.observations.prune(time.Now().Add(observationRetention + time.Second))
 	if len(s.observations.rows) != 1 || s.observations.rows[media.id].status != "running" {

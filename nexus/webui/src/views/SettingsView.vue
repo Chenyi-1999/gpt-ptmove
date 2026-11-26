@@ -14,7 +14,7 @@
         </nav>
 
         <div class="settings-content">
-          <router-view />
+          <router-view :key="route.name" />
         </div>
       </div>
     </div>
@@ -38,7 +38,7 @@ const sections = [
   { label: '通用', path: '/settings/general', icon: Setting },
   { label: '下载器', path: '/settings/downloader', icon: Download },
   { label: '站点管理', path: '/settings/cookie', icon: Tickets },
-  { label: '自动转种', path: '/plugins?plugin=automation', icon: Refresh },
+  { label: '转种', path: '/settings/transfer', icon: Refresh },
   { label: '站点配置', path: '/settings/site-profiles', icon: Connection },
   { label: 'API 管理', path: '/settings/api', icon: Key },
 ]

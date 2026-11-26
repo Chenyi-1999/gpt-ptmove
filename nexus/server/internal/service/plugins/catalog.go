@@ -220,7 +220,7 @@ func validText(s string, limit int, required bool) bool {
 func allowedTarget(target string) bool {
 	switch target {
 	case "/torrents", "/data", "/seed-maintenance", "/publish-logs", "/sites",
-		"/settings/downloader", "/settings/api", "/settings/site-profiles", "/settings/automation":
+		"/settings/downloader", "/settings/api", "/settings/site-profiles", "/settings/transfer", "/settings/automation":
 		return true
 	}
 	return false

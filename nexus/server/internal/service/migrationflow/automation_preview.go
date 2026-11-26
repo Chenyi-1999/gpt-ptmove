@@ -89,7 +89,7 @@ func (s *AutomationService) LatestWebPreview(ctx context.Context) (map[string]an
 }
 
 func (s *AutomationService) preview(ctx context.Context, body map[string]any, startedAt int64) (map[string]any, int) {
-	task := s.migrate.observeTask("candidate_preview", "获取预览候选", "/settings/automation")
+	task := s.migrate.observeTask("candidate_preview", "获取预览候选", automationPluginRoute)
 	defer task.finish(false, "预览未完成", "")
 	repo := s.repo.WithContext(ctx)
 	v, err := s.settings(repo)

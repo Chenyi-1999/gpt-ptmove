@@ -22,7 +22,7 @@ v1.1.0 的外部插件能力是 `downloader.summary`，返回配置中的下载�
 
 ## 自动转种
 
-现有自动化面板迁到「插件 → 自动转种」。旧的 `/settings/automation` 入口兼容跳转，已保存规则、候选预览、任务记录和 AI API 沿用。插件开关与每月计划独立。关闭插件暂停新的写操作并保留未完成任务，已提交到站点的结果仍可核对。自动转种继续由内置后端执行源站限制、目标查重与配额检查。
+在「插件 → 自动转种」管理自动规则、候选预览和执行记录。在「设置 → 转种」管理匿名发布、PTGen、默认下载器、发种参数和下载器标签。旧的 `/settings/automation` 地址也可打开转种设置。插件开关与每月计划独立。关闭插件暂停新的写操作并保留未完成任务，已提交到站点的结果仍可核对。自动转种继续由内置后端执行源站限制、目标查重与配额检查。
 
 ## 旧版 JSON 清单
 
@@ -46,7 +46,7 @@ v1.1.0 的外部插件能力是 `downloader.summary`，返回配置中的下载�
 ```
 
 - `id` 与文件名相同，使用小写字母、数字和连字符。
-- `text` 展示普通文本。`link` 打开应用内已有的功能，例如 `/seed-maintenance`、`/publish-logs`、`/settings/automation`、`/settings/site-profiles`、`/settings/api`。
+- `text` 展示普通文本。`link` 打开应用内已有的功能，例如 `/seed-maintenance`、`/publish-logs`、`/settings/transfer`、`/settings/site-profiles`、`/settings/api`。
 - `metric` 支持 `visible_torrents`、`transfer_drafts`、`configured_sites`。
 - 清单支持最多 16 个内容块，每个文件最多 64 KiB。错误文件会在插件页面标明。目录读取失败时，已加载的插件继续可用。
 

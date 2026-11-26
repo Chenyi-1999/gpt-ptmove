@@ -9,6 +9,8 @@ import (
 	policy "github.com/pt-nexus/server/internal/service/processing/automation"
 )
 
+const automationPluginRoute = "/plugins?plugin=automation"
+
 // observeAutomationScan 将扫描器的详情和分页计数转成同一任务的实时进度。
 func observeAutomationScan(ctx context.Context, task taskObservation) context.Context {
 	return acquireautomation.WithScanProgress(ctx, func(update acquireautomation.ScanProgress) {
@@ -67,5 +69,5 @@ func automationMonitorEntry(task repository.AutomationTaskProgress) map[string]a
 	}
 	return map[string]any{"key": "automation:" + task.ID, "kind": "automation", "title": task.Title,
 		"status": status, "outcome": outcome, "message": task.Message, "progress_text": progress, "updated_at": task.UpdatedAt,
-		"started_at": task.CreatedAt, "route_target": map[string]string{"path": "/settings/automation"}}
+		"started_at": task.CreatedAt, "route_target": map[string]string{"path": automationPluginRoute}}
 }

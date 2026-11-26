@@ -322,7 +322,8 @@ const routeTitleMap: Record<string, string> = {
   '/settings/general': '基础设置',
   '/settings/downloader': '下载器设置',
   '/settings/cookie': '站点管理',
-  '/settings/automation': '自动化设置',
+  '/settings/transfer': '转种设置',
+  '/settings/automation': '转种设置',
   '/settings/site-profiles': '站点配置',
   '/settings/api': 'API 管理',
   '/settings/ai': 'API 管理',
@@ -527,7 +528,12 @@ const openTaskMonitor = () => {
 const openTaskRoute = (routeTarget?: { path: string; query?: Record<string, string> }) => {
   if (!routeTarget?.path) return
   taskDrawerVisible.value = false
-  void router.push({ path: routeTarget.path, query: routeTarget.query })
+  // 旧版本缓存的自动化任务链接仍应打开自动转种插件。
+  if (routeTarget.path === '/settings/automation') {
+    void router.push({ path: '/plugins', query: { ...routeTarget.query, plugin: 'automation' } })
+    return
+  }
+  void router.push(routeTarget.query ? { path: routeTarget.path, query: routeTarget.query } : routeTarget.path)
 }
 
 const isRefreshing = ref(false)

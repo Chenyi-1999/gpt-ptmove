@@ -1,9 +1,10 @@
 <template>
   <div class="settings-container">
-    <h2 class="settings-section-title">通用设置</h2>
+    <h2 class="settings-section-title">{{ transferOnly ? '转种设置' : '通用设置' }}</h2>
     <div class="settings-grid">
       <!-- 用户信息设置卡片 -->
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
         :class="{ 'temp-password-highlight': mustChange }"
       >
@@ -84,6 +85,7 @@
 
       <!-- 背景设置卡片 -->
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -226,6 +228,7 @@
       </el-dialog>
 
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -277,6 +280,7 @@
 
       <!-- IYUU设置卡片 -->
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -423,6 +427,7 @@
 
       <!-- 图床设置卡片 -->
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -500,6 +505,7 @@
 
       <!-- 上传设置卡片 -->
       <div
+        v-if="transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -615,6 +621,7 @@
 
       <!-- 发种设置卡片 -->
       <div
+        v-if="transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -773,6 +780,7 @@
 
       <!-- 下载器标签/分类设置卡片 -->
       <div
+        v-if="transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -880,6 +888,7 @@
 
       <!-- 功能扩展卡片 -->
       <div
+        v-if="!transferOnly"
         class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <div class="card-header">
@@ -901,7 +910,7 @@
     </div>
   </div>
   <!-- 路径选择弹窗 -->
-  <div>
+  <div v-if="!transferOnly">
     <div>
       <el-dialog v-model="pathSelectorVisible" title="选择IYUU查询路径" width="600px" class="settings-dialog">
         <div v-loading="loadingPaths" style="min-height: 300px">
@@ -994,6 +1003,8 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from '@/utils/uiNotify'
 import { useContentFiltersStore } from '@/stores/contentFilters'
+
+const props = defineProps<{ transferOnly?: boolean }>()
 const router = useRouter()
 const contentFiltersStore = useContentFiltersStore()
 const showRestrictedTags = ref(false)
@@ -1354,11 +1365,13 @@ const onManualConcurrencyChange = () => {
 const fetchSettings = async () => {
   try {
     // 获取用户认证状态
-    const res = await axios.get('/api/auth/status')
-    if (res.data?.success) {
-      currentUsername.value = res.data.username || 'admin'
-      mustChange.value = !!res.data.must_change_password
-      form.value.username = currentUsername.value
+    if (!props.transferOnly) {
+      const res = await axios.get('/api/auth/status')
+      if (res.data?.success) {
+        currentUsername.value = res.data.username || 'admin'
+        mustChange.value = !!res.data.must_change_password
+        form.value.username = currentUsername.value
+      }
     }
 
     // 获取所有设置
@@ -1439,7 +1452,7 @@ const fetchSettings = async () => {
     await fetchPublishConcurrencyInfo()
 
     // 如果启用了路径过滤，则加载可用路径
-    if (iyuuForm.path_filter_enabled) {
+    if (!props.transferOnly && iyuuForm.path_filter_enabled) {
       await refreshPaths()
     }
   } catch {
@@ -1894,7 +1907,7 @@ const saveSelectedPaths = () => {
 
 onMounted(() => {
   fetchSettings()
-  void initDesktopRuntime()
+  if (!props.transferOnly) void initDesktopRuntime()
 })
 </script>
 

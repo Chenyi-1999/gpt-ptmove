@@ -67,13 +67,11 @@ const router = createRouter({
           component: () => import('../components/settings/SitesSettings.vue'),
         },
         {
-          path: 'automation',
-          name: 'settings-automation',
-          redirect: (to) => ({
-            name: 'plugins',
-            query: { ...to.query, plugin: 'automation' },
-            hash: to.hash,
-          }),
+          path: 'transfer',
+          name: 'settings-transfer',
+          alias: 'automation',
+          component: () => import('../components/settings/GeneralSettings.vue'),
+          props: { transferOnly: true },
         },
         {
           path: 'site-profiles',

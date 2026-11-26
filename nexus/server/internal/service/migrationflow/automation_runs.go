@@ -77,7 +77,7 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 		_ = s.repo.FinishRunLeased(run, "completed", "本月计划已结束", run.CandidatesJSON, run.Selected, s.now())
 		return
 	}
-	observed := s.migrate.observeTask("candidate_scan", "执行自动化候选扫描", "/settings/automation")
+	observed := s.migrate.observeTask("candidate_scan", "执行自动化候选扫描", automationPluginRoute)
 	defer observed.finish(false, "候选扫描未完成", "")
 	rows, _, err := s.scan(ctx, snapshot.Route.Settings, observed, excludedIDs)
 	if run.Execute && errors.Is(s.requirePluginEnabled(ctx), repository.ErrAutomationPluginDisabled) {
