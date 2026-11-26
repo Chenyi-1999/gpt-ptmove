@@ -786,3 +786,9 @@
 - Gitee 与 GitHub 标签指向同一源码提交 b8e464aa6115019a57c3dc68b4b44cab7d03fccc。GitHub 的 Git HTTPS 推送遇到 TLS 中断，改用官方 Git 数据接口提交相同 Git 对象，回读核对源码树、提交和版本标签。
 - GitHub 公开发行 459231876 附完整 Docker 镜像、Compose、SHA-256 校验及下载器统计示例，核对附件尺寸和摘要。Gitee 私有发行 1371547 附 Compose、校验文件与示例，逐一下载核对字节，并从其说明提供完整镜像入口。
 - 完整镜像 SHA-256 dbd80e217bbd1a45d15d1079db7c566b67cf287985d28f8eaa29816c0c2ffaa2，152 原始 Docker tar 与重建字节一致。D 盘发布归档含标签源码、完整镜像、Compose、校验、示例和恢复说明，校验 92 个 OCI 对象、ZIP 内容及归档 SHA-256 2bdae2df49918c020ae1226a45d918e516fdf3fb1d3f2999eb7127af592d3306。更新 docs/DEPLOYMENT.json 和归档索引，152 本次回执沿用 v1.1.0，版本标签不变。本条回执提交与双仓同步待执行。
+
+## PTM-20261126-V110-OVH-ROLLOUT — 2026-11-26T19:10:10+08:00 — Codex root、rollout_152_canary、ovh_readiness_review，v1.1.0 推广至 OVH
+
+- 152 对同一发行镜像进行两轮断网复测，第二轮按生产的 768 MiB 和一核运行。13 项全通过，生产容器连续运行且重启计数为 0，公网核对 7 份页面及资源。OVH 下载同一发行归档，核对 SHA-256，再以 Linux AMD64 运行 13 项断网测试并校验服务端二进制与页面资源。
+- OVH 在北洋园租约自然释放后暂停循环，保留定时记录及持久化路径 /docker/starpt/data，记录并快照 SQLite。切换 starpt 为 ptmove-nexus:1.1.0，原容器保留为 starpt-v115-rollback。切换后对比 36 条台账及原登录、下载器配置和环境，确认相同，qB 版本和 Web API 只读验证通过。
+- 公网 HTTPS、健康、7 份资源和匿名插件请求返回 401 均通过。按原一分钟间隔恢复北洋园循环，观测到已完成轮询，抽查新增 0、跳过 10、失败 0、移除 0，台账仍 36、容器重启 0。未手工触发试投、发种、实际加种或清理，未操作 81。docs/DEPLOYMENT.json 增加 OVH 回执。本次无源码、镜像或发行附件变更，记录提交及同步待执行。
