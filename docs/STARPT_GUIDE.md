@@ -47,6 +47,8 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 ## 站点 JSON 导入与兼容边界
 
+编写新站点时，可使用[站点配置编写说明及 AI 提示词](SITE_PROFILES.md)。
+
 站点档案是至多 64 KiB 的严格 JSON 声明，支持 `nexusphp` 引擎、HTTPS 公网 origin、站点角色、站点映射代号、官组标识、路径模板和有界 CSS selector。schema/template 可在管理员 UI 下载，公开档案可预览、导入、导出。导入结果为 `declared/unverified`；离线格式通过不表示站点 HTTP 页面结构、限制识别、登录或发布已验证。
 
 JSON 中不允许放 Cookie、RSS 或其他秘密。管理员应从 UI 的凭据入口单独配置 Cookie 和 RSS；查询接口只返回是否已配置，不返回凭据明文。Cookie 使用兼容存储；RSS 及机器 API 幂等响应使用独立加密注册表，备份时必须保留 `data/machine-registry.key` 和 `data/internal-api.key`。站点档案需要与 STARPT 已实现的站点发布适配器和 publisher 映射匹配；新增普通 JSON 声明不会自动生成新的站点协议或 publisher。没有映射或映射未经实际验证时，不应启用发布。

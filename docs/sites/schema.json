@@ -1,154 +1,168 @@
 {
-  "$defs": {
-    "ProfilePaths": {
-      "additionalProperties": false,
-      "properties": {
-        "listing": {
-          "default": "/torrents.php",
-          "title": "Listing",
-          "type": "string"
-        },
-        "detail": {
-          "default": "/details.php?id={id}",
-          "title": "Detail",
-          "type": "string"
-        },
-        "download": {
-          "default": "/download.php?id={id}",
-          "title": "Download",
-          "type": "string"
-        },
-        "search": {
-          "default": "/torrents.php?search={query}",
-          "title": "Search",
-          "type": "string"
-        }
-      },
-      "title": "ProfilePaths",
-      "type": "object"
-    },
-    "ProfileSelectors": {
-      "additionalProperties": false,
-      "properties": {
-        "table": {
-          "default": "table.torrents, table#torrenttable",
-          "title": "Table",
-          "type": "string"
-        },
-        "detail_link": {
-          "default": "a[href*=\"details.php?id=\"]",
-          "title": "Detail Link",
-          "type": "string"
-        },
-        "title": {
-          "default": "h1, #top, .torrent-title",
-          "title": "Title",
-          "type": "string"
-        },
-        "description": {
-          "default": "#kdescr, #description, .description",
-          "title": "Description",
-          "type": "string"
-        },
-        "download_link": {
-          "default": "a[href*=\"download.php\"]",
-          "title": "Download Link",
-          "type": "string"
-        },
-        "tags": {
-          "default": ".tag, .tags, .torrent-tag, .label",
-          "title": "Tags",
-          "type": "string"
-        },
-        "peers": {
-          "default": "#peercount, #peers, .peers",
-          "title": "Peers",
-          "type": "string"
-        }
-      },
-      "title": "ProfileSelectors",
-      "type": "object"
-    }
-  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "schema_version": {
-      "const": 1,
-      "default": 1,
-      "title": "Schema Version",
-      "type": "integer"
+    "announce_hosts": {
+      "items": {
+        "maxLength": 253,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "base_url": {
+      "format": "uri",
+      "maxLength": 512,
+      "pattern": "^https://",
+      "type": "string"
+    },
+    "engine": {
+      "const": "nexusphp",
+      "type": "string"
     },
     "id": {
       "pattern": "^[a-z][a-z0-9_-]{0,63}$",
-      "title": "Id",
       "type": "string"
     },
     "name": {
       "maxLength": 100,
       "minLength": 1,
-      "title": "Name",
       "type": "string"
     },
-    "base_url": {
-      "maxLength": 512,
-      "title": "Base Url",
-      "type": "string"
+    "official_groups": {
+      "items": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "paths": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "download": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "listing": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "search": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ptnexus_site": {
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "roles": {
       "items": {
         "enum": [
           "source",
           "target"
-        ],
-        "type": "string"
+        ]
       },
       "maxItems": 2,
       "minItems": 1,
-      "title": "Roles",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
-    "engine": {
-      "const": "nexusphp",
-      "default": "nexusphp",
-      "title": "Engine",
-      "type": "string"
-    },
-    "ptnexus_site": {
-      "anyOf": [
-        {
-          "maxLength": 64,
-          "minLength": 1,
-          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Site mapping code"
-    },
-    "official_groups": {
-      "items": {
-        "type": "string"
-      },
-      "maxItems": 64,
-      "title": "Official Groups",
-      "type": "array"
-    },
-    "announce_hosts": {
-      "items": {
-        "type": "string"
-      },
-      "maxItems": 32,
-      "title": "Announce Hosts",
-      "type": "array"
-    },
-    "paths": {
-      "$ref": "#/$defs/ProfilePaths"
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
     },
     "selectors": {
-      "$ref": "#/$defs/ProfileSelectors"
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "detail_link": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "download_link": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "leechers": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "official": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "peers": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "restriction_allowed": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "restriction_denied": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "search_empty": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "search_results": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "seeders": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "table": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tags": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
     }
   },
   "required": [
@@ -157,6 +171,6 @@
     "base_url",
     "roles"
   ],
-  "title": "SiteProfile",
+  "title": "STARPT declarative site profile",
   "type": "object"
 }

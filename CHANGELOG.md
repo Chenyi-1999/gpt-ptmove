@@ -846,3 +846,10 @@
 - 桌面及移动端通过 PTGen 来源新增、排序和保存验收，截图与验证记录保存在 D 盘本次 QA 目录。
 - 两仓库同一标签源码提交 376f90ea46efdbd7b2f27fb76576b4197e86af3b。GitHub 公开发行 459593495 附 152 验证的完整 Docker 镜像、Compose、SHA-256 校验与下载器统计示例。Gitee 私有发行 1372957 附 Compose、校验与示例，逐一授权读取核对，并提供同版完整镜像入口。
 - 完整镜像 SHA-256 7991de8ee7af95df9d27bb96b5866be181cde3f19441d10f4d1e022267bc2fff，D 盘历史归档通过 102 个 OCI 对象、ZIP 内容及归档 SHA-256 eb36f2640b69dc10fbe6a04d79054b030963daa117b99b605c60a2696251dc27 核对，归档索引已登记。更新 docs/DEPLOYMENT.json，152 与 OVH 继续运行 v1.1.4。版本标签保持，回执单独同步两仓。
+
+
+## PTM-20261126-SITE-PROFILE-AI-GUIDE — 2026-11-26T23:40:01+08:00 — Codex root，站点配置编写说明与 AI 提示词
+
+- 扩充 docs/SITE_PROFILES.md，说明脱敏素材、站点映射、路径占位符、CSS 选择器、转载与查重证据、凭据录入及导入检查。新增 docs/sites/AI_PROMPT.md 和虚构来源站示例 docs/sites/example.json，在 README.md 和 docs/STARPT_GUIDE.md 增加入口。
+- 根据当前 HTTP Schema 生成器更新 docs/sites/schema.json，补齐做种人数、下载人数、官种、转载限制和搜索结果字段。未修改运行时与部署配置。
+- 本地通过 Go 后端模板及示例解析、四种 URL 展开、模拟 HTML 选择器和 Schema 同步核对。站点档案、只读扫描、转载限制和查重证据定向 Go 测试、Markdown 链接及 JSON 格式检查均通过。真实站点兼容性由各站配置导入后独立验证。本次未访问站点、152、OVH 或 81。记录时文档提交与两仓同步待执行，无版本发行或部署。
