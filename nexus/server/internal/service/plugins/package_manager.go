@@ -128,10 +128,14 @@ func (m *PackageManager) Refresh(ctx context.Context) (PackageSnapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return m.snapshot(), err
 	}
-	if !maps.Equal(next, m.active) {
+	changed := !maps.Equal(next, m.active)
+	// Refresh also restores the saved state from memory if the cache was lost.
+	if changed || len(next) != 0 || len(preferences) != 0 {
 		if err := m.persist(next, preferences); err != nil {
 			return m.snapshot(), err
 		}
+	}
+	if changed {
 		m.active, m.preferences = next, preferences
 		m.pruneCache()
 	}
@@ -159,8 +163,12 @@ func (m *PackageManager) loadSource(ctx context.Context, id, name string, next m
 		return nil, errors.New("无法读取 ZIP，须为不超过 8 MiB 的普通文件")
 	}
 	zipDigest := packageDigest(content)
-	if previous := next[id]; previous != nil && previous.record.ZipDigest == zipDigest {
-		return previous, nil
+	previous := next[id]
+	unchanged := previous != nil && previous.record.ZipDigest == zipDigest
+	if unchanged {
+		if _, err := m.readApprovedCode(previous.record.Digest); err == nil {
+			return previous, nil
+		}
 	}
 	manifest, module, err := readPackageZip(content, id)
 	if err != nil {
@@ -173,6 +181,9 @@ func (m *PackageManager) loadSource(ctx context.Context, id, name string, next m
 	}
 	if err := m.cacheModule(digest, module); err != nil {
 		return nil, errors.New("保存已校验的插件版本失败")
+	}
+	if unchanged && previous.record.Digest == digest {
+		return previous, nil
 	}
 	return &installedPackage{record: cachedPackage{manifest, digest, zipDigest}, compiled: compiled}, nil
 }

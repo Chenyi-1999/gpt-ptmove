@@ -135,6 +135,9 @@ func writePackageState(path string, state savedPackageState) error {
 	if len(data) > maxStateBytes {
 		return errors.New("插件配置缓存超过大小限制")
 	}
+	if current, err := readPackageFile(path, maxStateBytes); err == nil && bytes.Equal(current, data) {
+		return nil
+	}
 	return atomicPackageWrite(path, data)
 }
 

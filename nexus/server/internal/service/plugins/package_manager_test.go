@@ -116,6 +116,78 @@ func TestPackageManualRefreshAndRestore(t *testing.T) {
 	}
 }
 
+func TestPackageRefreshRepairsCacheFromUnchangedZIP(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := isolatedExecutable.Swap(&executable)
+	t.Cleanup(func() { isolatedExecutable.Store(previous) })
+	manager := testPackageManager(t, dataDir)
+	wasm := fixtureWASM(`{"message":"recovered"}`, nil)
+	for _, id := range []string{"active", "disabled"} {
+		writeTestPackage(t, dataDir, fixturePackageManifest(id, "1"), wasm, "plugin.wasm")
+	}
+	if snapshot, err := manager.Refresh(ctx); err != nil || len(snapshot.Issues) != 0 || len(snapshot.Items) != 2 {
+		t.Fatalf("initial refresh: %+v, %v", snapshot, err)
+	}
+	if _, err := manager.SaveSettings("disabled", map[string]any{"limit": 9, "style": "compact"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.SetEnabled("disabled", false); err != nil {
+		t.Fatal(err)
+	}
+	assertPreferences := func(t *testing.T, source *PackageManager) {
+		t.Helper()
+		info, err := source.Get("disabled")
+		if err != nil || info.Enabled || info.Settings["limit"] != int64(9) || info.Settings["style"] != "compact" {
+			t.Fatalf("disabled plugin preferences: %+v, %v", info, err)
+		}
+		if _, err := source.Invoke(ctx, "disabled", "report", nil); !errors.Is(err, ErrPackageDisabled) {
+			t.Fatalf("disabled plugin should remain disabled: %v", err)
+		}
+	}
+	digest := packageDigest(wasm)
+	modulePath := manager.modulePath(digest)
+	for _, name := range []string{"missing", "corrupt"} {
+		t.Run(name, func(t *testing.T) {
+			for _, path := range []string{modulePath, manager.statePath()} {
+				if name == "missing" {
+					err = os.Remove(path)
+				} else {
+					err = os.WriteFile(path, []byte("damaged cache"), 0o600)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := manager.Invoke(ctx, "active", "report", nil); !errors.Is(err, ErrPackageExecution) {
+				t.Fatalf("worker accepted invalid module cache: %v", err)
+			}
+			if snapshot, err := manager.Refresh(ctx); err != nil || len(snapshot.Issues) != 0 || len(snapshot.Items) != 2 {
+				t.Fatalf("repair refresh: %+v, %v", snapshot, err)
+			}
+			if result, err := manager.Invoke(ctx, "active", "report", nil); err != nil || result.Message != "recovered" {
+				t.Fatalf("worker could not run repaired module: %+v, %v", result, err)
+			}
+			assertPreferences(t, manager)
+			assertPreferences(t, testPackageManager(t, dataDir))
+		})
+	}
+	if err := os.Remove(modulePath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(modulePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := manager.Refresh(ctx); err != nil || len(snapshot.Issues) != 2 || len(snapshot.Items) != 2 {
+		t.Fatalf("cache write failure should retain loaded entries: %+v, %v", snapshot, err)
+	}
+	assertPreferences(t, manager)
+}
+
 func TestPackageRejectsUnsafeEntriesAndBoundsGuestCalls(t *testing.T) {
 	dataDir := t.TempDir()
 	manager := testPackageManager(t, dataDir)
