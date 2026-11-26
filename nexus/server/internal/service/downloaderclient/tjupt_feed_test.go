@@ -206,14 +206,16 @@ func TestTjuptFeedRejectsWritesBeforeDispatch(t *testing.T) {
 
 func TestTjuptFeedResumesOnlyScopedTrial(t *testing.T) {
 	for _, tc := range []struct {
-		name, state, tags, category, endpoint string
-		addedOn                               int64
-		progress                              float64
-		failWrite                             bool
-		wantErr                               error
+		name, state, tags, category, endpoint, marker string
+		addedOn                                       int64
+		progress                                      float64
+		failWrite                                     bool
+		wantErr                                       error
 	}{
 		{name: "qB 5.3.1 start", state: "stoppedDL", tags: "starpt-tjupt," + tjuptMockMarker, category: tjuptMockCategory, endpoint: "start", addedOn: tjuptMockAddedOn},
 		{name: "qB 4.x resume", state: "pausedDL", tags: "starpt-tjupt," + tjuptMockMarker, category: tjuptMockCategory, endpoint: "resume", addedOn: tjuptMockAddedOn},
+		{name: "public label resume", state: "stoppedDL", tags: TjuptFeedDisplayTag, category: tjuptMockCategory, endpoint: "start", marker: TjuptFeedDisplayTag, addedOn: tjuptMockAddedOn},
+		{name: "public label wrong timestamp", state: "stoppedDL", tags: TjuptFeedDisplayTag, category: tjuptMockCategory, marker: TjuptFeedDisplayTag, addedOn: tjuptMockAddedOn - 1, wantErr: ErrTjuptFeedScope},
 		{name: "wrong marker", state: "stoppedDL", tags: "starpt-tjupt", category: tjuptMockCategory, addedOn: tjuptMockAddedOn, wantErr: ErrTjuptFeedScope},
 		{name: "wrong timestamp", state: "stoppedDL", tags: "starpt-tjupt," + tjuptMockMarker, category: tjuptMockCategory, addedOn: tjuptMockAddedOn - 5, wantErr: ErrTjuptFeedScope},
 		{name: "wrong category", state: "stoppedDL", tags: "starpt-tjupt," + tjuptMockMarker, category: "changed", addedOn: tjuptMockAddedOn, wantErr: ErrTjuptFeedScope},
@@ -252,7 +254,11 @@ func TestTjuptFeedResumesOnlyScopedTrial(t *testing.T) {
 			}))
 			defer server.Close()
 			d := Downloader{Type: "qbittorrent", Enabled: true, Host: server.URL, APIKey: "fake-token"}
-			torrent, err := d.ResumeTjuptFeedTorrent(context.Background(), hash, tjuptMockAddedOn, tjuptMockMarker, tjuptMockCategory)
+			marker := tc.marker
+			if marker == "" {
+				marker = tjuptMockMarker
+			}
+			torrent, err := d.ResumeTjuptFeedTorrent(context.Background(), hash, tjuptMockAddedOn, marker, tjuptMockCategory)
 			if !errors.Is(err, tc.wantErr) || (tc.wantErr == nil && (torrent == nil || !torrent.TjuptFeedStarted())) {
 				t.Fatalf("resume result = %+v, %v, want %v", torrent, err, tc.wantErr)
 			}

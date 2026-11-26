@@ -80,8 +80,9 @@ var (
 
 type tjuptFeedConfig struct {
 	TjuptFeedSettings
-	rss string
-	hnr string
+	rss        string
+	hnr        string
+	storedTags string
 }
 
 // TjuptFeed 编排北洋园直连 qB 的试运行与定时下载。
@@ -110,7 +111,7 @@ func NewTjuptFeed(db *gorm.DB, plugin *TjuptRSSService, dataDir string) (*TjuptF
 	}
 	settings := TjuptFeedSettings{
 		DownloaderID: base.DownloaderID, IntervalMinutes: 1, MinGiB: base.MinGiB, MaxGiB: base.MaxGiB,
-		TotalLimitGiB: base.TotalLimitGiB, ActiveLimit: base.ActiveLimit, Tags: tjuptTag,
+		TotalLimitGiB: base.TotalLimitGiB, ActiveLimit: base.ActiveLimit, Tags: downloaderclient.TjuptFeedDisplayTag,
 		UploadThresholdKiB: tjuptFeedDefaultUploadKiB, LowSpeedMinutes: tjuptFeedDefaultLowSpeedMinutes,
 	}
 	policy, err := json.Marshal(settings)
@@ -153,6 +154,7 @@ func (f *TjuptFeed) View(ctx context.Context) (TjuptFeedView, error) {
 	if err != nil {
 		return view, err
 	}
+	view.Settings.Tags = strings.Join(tjuptFeedTags(view.Settings.Tags), ", ")
 	view.Settings.UseSiteUploadLimit = row.UseSiteUploadLimit
 	if limit, err := tjuptSiteUploadLimit(ctx, f.repo); err == nil {
 		view.SiteUploadLimitMBps = &limit
@@ -376,6 +378,8 @@ func (f *TjuptFeed) loadConfig(row repository.TjuptFeedControl, rss, hnr bool) (
 		return cfg, err
 	}
 	cfg.TjuptFeedSettings = settings
+	cfg.storedTags = settings.Tags
+	cfg.Tags = strings.Join(tjuptFeedTags(settings.Tags), ", ")
 	if err := validateTjuptFeedSettings(cfg.TjuptFeedSettings); err != nil {
 		return cfg, err
 	}
@@ -437,8 +441,9 @@ func decodeTjuptFeedSettings(policy string) (TjuptFeedSettings, error) {
 }
 
 func tjuptFeedTags(raw string) []string {
-	tags := []string{tjuptTag}
-	seen := map[string]bool{tjuptTag: true}
+	common := downloaderclient.TjuptFeedDisplayTag
+	tags := []string{common}
+	seen := map[string]bool{common: true, tjuptTag: true}
 	for _, tag := range strings.Split(raw, ",") {
 		tag = strings.TrimSpace(tag)
 		if tag != "" && !seen[tag] {

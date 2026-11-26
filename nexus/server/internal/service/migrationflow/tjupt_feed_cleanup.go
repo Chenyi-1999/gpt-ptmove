@@ -150,7 +150,7 @@ func (c *tjuptFeedCycle) applyCleanupAssessment(ctx, requestCtx context.Context,
 		return err
 	}
 	rules.observing--
-	err := c.downloader.RemoveTjuptFeedTorrent(requestCtx, task.Hash, task.AddedOn, task.Marker, rules.uploadThreshold)
+	err := c.downloader.RemoveTjuptFeedTorrent(requestCtx, task.Hash, task.AddedOn, tjuptFeedOwnershipTag(task), rules.uploadThreshold)
 	switch {
 	case err == nil:
 		task.State = repository.TjuptFeedGone

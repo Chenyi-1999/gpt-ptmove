@@ -20,6 +20,8 @@ import (
 const (
 	tjuptFeedScopeTag      = "starpt-tjupt"
 	tjuptFeedHashBatchSize = 64
+	// TjuptFeedDisplayTag 是用户可见的北洋园 qB 标签。
+	TjuptFeedDisplayTag = "北洋园"
 )
 
 // ErrTjuptFeedAlreadyExists 表示提交前发现 qB 内已有此哈希，没有加种。
@@ -157,7 +159,11 @@ func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filena
 	if !valid || err != nil || meta.InfoHash != hash {
 		return nil, errors.New("种子文件与北洋园任务哈希不一致")
 	}
-	tags = compactStrings(append([]string{tjuptFeedScopeTag}, tags...))
+	requestedTags := compactStrings(tags)
+	if !slices.Contains(requestedTags, TjuptFeedDisplayTag) {
+		requestedTags = compactStrings(append([]string{tjuptFeedScopeTag}, requestedTags...))
+	}
+	tags = requestedTags
 	for _, tag := range tags {
 		if strings.ContainsRune(tag, ',') || strings.IndexFunc(tag, unicode.IsControl) >= 0 {
 			return nil, errors.New("qB 标签不能包含逗号或控制字符")
@@ -216,7 +222,7 @@ func (d Downloader) AddTjuptFeedTorrent(ctx context.Context, data []byte, filena
 // 使用对应版本的原生启动接口并只发送一次，随后以只读查询确认状态。
 func (d Downloader) ResumeTjuptFeedTorrent(ctx context.Context, hash string, addedOn int64, marker, category string) (*TaggedQBTorrent, error) {
 	hash, valid := normalizeTjuptFeedHash(hash)
-	if !valid || addedOn <= 0 || !validTjuptFeedMarker(marker) {
+	if !valid || addedOn <= 0 || !validTjuptFeedMarkerOrDisplay(marker) {
 		return nil, ErrTjuptFeedScope
 	}
 	client, err := d.newPluginQB()
@@ -229,7 +235,10 @@ func (d Downloader) ResumeTjuptFeedTorrent(ctx context.Context, hash string, add
 		return nil, err
 	}
 	category = strings.TrimSpace(category)
-	tags := []string{tjuptFeedScopeTag, marker}
+	tags := []string{marker}
+	if marker != TjuptFeedDisplayTag {
+		tags = append(tags, tjuptFeedScopeTag)
+	}
 	if torrent == nil || !torrent.matchesTjuptFeedScope(category, tags, addedOn) || !torrent.TjuptFeedUntouched() {
 		return nil, ErrTjuptFeedScope
 	}
@@ -289,6 +298,10 @@ func validTjuptFeedMarker(marker string) bool {
 	return ok && len(id) == 24 && isTjuptFeedHex(id)
 }
 
+func validTjuptFeedMarkerOrDisplay(marker string) bool {
+	return marker == TjuptFeedDisplayTag || validTjuptFeedMarker(marker)
+}
+
 func isTjuptFeedHex(text string) bool {
 	_, err := hex.DecodeString(text)
 	return err == nil
@@ -343,12 +356,29 @@ func (torrent TaggedQBTorrent) matchesTjuptFeedScope(category string, tags []str
 		return false
 	}
 	actualTags := compactStrings(strings.Split(torrent.Tags, ","))
+	if slices.Contains(tags, TjuptFeedDisplayTag) {
+		return slices.Contains(actualTags, TjuptFeedDisplayTag) &&
+			(tjuptFeedLegacyMarker(tags) == "" || slices.Contains(actualTags, tjuptFeedLegacyMarker(tags)))
+	}
+	if marker := tjuptFeedLegacyMarker(tags); marker != "" {
+		return slices.Contains(actualTags, marker) &&
+			(slices.Contains(actualTags, TjuptFeedDisplayTag) || slices.Contains(actualTags, tjuptFeedScopeTag))
+	}
 	for _, tag := range tags {
 		if !slices.Contains(actualTags, tag) {
 			return false
 		}
 	}
 	return true
+}
+
+func tjuptFeedLegacyMarker(tags []string) string {
+	for _, tag := range tags {
+		if validTjuptFeedMarker(tag) {
+			return tag
+		}
+	}
+	return ""
 }
 
 // confirmTjuptFeedTorrent 允许 qB 短时间同步新增状态，仅重复读取，不重新发送写请求。

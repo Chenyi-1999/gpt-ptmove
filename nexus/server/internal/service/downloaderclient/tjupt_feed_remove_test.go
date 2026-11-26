@@ -20,6 +20,7 @@ func TestTjuptFeedRemoveNativeKeepsFiles(t *testing.T) {
 	goodTrackers := `[{"url":"** [DHT] **","tier":-1,"status":0},{"url":"** [PeX] **","tier":-1,"status":0},{"url":"** [LSD] **","tier":-1,"status":0},{"url":"https://tracker.tjupt.org/announce","tier":0,"status":2}]`
 	for _, tc := range []struct {
 		name     string
+		marker   string
 		trackers string
 		info     string
 		mutate   func(*TaggedQBTorrent)
@@ -29,6 +30,8 @@ func TestTjuptFeedRemoveNativeKeepsFiles(t *testing.T) {
 		wantPost int32
 	}{
 		{name: "one native removal and exact missing readback", wantPost: 1},
+		{name: "public label marker", marker: TjuptFeedDisplayTag, mutate: func(row *TaggedQBTorrent) { row.Tags = TjuptFeedDisplayTag }, wantPost: 1},
+		{name: "public label wrong timestamp", marker: TjuptFeedDisplayTag, mutate: func(row *TaggedQBTorrent) { row.Tags = TjuptFeedDisplayTag; row.AddedOn++ }, wantErr: ErrTjuptFeedScope},
 		{name: "same hash readded after deletion request", result: "readded", wantPost: 1, wantErr: ErrTjuptFeedUnconfirmed},
 		{name: "malformed readback", result: "invalid", wantPost: 1, wantErr: ErrTjuptFeedUnconfirmed},
 		{name: "HTTP failure after write", result: "uncertain", wantPost: 1, wantErr: ErrTjuptFeedUnconfirmed},
@@ -136,7 +139,11 @@ func TestTjuptFeedRemoveNativeKeepsFiles(t *testing.T) {
 			defer server.Close()
 			client := Downloader{Type: "qbittorrent", Enabled: true, Host: server.URL, APIKey: "fake-test-api-key"}
 			client = client.WithEffectGuard(func() error { return tc.guard })
-			err := client.RemoveTjuptFeedTorrent(context.Background(), strings.ToUpper(hash), tjuptMockAddedOn, tjuptMockMarker, threshold)
+			marker := tc.marker
+			if marker == "" {
+				marker = tjuptMockMarker
+			}
+			err := client.RemoveTjuptFeedTorrent(context.Background(), strings.ToUpper(hash), tjuptMockAddedOn, marker, threshold)
 			if !errors.Is(err, tc.wantErr) || writes.Load() != tc.wantPost {
 				t.Fatalf("got error %v and %d writes, want %v and %d writes", err, writes.Load(), tc.wantErr, tc.wantPost)
 			}

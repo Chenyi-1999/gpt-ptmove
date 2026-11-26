@@ -27,6 +27,9 @@ type tjuptFeedDownloader interface {
 	AddTjuptFeedTorrent(context.Context, []byte, string, string, bool, []string, string, string, int) (*downloaderclient.TaggedQBTorrent, error)
 	ResumeTjuptFeedTorrent(context.Context, string, int64, string, string) (*downloaderclient.TaggedQBTorrent, error)
 	RemoveTjuptFeedTorrent(context.Context, string, int64, string, int64) error
+	EnsureTjuptFeedDisplayTag(context.Context, string, int64, string) error
+	RemoveTjuptFeedLegacyTags(context.Context, string, int64, string) error
+	PruneEmptyTjuptFeedMarker(context.Context, string) error
 }
 
 func (f *TjuptFeed) run(parent context.Context, trial bool) (TjuptFeedResult, error) {
@@ -98,14 +101,22 @@ func (f *TjuptFeed) runCycle(ctx context.Context, row repository.TjuptFeedContro
 		}
 		return f.checkLegacy(ctx)
 	}
+	trialScopeFor := func(tags string) string {
+		return tjuptFeedDigest(scope, cfg.rss, tags, cfg.Category, cfg.SavePath,
+			fmt.Sprintf("%g/%g/%g/%d", cfg.MinGiB, cfg.MaxGiB, cfg.TotalLimitGiB, cfg.ActiveLimit))
+	}
+	oldTags := tjuptFeedTags(cfg.Tags)
+	oldTags[0] = tjuptTag
 	cycle := tjuptFeedCycle{
 		cfg: cfg, repo: f.repo, downloader: f.connect(d, func() error { return guard(nil) }), lease: lease, trial: trial, scope: scope,
 		useSiteUploadLimit: row.UseSiteUploadLimit,
 		newAdder: func() tjuptFeedDownloader {
 			return f.connect(d, func() error { return guard(&row.SiteUploadLimitRevision) })
 		},
-		trialScope: tjuptFeedDigest(scope, cfg.rss, cfg.Tags, cfg.Category, cfg.SavePath,
-			fmt.Sprintf("%g/%g/%g/%d", cfg.MinGiB, cfg.MaxGiB, cfg.TotalLimitGiB, cfg.ActiveLimit)),
+		trialScope: trialScopeFor(cfg.Tags), legacyTrialScopes: [2]string{trialScopeFor(strings.Join(oldTags, ", "))},
+	}
+	if tjuptHasTag(cfg.storedTags, tjuptTag) {
+		cycle.legacyTrialScopes[1] = trialScopeFor(cfg.storedTags)
 	}
 	if sampleCleanup {
 		hnrConfig, err := f.loadConfig(row, false, true)
@@ -132,6 +143,7 @@ type tjuptFeedCycle struct {
 	lease              string
 	scope              string
 	trialScope         string
+	legacyTrialScopes  [2]string
 	trial              bool
 	used               int64
 	active             int
@@ -315,13 +327,21 @@ func (c *tjuptFeedCycle) add(ctx context.Context, sourceID string, meta tjupt.To
 	c.active++
 	c.used += task.SizeBytes
 	result.Added++
+	tagCtx, cancel := context.WithTimeout(ctx, tjuptFeedTagTimeout)
+	defer cancel()
+	if err := c.unifyOwnedTags(tagCtx, &task); err != nil && tagCtx.Err() == nil {
+		return "已确认投种，标签整理将在下一轮继续", err
+	}
 	return "", nil
 }
 
 func (c *tjuptFeedCycle) reconcile(ctx context.Context) error {
 	tasks, err := c.repo.LiveTasks(ctx, c.scope)
-	if err != nil || len(tasks) == 0 {
+	if err != nil {
 		return err
+	}
+	if len(tasks) == 0 {
+		return c.pruneArchivedTags(ctx)
 	}
 	hashes := make([]string, 0, len(tasks))
 	for _, task := range tasks {
@@ -334,6 +354,9 @@ func (c *tjuptFeedCycle) reconcile(ctx context.Context) error {
 	}
 	if receipts == nil {
 		return errors.New("qB 未确认任务列表")
+	}
+	if err := c.normalizeKnownTags(ctx, tasks, receipts); err != nil {
+		return err
 	}
 	for _, task := range tasks {
 		receipt, exists := receipts[strings.ToLower(task.Hash)]
@@ -363,7 +386,7 @@ func (c *tjuptFeedCycle) reconcile(ctx context.Context) error {
 		c.active++
 		c.used += task.SizeBytes
 	}
-	return nil
+	return c.pruneArchivedTags(ctx)
 }
 
 func (c *tjuptFeedCycle) reconcileOwned(ctx context.Context, task repository.TjuptFeedTask, receipt *downloaderclient.TaggedQBTorrent) error {
@@ -389,7 +412,7 @@ func (c *tjuptFeedCycle) reconcileOwned(ctx context.Context, task repository.Tju
 	if c.trial {
 		return nil
 	}
-	if task.TrialScope != c.trialScope || !receipt.TjuptFeedUntouched() || receipt.Category != c.cfg.Category {
+	if !c.matchesTrialScope(task.TrialScope) || !receipt.TjuptFeedUntouched() || receipt.Category != c.cfg.Category {
 		c.held++
 		return nil
 	}
@@ -397,7 +420,7 @@ func (c *tjuptFeedCycle) reconcileOwned(ctx context.Context, task repository.Tju
 	if err := c.saveTask(ctx, task); err != nil {
 		return err
 	}
-	resumed, err := c.downloader.ResumeTjuptFeedTorrent(ctx, task.Hash, task.AddedOn, task.Marker, c.cfg.Category)
+	resumed, err := c.downloader.ResumeTjuptFeedTorrent(ctx, task.Hash, task.AddedOn, tjuptFeedOwnershipTag(task), c.cfg.Category)
 	if err == nil && tjuptFeedReceiptMatches(task, resumed) && resumed.TjuptFeedStarted() {
 		task.State = repository.TjuptFeedStarted
 		c.resumed++
@@ -421,9 +444,19 @@ func (c *tjuptFeedCycle) saveTask(ctx context.Context, task repository.TjuptFeed
 }
 
 func tjuptFeedReceiptMatches(task repository.TjuptFeedTask, receipt *downloaderclient.TaggedQBTorrent) bool {
-	return receipt != nil && receipt.AddedOn > 0 && strings.EqualFold(receipt.Hash, task.Hash) &&
-		(task.AddedOn == 0 || task.AddedOn == receipt.AddedOn) &&
-		tjuptHasTag(receipt.Tags, tjuptTag) && tjuptHasTag(receipt.Tags, task.Marker)
+	if receipt == nil || receipt.AddedOn <= 0 || !strings.EqualFold(receipt.Hash, task.Hash) ||
+		(task.AddedOn != 0 && task.AddedOn != receipt.AddedOn) || !validTjuptFeedTaskMarker(task.Marker) {
+		return false
+	}
+	common := tjuptHasTag(receipt.Tags, downloaderclient.TjuptFeedDisplayTag)
+	if task.TagUnified {
+		return tjuptFeedUsesSharedTag(task) && common
+	}
+	return (common || tjuptHasTag(receipt.Tags, tjuptTag)) && tjuptHasTag(receipt.Tags, task.Marker)
+}
+
+func (c *tjuptFeedCycle) matchesTrialScope(scope string) bool {
+	return scope != "" && (scope == c.trialScope || scope == c.legacyTrialScopes[0] || scope == c.legacyTrialScopes[1])
 }
 
 func tjuptFeedDigest(parts ...string) string {

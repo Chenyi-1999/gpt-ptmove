@@ -34,6 +34,9 @@ type TjuptFeedTask struct {
 	Scope      string `gorm:"index:idx_tjupt_feed_scope_state;size:64"`
 	State      string `gorm:"index:idx_tjupt_feed_scope_state;size:24"`
 	Marker     string `gorm:"size:64"`
+	TagUnified bool   `gorm:"not null;default:false"`
+	TagCleaned bool   `gorm:"not null;default:false"`
+	TagTriedAt int64  `gorm:"not null;default:0"`
 	TrialScope string `gorm:"size:64"`
 	SizeBytes  int64
 	AddedOn    int64
@@ -217,6 +220,51 @@ func (r *TjuptFeedRepository) LiveTasks(ctx context.Context, scope string) ([]Tj
 	err := r.db.WithContext(ctx).Where("scope = ? AND state <> ?", scope, TjuptFeedGone).
 		Order("source_id").Find(&rows).Error
 	return rows, err
+}
+
+// GoneTagMarkers 只读取当前下载器范围内仍有待核对标记的归档任务。
+func (r *TjuptFeedRepository) GoneTagMarkers(ctx context.Context, scope string, limit int) ([]TjuptFeedTask, error) {
+	var rows []TjuptFeedTask
+	err := r.db.WithContext(ctx).Where("scope = ? AND state = ? AND tag_cleaned = ? AND marker <> ''", scope, TjuptFeedGone, false).
+		Order("tag_tried_at, source_id").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+// RecordTagAttempt 记录一次核对尝试，让暂时无法处理的旧标记不会挡住其他任务。
+func (r *TjuptFeedRepository) RecordTagAttempt(ctx context.Context, lease string, now int64, task TjuptFeedTask) error {
+	return r.updateTagProgress(ctx, lease, now, task, "tag_tried_at", gorm.Expr("CASE WHEN tag_tried_at >= ? THEN tag_tried_at + 1 ELSE ? END", now, now))
+}
+
+// RecordTagUnified 在 qB 旧标记仍可核验时持久化已确认的公共标签归属。
+func (r *TjuptFeedRepository) RecordTagUnified(ctx context.Context, lease string, now int64, task TjuptFeedTask) error {
+	if task.AddedOn <= 0 || task.State == TjuptFeedAdding || task.State == TjuptFeedRemoving || task.State == TjuptFeedGone {
+		return ErrTjuptFeedLease
+	}
+	return r.updateTagProgress(ctx, lease, now, task, "tag_unified", true)
+}
+
+// RecordTagCleaned 仅在统一标签已持久化或原任务已归档时确认标记已清理。
+func (r *TjuptFeedRepository) RecordTagCleaned(ctx context.Context, lease string, now int64, task TjuptFeedTask) error {
+	if !task.TagUnified && task.State != TjuptFeedGone {
+		return ErrTjuptFeedLease
+	}
+	return r.updateTagProgress(ctx, lease, now, task, "tag_cleaned", true)
+}
+
+func (r *TjuptFeedRepository) updateTagProgress(ctx context.Context, lease string, now int64, task TjuptFeedTask, column string, value any) error {
+	return r.inLease(ctx, lease, now, func(tx *gorm.DB) error {
+		result := tx.Model(&TjuptFeedTask{}).
+			Where("hash = ? AND scope = ? AND marker = ? AND added_on = ? AND state = ?", task.Hash, task.Scope, task.Marker, task.AddedOn, task.State).
+			Where("tag_unified = ? AND tag_cleaned = ?", task.TagUnified, task.TagCleaned).
+			UpdateColumn(column, value)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrTjuptFeedLease
+		}
+		return nil
+	})
 }
 
 // SeenSource 查询曾经登记的来源种子，并保留旧版台账的来源去重行为。

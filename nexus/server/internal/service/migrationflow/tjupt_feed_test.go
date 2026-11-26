@@ -46,18 +46,24 @@ func (s *tjuptFeedFakeSite) DownloadCandidate(_ context.Context, item tjupt.Auto
 }
 
 type tjuptFeedFakeQB struct {
-	rows         map[string]downloaderclient.TaggedQBTorrent
-	guard        func() error
-	beforeWrite  func()
-	adds         []bool
-	uploadLimits []int
-	starts       []string
-	unknown      bool
-	removes      []string
-	removeErr    error
-	beforeRemove func()
-	lookupCalls  [][]string
-	lookupErr    error
+	rows            map[string]downloaderclient.TaggedQBTorrent
+	guard           func() error
+	beforeWrite     func()
+	adds            []bool
+	uploadLimits    []int
+	starts          []string
+	unknown         bool
+	removes         []string
+	removeErr       error
+	beforeRemove    func()
+	lookupCalls     [][]string
+	lookupErr       error
+	afterEnsure     func()
+	beforeTagRemove func()
+	tagRemoveErr    error
+	tagAttempts     []string
+	pruned          []string
+	removeMarkers   []string
 }
 
 func (d *tjuptFeedFakeQB) TjuptFeedTorrent(_ context.Context, hash string) (*downloaderclient.TaggedQBTorrent, error) {
@@ -133,10 +139,70 @@ func (d *tjuptFeedFakeQB) RemoveTjuptFeedTorrent(_ context.Context, hash string,
 		return err
 	}
 	d.removes = append(d.removes, hash)
+	d.removeMarkers = append(d.removeMarkers, marker)
 	if d.removeErr != nil {
 		return d.removeErr
 	}
 	delete(d.rows, hash)
+	return nil
+}
+
+func (d *tjuptFeedFakeQB) EnsureTjuptFeedDisplayTag(_ context.Context, hash string, addedOn int64, marker string) error {
+	row, ok := d.rows[hash]
+	common := downloaderclient.TjuptFeedDisplayTag
+	if !ok || row.AddedOn != addedOn || !tjuptHasTag(row.Tags, marker) ||
+		(!tjuptHasTag(row.Tags, tjuptTag) && !tjuptHasTag(row.Tags, common)) {
+		return downloaderclient.ErrTjuptFeedScope
+	}
+	if err := d.guard(); err != nil {
+		return err
+	}
+	d.tagAttempts = append(d.tagAttempts, hash)
+	if !tjuptHasTag(row.Tags, common) {
+		row.Tags += "," + common
+		d.rows[hash] = row
+	}
+	if d.afterEnsure != nil {
+		d.afterEnsure()
+	}
+	return nil
+}
+
+func (d *tjuptFeedFakeQB) RemoveTjuptFeedLegacyTags(_ context.Context, hash string, addedOn int64, marker string) error {
+	row, ok := d.rows[hash]
+	if !ok || row.AddedOn != addedOn || !tjuptHasTag(row.Tags, downloaderclient.TjuptFeedDisplayTag) {
+		return downloaderclient.ErrTjuptFeedScope
+	}
+	if err := d.guard(); err != nil {
+		return err
+	}
+	if d.beforeTagRemove != nil {
+		d.beforeTagRemove()
+	}
+	if d.tagRemoveErr != nil {
+		return d.tagRemoveErr
+	}
+	var tags []string
+	for _, tag := range strings.Split(row.Tags, ",") {
+		if tag = strings.TrimSpace(tag); tag != marker && tag != tjuptTag {
+			tags = append(tags, tag)
+		}
+	}
+	row.Tags = strings.Join(tags, ",")
+	d.rows[hash] = row
+	return nil
+}
+
+func (d *tjuptFeedFakeQB) PruneEmptyTjuptFeedMarker(_ context.Context, marker string) error {
+	for _, row := range d.rows {
+		if tjuptHasTag(row.Tags, marker) {
+			return downloaderclient.ErrTjuptFeedScope
+		}
+	}
+	if err := d.guard(); err != nil {
+		return err
+	}
+	d.pruned = append(d.pruned, marker)
 	return nil
 }
 
@@ -224,7 +290,7 @@ func TestTjuptFeedSettingsArePersistentMaskedAndDefaultOff(t *testing.T) {
 	after, err := feed.View(ctx)
 	raw, _ := json.Marshal(after)
 	if err != nil || !after.RSSConfigured || !after.HNRConfigured || after.Enabled ||
-		after.Settings.Tags != "starpt-tjupt, seed, personal" || strings.Contains(string(raw), mockTjuptHNR) ||
+		after.Settings.Tags != "北洋园, seed, personal" || strings.Contains(string(raw), mockTjuptHNR) ||
 		strings.Contains(string(raw), mockTjuptRSS) {
 		t.Fatalf("view must preserve settings and mask credentials: %#v, %v", after, err)
 	}

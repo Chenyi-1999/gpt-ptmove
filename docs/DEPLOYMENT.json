@@ -11,6 +11,39 @@
   "image_archive_sha256": "6bd74930a232760202d55761ef20fb8d04431e82e53e04993eee41a5b0c9db85",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
+  "release_v1_0_15": {
+    "version": "1.0.15",
+    "architecture": "linux/amd64",
+    "production_152": {
+      "host": "152.136.236.238",
+      "url": "http://152.136.236.238:18120/plugins",
+      "image": "ptmove-nexus:1.0.15",
+      "image_id": "sha256:c0f2ec40ecf8b78b75fce71029e81e11b437b8df4501d9b1a2c67ceeece2594a",
+      "rollback_image": "ptmove-nexus:1.0.14",
+      "rollback_image_id": "sha256:87bae15ada62d8bee6da49cd2d54f11b2a490bea203c67698b8be926744148ec",
+      "host_directory": "/opt/gpt-ptmove-nexus/releases/tjupt-one-tag-v115-261126",
+      "downloaders_unchanged": true,
+      "rss_enabled": false,
+      "isolated_network": "none",
+      "assets_verified": 7
+    },
+    "production_ovh": {
+      "host": "149.202.66.152",
+      "url": "https://ovh-starpt.star1999.de/plugins",
+      "image": "ptmove-nexus:1.0.15-ovh.1",
+      "image_id": "sha256:1c2a21e133590917ed3d3d4230bd5662beb163daeafa8adb8cd1715c6517c86a",
+      "rollback_container": "starpt-v114-rollback",
+      "rollback_directory": "/project/GPT-PTMOVE/releases/tjupt-one-tag-v115-261126",
+      "pre_migration_managed_tasks": 22,
+      "pre_migration_random_tags": 23,
+      "first_migration_batch_verified": 4,
+      "downloaders_unchanged": true,
+      "rss_enabled": true,
+      "isolated_network": "none",
+      "assets_verified": 7
+    },
+    "server_binary_sha256": "80856f6b4018de73ab523a2f0d3ed199a3e89397aa512dd5dfc2495b774327f1"
+  },
   "release_v1_0_14": {
     "version": "1.0.14",
     "architecture": "linux/amd64",

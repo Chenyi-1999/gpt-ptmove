@@ -87,7 +87,8 @@ function editableSettings(settings: FeedSettings): FeedSettings {
     max_gib: settings.max_gib,
     total_limit_gib: settings.total_limit_gib,
     active_limit: settings.active_limit,
-    tags: settings.tags ?? '',
+    tags: (settings.tags ?? '').split(',').map((tag) => tag.trim())
+      .filter((tag) => tag && tag !== '北洋园' && tag !== 'starpt-tjupt').join(', '),
     category: settings.category ?? '',
     save_path: settings.save_path ?? '',
     cleanup_enabled: settings.cleanup_enabled ?? false,
@@ -391,8 +392,8 @@ onUnmounted(() => window.clearInterval(pollTimer))
             <input v-model.number="draft.interval_minutes" type="number" min="1" max="1440" step="1" required />
           </label>
           <label class="field">
-            <span>标签</span>
-            <input v-model="draft.tags" type="text" placeholder="多个标签用逗号分隔" />
+            <span>附加标签</span>
+            <input v-model="draft.tags" type="text" placeholder="固定使用「北洋园」，附加标签可留空" />
           </label>
           <label class="field">
             <span>分类</span>
@@ -553,7 +554,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
           <span v-if="torrents" class="hr-status-count">{{ torrents.length }} 项</span>
         </summary>
         <div class="hr-status-body">
-          <p class="help-text">{{ readyForStatus ? '读取所选下载器中带「starpt-tjupt」标签的种子，按北洋园记录计算实际剩余做种时间。' : '保存下载器及北洋园 API Token 后即可查询。' }}</p>
+          <p class="help-text">{{ readyForStatus ? '读取所选下载器中的北洋园任务，按站点记录计算实际剩余做种时间。' : '保存下载器及北洋园 API Token 后即可查询。' }}</p>
           <div class="action-row">
             <button class="action-button action-secondary" type="button" :aria-disabled="!!busy || !readyForStatus" @click="refreshStatus">
               {{ busy === 'status' ? '正在查询…' : '查询 H&R 状态' }}
@@ -573,7 +574,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
               </tbody>
             </table>
           </div>
-          <p v-else-if="torrents" class="empty-state">没有找到带「starpt-tjupt」标签的北洋园任务。</p>
+          <p v-else-if="torrents" class="empty-state">没有找到带「北洋园」或旧版北洋园标签的任务。</p>
         </div>
       </details>
     </template>

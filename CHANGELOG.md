@@ -743,3 +743,10 @@
 - D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。已核对 83 个 OCI 对象并登记归档索引。ZIP SHA-256 7944d75dfeeb6a60389ecfed0c64bf651f445941faf194ae45cd78453c416a42。
 - 腾讯 152 使用同一发行镜像的断网容器模拟直连 qB 和飞牛 Hub 的下载器 API 与媒体代理双通道，隔离实例的 RSS 循环保持关闭。
 - OVH 与 152 生产运行 v1.0.14，核对两地下载器配置原样保留及 qB API 正常。152 的远程客户端继续沿用现有 HTTPS 领单。v1.0.13 中间标签没有单独发布附件。本条与 docs/DEPLOYMENT.json 为独立回执提交，标签不变。未访问 81，未重新发种。
+
+## PTM-20261126-TJUPT-UNIFIED-TAG — 2026-11-26T13:16:48+08:00 — Codex root、feiniu_proxy、site_client、qb_path、tjupt_review，北洋园统一标签
+
+- 修改 nexus/server/internal/repository/tjupt_feed_repository.go、service/migrationflow/tjupt_feed*.go、service/migrationflow/tjupt_rss*.go 和 service/downloaderclient/tjupt_feed*.go。新任务在回执确认前保留随机标记，存量任务每轮最多迁移四个。核对下载器、哈希和加入时间，先持久化归属再移除旧标记，回收台账确认且无关联任务的空标记。H&R 页面兼容两种标签。手工打「北洋园」标签的任务不会被接管。退种继续要求台账匹配、站点两次确认达标或免考并复核低速，保留本地文件。
+- 修改 nexus/webui/src/components/plugins/TjuptRssPanel.vue 和前端 dist。界面显示固定标签和可选附加标签。更新插件及 API 文档、版本、Compose 和 v1.0.15 发行说明。Linux Go 1.23 全量测试、相关 Go vet、模拟 qB 迁移与退种回归、Vue 类型检查、组件 ESLint、Vite 构建与 41 个产物哈希检查通过。Windows 全量测试遇到六个既有维护用例的 SQLite 临时文件锁定，相关定向测试和 Linux 全量通过。
+- 两地断网容器验收通过。152 发布 v1.0.15，原 RSS 关闭设置和下载器配置保持，保留 v1.0.14 镜像和 SQLite 快照。OVH 发布 v1.0.15-ovh.1，暂停 RSS 并等租约释放后备份台账，核对 qB、本地资源和配置后恢复循环。22 项存量任务与 23 个旧随机标签均匹配台账，首批 4 项完成，1 个归档随机标签已回收。其余随正常轮询迁移。旧版回滚时先暂停 RSS，再按台账恢复旧标签。
+- 并行版本发布期间曾临时覆盖 152 的 v1.0.14 镜像标签，保护检查在替换容器前停止。已从原发布镜像恢复并核对原标签和运行容器，随后独立构建 v1.0.15。未自行启动加种、发种或访问 81。记录时本次提交、推送和双仓发行待完成。

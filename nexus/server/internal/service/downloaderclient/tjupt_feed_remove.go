@@ -45,7 +45,7 @@ func (d Downloader) TjuptFeedNorthYangYuanTrackers(ctx context.Context, hash str
 // 写入只发送一次，仅在后续精确查询确认任务已不存在时返回成功。
 func (d Downloader) RemoveTjuptFeedTorrent(ctx context.Context, hash string, addedOn int64, marker string, uploadThresholdBytes int64) error {
 	hash, valid := normalizeTjuptFeedHash(hash)
-	if !valid || addedOn <= 0 || !validTjuptFeedMarker(marker) || uploadThresholdBytes <= 0 {
+	if !valid || addedOn <= 0 || !validTjuptFeedMarkerOrDisplay(marker) || uploadThresholdBytes <= 0 {
 		return ErrTjuptFeedScope
 	}
 	client, err := d.newPluginQB()
@@ -89,8 +89,14 @@ func (d Downloader) RemoveTjuptFeedTorrent(ctx context.Context, hash string, add
 // tjuptFeedOwned 同时验证加入时间、插件标签和单任务归属标记。
 func (torrent TaggedQBTorrent) tjuptFeedOwned(addedOn int64, marker string) bool {
 	tags := compactStrings(strings.Split(torrent.Tags, ","))
-	return torrent.AddedOn == addedOn &&
-		slices.Contains(tags, tjuptFeedScopeTag) && slices.Contains(tags, marker)
+	if torrent.AddedOn != addedOn {
+		return false
+	}
+	if marker == TjuptFeedDisplayTag {
+		return slices.Contains(tags, TjuptFeedDisplayTag)
+	}
+	return validTjuptFeedMarker(marker) && slices.Contains(tags, marker) &&
+		(slices.Contains(tags, TjuptFeedDisplayTag) || slices.Contains(tags, tjuptFeedScopeTag))
 }
 
 // tjuptFeedNorthYangYuanTrackers 只忽略 qB 明确标记为关闭的内置发现项。

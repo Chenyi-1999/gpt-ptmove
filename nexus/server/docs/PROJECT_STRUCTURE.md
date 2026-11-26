@@ -52,6 +52,8 @@
 
 北洋园插件的上传限速开关使用独立接口保存。新任务加种时从现有站点设置读取上传限速，由 `internal/service/downloaderclient` 写入该 qB 任务。用户可在 RSS 循环运行时调整开关。
 
+北洋园统一标签的转换由 RSS 循环持有租约时执行。已确认的任务先在投种台账登记公共标签归属，再由 `internal/service/downloaderclient/tjupt_feed_tags.go` 移除临时回执标签。旧版标签仍可用于只读 H&R 查询。
+
 正式循环可按插件配置判断低速退种。H&R 同一记录的二次达标确认及低速窗口由 `internal/service/migrationflow/tjupt_feed*.go` 编排和持久化，`internal/service/downloaderclient` 在调用原生 qB 移除前复查任务归属、Tracker 和实时速度，保留下载文件。
 
 ### 3.2 `internal/config`

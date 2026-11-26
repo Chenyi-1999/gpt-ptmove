@@ -131,7 +131,7 @@ func (s *TjuptRSSService) PreviewRange(ctx context.Context, rssURL string, minGi
 	return rows, nil
 }
 
-// Status 只查询指定 qB 标签中的任务和站点的 H&R 记录。
+// Status 查询公共标签与迁移期间的旧标签，并按 qB 任务身份合并 H&R 记录。
 func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string) ([]TjuptTorrentStatus, error) {
 	d, err := s.downloader(downloaderID)
 	if err != nil {
@@ -141,6 +141,11 @@ func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string
 	if err != nil {
 		return nil, err
 	}
+	publicRows, err := d.TjuptFeedTaggedTorrents(ctx, downloaderclient.TjuptFeedDisplayTag)
+	if err != nil {
+		return nil, err
+	}
+	rows = append(rows, publicRows...)
 	hashes := make([]string, 0, len(rows))
 	items := make([]TjuptTorrentStatus, 0, len(rows))
 	matched := make(map[string]downloaderclient.TaggedQBTorrent, len(rows))
@@ -149,8 +154,11 @@ func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string
 		if (row.Tracker != "" && !tjuptTracker(row.Tracker)) || !tjupt.ValidHash(hash) {
 			continue
 		}
-		if _, exists := matched[hash]; exists {
-			return nil, errors.New("qB 返回了重复的任务标识")
+		if previous, exists := matched[hash]; exists {
+			if previous.AddedOn != row.AddedOn {
+				return nil, errors.New("qB 任务在标签查询期间发生变化")
+			}
+			continue
 		}
 		matched[hash] = row
 		hashes = append(hashes, hash)
@@ -177,7 +185,9 @@ func (s *TjuptRSSService) Status(ctx context.Context, downloaderID, token string
 		if assessment.Label == "" {
 			assessment.Label = "站点未返回考核记录"
 		}
-		assessment.CanRetire = s.trustedToken(token) && !hmac.Equal(s.retireKey, []byte(d.APIKey)) &&
+		// 旧飞牛手动暂停通道继续使用其固定标签。RSS 台账管理和低速清理由独立接口负责。
+		assessment.CanRetire = tjuptHasTag(matched[hash].Tags, tjuptTag) &&
+			s.trustedToken(token) && !hmac.Equal(s.retireKey, []byte(d.APIKey)) &&
 			tjuptMayRetire(matched[hash], assessment)
 		items[index].Assessment = assessment
 	}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/pt-nexus/server/internal/config"
 	"github.com/pt-nexus/server/internal/service/acquire/tjupt"
+	"github.com/pt-nexus/server/internal/service/downloaderclient"
 )
 
 type fakeTjuptSite struct {
@@ -48,8 +49,9 @@ func TestTjuptStatusPagesAllTaggedTasksAndBatchesHNR(t *testing.T) {
 	t.Setenv("AUTH_PASSWORD", "mock-ui-password")
 	const taskCount = 109
 	qb := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tag := r.URL.Query().Get("tag")
 		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/torrents/info" ||
-			r.URL.Query().Get("tag") != tjuptTag {
+			(tag != tjuptTag && tag != downloaderclient.TjuptFeedDisplayTag) {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -62,8 +64,16 @@ func TestTjuptStatusPagesAllTaggedTasksAndBatchesHNR(t *testing.T) {
 			return
 		}
 		rows := make([]map[string]any, 0)
-		for i := offset; i < min(offset+limit, taskCount); i++ {
-			rows = append(rows, map[string]any{"hash": fmt.Sprintf("%040x", i+1), "tags": tjuptTag,
+		first, count := 0, taskCount-1
+		if tag == downloaderclient.TjuptFeedDisplayTag {
+			first, count = taskCount-2, 2
+		}
+		for i := offset; i < min(offset+limit, count); i++ {
+			tags := tag
+			if first+i == taskCount-2 {
+				tags = tjuptTag + "," + downloaderclient.TjuptFeedDisplayTag
+			}
+			rows = append(rows, map[string]any{"hash": fmt.Sprintf("%040x", first+i+1), "tags": tags,
 				"state": "stalledUP", "progress": 1, "tracker": "https://tracker.tjupt.org/announce"})
 		}
 		_ = json.NewEncoder(w).Encode(rows)
@@ -116,6 +126,10 @@ func TestTjuptPreviewStatusAndRetireUseDifferentEffects(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/torrents/info":
 			reads++
+			if r.URL.Query().Get("tag") == downloaderclient.TjuptFeedDisplayTag {
+				_, _ = w.Write([]byte("[]"))
+				return
+			}
 			if r.URL.Query().Get("tag") != tjuptTag {
 				t.Error("qB query was not scoped to the plugin tag")
 			}
