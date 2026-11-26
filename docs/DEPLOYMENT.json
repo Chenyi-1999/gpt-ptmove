@@ -43,7 +43,67 @@
     },
     "server_binary_sha256": "4efbaf1846ba9f0df771e40c7172d6af11d24a6551610cd28adaa02898b639e3",
     "generic_remote_labels_verified": true,
-    "downloader_modes_verified": true
+    "downloader_modes_verified": true,
+    "publish_receipt": {
+      "released_at": "2026-11-26T13:10:04+08:00",
+      "tag": "v1.0.14",
+      "source_commit": "0bbf2d20984fd776a99b841e95c2cd6b97d78fc6",
+      "isolated_downloader_modes_verified": true,
+      "github": {
+        "id": 458980162,
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.14",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "size": 499,
+            "digest": "sha256:b7b0feec84596475a0b3dcbc8620e5f134ddc2434e7aa77d3f25742d31323c49",
+            "id": 794406234
+          },
+          {
+            "name": "starpt-v1.0.14-linux-amd64.tar.gz.sha256",
+            "size": 101,
+            "digest": "sha256:14b273261f48f7f021c79028f61eebc19df79a7699589bd50ef9b430446c6b97",
+            "id": 794406236
+          },
+          {
+            "name": "starpt-v1.0.14-linux-amd64.tar.gz",
+            "size": 876477404,
+            "digest": "sha256:a5d94683e41b62a16e87397ca17f8480b4c5780d2ea665ba4d2c08db175f3cbd",
+            "id": 794406375
+          }
+        ],
+        "published_at": "2026-11-26T05:09:49Z"
+      },
+      "gitee": {
+        "id": 1370240,
+        "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.14",
+        "assets": [
+          {
+            "id": 3839007,
+            "name": "compose.starpt.yaml",
+            "size": 499,
+            "sha256": "b7b0feec84596475a0b3dcbc8620e5f134ddc2434e7aa77d3f25742d31323c49"
+          },
+          {
+            "id": 3839008,
+            "name": "starpt-v1.0.14-linux-amd64.tar.gz.sha256",
+            "size": 101,
+            "sha256": "14b273261f48f7f021c79028f61eebc19df79a7699589bd50ef9b430446c6b97"
+          }
+        ]
+      },
+      "local_archive": {
+        "project": "GPT-PTMOVE",
+        "timestamp": "2026-11-26T13:05:40.770810+08:00",
+        "type": "历史发布",
+        "version": "v1.0.14",
+        "path": "GPT-PTMOVE__2026-11-26_130540__历史发布__STARPT-v1.0.14.zip",
+        "bytes": 893723028,
+        "sha256": "7944d75dfeeb6a60389ecfed0c64bf651f445941faf194ae45cd78453c416a42",
+        "oci_blobs_verified": 83,
+        "source_commit": "0bbf2d20984fd776a99b841e95c2cd6b97d78fc6"
+      }
+    }
   },
   "release_v1_0_13": {
     "version": "1.0.13",
