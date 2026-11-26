@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.0.15"
+const forkVersion = "1.0.16"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-26",
+				"changes": []string{"项目源码、问题反馈和浏览器扩展入口指向 GitHub"},
+			},
+			{
+				"version": "1.0.15",
 				"date":    "2026-11-26",
 				"changes": []string{"北洋园订阅使用统一标签，已确认归属的历史任务分批更新标签"},
 			},
@@ -125,7 +130,7 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 				"version": "0.3.0",
 				"date":    "2026-10-27",
 				"changes": []string{"提供 Go + Vue 的手动转种界面", "新增可启停的自动下载与转种模块、站点 JSON 声明导入和独立 AI API"},
-				"note":    "发布地址：https://gitee.com/star1999/gpt-ptmove/releases",
+				"note":    "发布地址：https://github.com/Chenyi-1999/gpt-ptmove/releases",
 			},
 		}
 		c.JSON(200, gin.H{"success": true, "history": history})

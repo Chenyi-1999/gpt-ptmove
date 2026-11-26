@@ -6,7 +6,9 @@
 
 ## 下载与部署
 
-GitHub 私有发行提供完整 Linux AMD64 Docker 镜像、Compose 和校验文件。Gitee 提供 Compose、校验文件及完整镜像入口。 [GitHub 发行](https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.15) · [Gitee 发行](https://gitee.com/star1999/starpt/releases/tag/v1.0.15)
+GitHub 公开发行提供完整 Linux AMD64 Docker 镜像、Compose 和校验文件。Gitee 私有发行提供 Compose、校验文件及完整镜像入口。 [GitHub 发行](https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.15) · [Gitee 发行](https://gitee.com/star1999/starpt/releases/tag/v1.0.15)
+
+[项目源码](https://github.com/Chenyi-1999/gpt-ptmove) · [问题反馈](https://github.com/Chenyi-1999/gpt-ptmove/issues)
 
 ```sh
 sha256sum -c starpt-v1.0.15-linux-amd64.tar.gz.sha256

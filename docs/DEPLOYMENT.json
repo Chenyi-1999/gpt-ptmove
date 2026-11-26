@@ -11,6 +11,26 @@
   "image_archive_sha256": "6bd74930a232760202d55761ef20fb8d04431e82e53e04993eee41a5b0c9db85",
   "access": "http://152.136.236.238:18120",
   "api_management": "http://152.136.236.238:18120/settings/api",
+  "release_v1_0_16": {
+    "version": "1.0.16",
+    "architecture": "linux/amd64",
+    "repository_source": "https://github.com/Chenyi-1999/gpt-ptmove",
+    "issue_tracker": "https://github.com/Chenyi-1999/gpt-ptmove/issues",
+    "production_152": {
+      "host": "152.136.236.238",
+      "url": "http://152.136.236.238:18120",
+      "image": "ptmove-nexus:1.0.16",
+      "image_id": "sha256:ed7b27f87a69683b7c3efe4def67ae5a477849e9b4ff73d0c74c12169871aeec",
+      "rollback_image": "ptmove-nexus:1.0.15",
+      "rollback_image_id": "sha256:c0f2ec40ecf8b78b75fce71029e81e11b437b8df4501d9b1a2c67ceeece2594a",
+      "host_directory": "/opt/gpt-ptmove-nexus/releases/github-links-v116-261126",
+      "downloaders_unchanged": true,
+      "rss_enabled": false,
+      "isolated_network": "none",
+      "assets_verified": 8
+    },
+    "server_binary_sha256": "1d71f2bed252cab9fbcada444875d514c454bfd539e14595403c84e6e76a25cf"
+  },
   "release_v1_0_15": {
     "version": "1.0.15",
     "architecture": "linux/amd64",
@@ -54,7 +74,7 @@
         "empty_legacy_shared_tag_removed": true
       },
       "github": {
-        "private": true,
+        "private": false,
         "id": 458992048,
         "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.15",
         "assets": [
@@ -80,9 +100,25 @@
       },
       "gitee": {
         "source_tag_pushed": true,
-        "repository_public": true,
-        "release_assets_published": false,
-        "public_release_pending_decision": true
+        "repository_public": false,
+        "release_assets_published": true,
+        "id": 1370307,
+        "url": "https://gitee.com/star1999/starpt/releases/tag/v1.0.15",
+        "full_image_location": "https://github.com/Chenyi-1999/gpt-ptmove/releases/download/v1.0.15/starpt-v1.0.15-linux-amd64.tar.gz",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "id": 3839265,
+            "size": 499,
+            "sha256": "fc7e9301fa4812accc9945d35b658a86b1199e780432f49b2df30b464f49a2b4"
+          },
+          {
+            "name": "starpt-v1.0.15-linux-amd64.tar.gz.sha256",
+            "id": 3839266,
+            "size": 100,
+            "sha256": "3f2fd79a26342223a3b7e74f313abf4d33716c4f270450f05370c6386c162ee4"
+          }
+        ]
       },
       "archive": {
         "zip_bytes": 914119214,

@@ -328,7 +328,7 @@ const routeTitleMap: Record<string, string> = {
   '/settings/ai': 'API 管理',
 }
 
-const sourceUrl = 'https://gitee.com/star1999/gpt-ptmove'
+const sourceUrl = 'https://github.com/Chenyi-1999/gpt-ptmove'
 const issuesUrl = sourceUrl + '/issues'
 const mainContent = ref<HTMLElement>()
 const currentVersion = ref('加载中…')

@@ -4,6 +4,8 @@ STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可
 
 使用者应遵守站点规则和适用法律。
 
+[项目源码](https://github.com/Chenyi-1999/gpt-ptmove) · [问题反馈](https://github.com/Chenyi-1999/gpt-ptmove/issues)
+
 ## 功能与安全默认值
 
 - 提供 Go 后端、Vue 管理界面和手动转种流程。
@@ -21,8 +23,8 @@ STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可
 先准备 Docker Compose 环境，并为本改版选择独立目录。不要复用旧 Python 版的目录、数据库、密钥或 NAS worker 状态目录。
 
 ```sh
-git clone https://gitee.com/star1999/starpt.git
-cd starpt/nexus
+git clone https://github.com/Chenyi-1999/gpt-ptmove.git
+cd gpt-ptmove/nexus
 ```
 
 创建仅供该实例使用的 `.env.ptmove`。至少设置高熵、私有的 `JWT_SECRET`；不要提交该文件。`PTMOVE_BIND` 默认 `0.0.0.0`，若只需本机或反向代理访问，可设为 `127.0.0.1`。端口默认 `18120`。
@@ -44,7 +46,7 @@ docker compose --env-file .env.ptmove -f compose.ptmove.yaml ps
 
 Compose 只将当前目录的 `data/` 挂载到 `/app/data`，使用容器内 5275 端口，主机端口由 `PTMOVE_PORT` 控制；容器资源上限为 768 MiB 和 1 CPU。请使用独立主机目录与独立端口，避免覆盖 PTMove Python 0.2 或其他服务。该 compose 文件引用 `.env.ptmove`，且不会自动创建管理员以外的站点凭据。
 
-STARPT v1.0.15 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.15 发行说明](docs/RELEASE-v1.0.15.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
+STARPT v1.0.16 提供 Linux AMD64 完整 Docker 镜像和离线 Compose。安装和升级步骤见 [v1.0.16 发行说明](docs/RELEASE-v1.0.16.md)。152 的部署与测试记录见 [DEPLOYMENT.json](docs/DEPLOYMENT.json)，API 管理入口为 `/settings/api`。
 
 ## 初次配置
 

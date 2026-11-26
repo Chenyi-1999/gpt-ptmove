@@ -50,7 +50,7 @@
             <span>同步 Cookie</span>
           </el-button>
           <el-link
-            href="https://gitee.com/star1999/gpt-ptmove/tree/master/nexus/extension"
+            href="https://github.com/Chenyi-1999/gpt-ptmove/tree/master/nexus/extension"
             target="_blank"
             rel="noopener noreferrer"
             type="primary"
