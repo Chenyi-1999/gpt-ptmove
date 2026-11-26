@@ -527,21 +527,29 @@
 
         <div class="card-content">
           <el-form :model="uploadForm" label-position="top" class="settings-form">
-            <el-form-item label="" class="form-item">
-              <div style="display: flex; align-items: center; gap: 20px; padding: 15px 0">
-                <el-switch
-                  v-model="uploadForm.anonymous_upload"
-                  active-text="启用匿名"
-                  inactive-text="禁用匿名"
+            <div class="form-item anonymous-setting">
+              <label for="transfer-anonymous" class="anonymous-setting__label">匿名发布</label>
+              <div class="anonymous-slider" :class="{ 'anonymous-slider--enabled': uploadForm.anonymous_upload }">
+                <input
+                  id="transfer-anonymous"
+                  v-model.number="anonymousUploadPosition"
+                  class="anonymous-slider__input"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="1"
+                  :aria-valuetext="uploadForm.anonymous_upload ? '启用匿名' : '禁用匿名'"
+                  aria-describedby="transfer-anonymous-description"
                 />
+                <div class="anonymous-slider__track" aria-hidden="true">
+                  <span>禁用匿名</span>
+                  <span>启用匿名</span>
+                </div>
               </div>
-              <el-text type="info" size="small" style="display: block">
-                <el-icon size="12" style="vertical-align: middle; margin-right: 4px">
-                  <InfoFilled />
-                </el-icon>
-                启用后，发布种子时将使用匿名模式，不显示上传者信息
+              <el-text id="transfer-anonymous-description" type="info" size="small">
+                启用匿名后，发布的种子将隐藏上传者信息。
               </el-text>
-            </el-form-item>
+            </div>
             <div class="form-item" style="margin-bottom: 16px">
               <div
                 style="
@@ -1187,6 +1195,13 @@ const uploadForm = reactive({
 })
 
 // 分享率检测间隔（分钟），用于UI显示和输入
+const anonymousUploadPosition = computed({
+  get: () => Number(uploadForm.anonymous_upload),
+  set: (position: number) => {
+    uploadForm.anonymous_upload = position === 1
+  },
+})
+
 const ratioLimiterIntervalMinutes = computed({
   get: () => Math.round(uploadForm.ratio_limiter_interval_seconds / 60),
   set: (val: number) => {
@@ -1982,6 +1997,93 @@ onMounted(() => {
 
 .form-item {
   margin-bottom: 16px;
+}
+
+.anonymous-setting {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.anonymous-setting__label {
+  color: var(--star-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.anonymous-slider {
+  position: relative;
+  width: min(100%, 280px);
+  direction: ltr;
+}
+
+.anonymous-slider__input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  cursor: ew-resize;
+  opacity: 0;
+  touch-action: pan-y;
+}
+
+.anonymous-slider__track {
+  position: relative;
+  display: grid;
+  min-height: 44px;
+  box-sizing: border-box;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 3px;
+  border: 1px solid var(--star-border);
+  border-radius: 10px;
+  background: var(--star-surface-muted);
+  color: var(--star-muted);
+  text-align: center;
+}
+
+.anonymous-slider__track::before {
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc((100% - 6px) / 2);
+  box-sizing: border-box;
+  border: 1px solid var(--star-accent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--star-accent) 24%, var(--star-surface));
+  content: '';
+  transition: transform 170ms ease-out;
+}
+
+.anonymous-slider--enabled .anonymous-slider__track::before {
+  transform: translateX(100%);
+}
+
+.anonymous-slider__track span {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 5px 4px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.anonymous-slider:not(.anonymous-slider--enabled) span:first-child,
+.anonymous-slider--enabled span:last-child {
+  color: var(--star-ink);
+  font-weight: 650;
+}
+
+.anonymous-slider__input:focus-visible + .anonymous-slider__track {
+  outline: 2px solid var(--star-accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anonymous-slider__track::before {
+    transition: none;
+  }
 }
 
 .form-item.compact {
