@@ -1,52 +1,76 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Box, FolderOpened, Refresh } from '@element-plus/icons-vue'
 import TjuptRssPanel from '../components/plugins/TjuptRssPanel.vue'
+import WasmPluginPanel from '../components/plugins/WasmPluginPanel.vue'
+import { requestPlugin, type PluginCatalog, type PluginInfo } from '../components/plugins/pluginApi'
 
-type Block = {
-  kind: 'text' | 'link' | 'metric'
-  title: string
-  text?: string
-  target?: string
-  metric?: string
-}
-type Manifest = { id: string; name: string; version: string; description?: string; blocks: Block[] }
-type Catalog = {
-  items: Manifest[]
-  issues: { file: string; message: string }[]
-  metrics: Record<string, number | null>
-  message?: string
-}
-
-const catalog = ref<Catalog>({ items: [], issues: [], metrics: {} })
-const selected = ref('')
-const busy = ref(false)
+const AutomationSettings = defineAsyncComponent(
+  () => import('../components/settings/AutomationSettings.vue'),
+)
+const route = useRoute()
+const router = useRouter()
+const catalog = ref<PluginCatalog>({ items: [], issues: [], metrics: {} })
+const loading = ref<'list' | 'refresh'>()
+const panelBusy = ref(false)
+const automationBusy = ref(false)
+const automationError = ref('')
 const error = ref('')
 const notice = ref('')
-const current = computed(() => catalog.value.items.find((plugin) => plugin.id === selected.value))
+const current = computed(
+  () => catalog.value.items.find((plugin) => plugin.id === route.query.plugin) ?? catalog.value.items[0],
+)
+const busy = computed(() => Boolean(loading.value) || panelBusy.value || automationBusy.value)
+
+function selectPlugin(id: string) {
+  void router.push({ name: 'plugins', query: { ...route.query, plugin: id } })
+}
+
+function updatePlugin(updated: PluginInfo) {
+  const index = catalog.value.items.findIndex((plugin) => plugin.id === updated.id)
+  if (index !== -1) catalog.value.items[index] = updated
+}
+
+async function toggleAutomation(enabled: boolean) {
+  if (busy.value) return
+  automationBusy.value = true
+  automationError.value = ''
+  try {
+    const { plugin } = await requestPlugin<{ plugin: PluginInfo }>(
+      '/automation/enabled',
+      'PUT',
+      '更新自动转种状态失败',
+      { enabled },
+    )
+    updatePlugin(plugin)
+  } catch (err) {
+    automationError.value = err instanceof Error ? err.message : '更新自动转种状态失败'
+  } finally {
+    automationBusy.value = false
+  }
+}
 
 async function load(refresh = false) {
   if (busy.value) return
-  busy.value = true
+  loading.value = refresh ? 'refresh' : 'list'
   error.value = ''
   notice.value = ''
   try {
-    const response = await fetch(refresh ? '/api/plugins/refresh' : '/api/plugins', {
-      method: refresh ? 'POST' : 'GET',
-    })
-    const data = (await response.json()) as Catalog
-    if (!response.ok || !Array.isArray(data.items) || !Array.isArray(data.issues)) {
-      throw new Error(data.message || '插件列表暂时不可用')
+    const data = await requestPlugin<PluginCatalog>(
+      refresh ? '/refresh' : '',
+      refresh ? 'POST' : 'GET',
+      refresh ? '刷新插件失败' : '插件列表暂时不可用',
+    )
+    if (!Array.isArray(data.items) || !Array.isArray(data.issues)) {
+      throw new Error('插件列表格式无效')
     }
     catalog.value = data
-    if (!catalog.value.items.some((item) => item.id === selected.value)) {
-      selected.value = catalog.value.items[0]?.id || ''
-    }
     if (refresh) notice.value = `已刷新，共 ${data.items.length} 个插件`
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '未能读取插件目录'
+    error.value = err instanceof Error ? err.message : '读取插件列表失败'
   } finally {
-    busy.value = false
+    loading.value = undefined
   }
 }
 
@@ -54,33 +78,42 @@ onMounted(() => void load())
 </script>
 
 <template>
-  <main class="star-plugins" :aria-busy="busy">
+  <section class="star-plugins" aria-labelledby="plugins-heading" :aria-busy="Boolean(loading)">
     <header class="plugin-heading">
       <div>
-        <h1>插件</h1>
-        <p>管理本机扩展和常用工具入口。</p>
+        <h1 id="plugins-heading">插件</h1>
+        <p>安装或更新文件后，点击「刷新插件」读取目录。</p>
       </div>
       <button class="plugin-refresh" type="button" :disabled="busy" @click="load(true)">
         <Refresh class="plugin-icon" aria-hidden="true" />
-        {{ busy ? '正在读取…' : '刷新插件' }}
+        {{ loading === 'refresh' ? '正在刷新…' : '刷新插件' }}
       </button>
     </header>
 
     <p v-if="error" class="plugin-message plugin-error" role="alert">{{ error }}</p>
     <p v-if="notice" class="plugin-message" role="status">{{ notice }}</p>
 
+    <details v-if="catalog.issues.length" class="plugin-details plugin-warning" open>
+      <summary>{{ catalog.issues.length }} 个插件文件需要处理</summary>
+      <ul>
+        <li v-for="(issue, index) in catalog.issues" :key="index">
+          <code>{{ issue.file }}</code> {{ issue.message }}
+        </li>
+      </ul>
+    </details>
     <div v-if="current" class="plugin-layout">
       <nav class="plugin-list" aria-label="已安装插件">
         <button
           v-for="plugin in catalog.items"
           :key="plugin.id"
           type="button"
-          :aria-current="plugin.id === selected ? 'true' : undefined"
-          @click="selected = plugin.id"
+          :disabled="panelBusy || automationBusy"
+          :aria-current="plugin.id === current.id ? 'page' : undefined"
+          @click="selectPlugin(plugin.id)"
         >
           <Box class="plugin-icon" aria-hidden="true" />
           <span>{{ plugin.name }}</span>
-          <ArrowRight v-if="plugin.id === selected" class="plugin-chev" aria-hidden="true" />
+          <ArrowRight v-if="plugin.id === current.id" class="plugin-chev" aria-hidden="true" />
         </button>
       </nav>
       <section class="plugin-content" :aria-label="current.name">
@@ -90,7 +123,36 @@ onMounted(() => void load())
         </header>
         <p v-if="current.description" class="plugin-description">{{ current.description }}</p>
         <TjuptRssPanel v-if="current.id === 'tjupt-rss'" />
-        <div class="plugin-blocks">
+        <template v-else-if="current.id === 'automation'">
+          <div class="automation-state">
+            <span :class="{ 'automation-state__active': current.enabled !== false }">
+              {{ current.enabled === false ? '已停用' : '已启用' }}
+            </span>
+            <el-button
+              :disabled="busy"
+              :loading="automationBusy"
+              @click="toggleAutomation(current.enabled === false)"
+            >
+              {{ current.enabled === false ? '启用插件' : '停用插件' }}
+            </el-button>
+          </div>
+          <p v-if="automationError" class="plugin-message plugin-error" role="alert">
+            {{ automationError }}
+          </p>
+          <p v-if="current.enabled === false" class="plugin-description" role="status">
+            自动转种已暂停。仍可预览候选、查看历史和核对已提交的任务。
+          </p>
+          <AutomationSettings class="automation-settings" :plugin-enabled="current.enabled !== false" />
+        </template>
+        <WasmPluginPanel
+          v-else-if="current.kind === 'wasm'"
+          :key="current.id"
+          :plugin="current"
+          :refreshing="Boolean(loading)"
+          @updated="updatePlugin"
+          @busy="panelBusy = $event"
+        />
+        <div v-else-if="current.blocks?.length" class="plugin-blocks">
           <article v-for="(block, index) in current.blocks" :key="index" class="plugin-block">
             <RouterLink v-if="block.kind === 'link' && block.target" :to="block.target">
               <span>
@@ -110,37 +172,33 @@ onMounted(() => void load())
         </div>
       </section>
     </div>
-    <div v-else-if="!error && !busy" class="plugin-empty">
+    <div v-else-if="!error && !loading" class="plugin-empty">
       <Box class="plugin-empty-icon" aria-hidden="true" />
       <h2>还没有安装插件</h2>
-      <p>把插件的 JSON 文件放进 <code>data/plugins/</code>，然后点击刷新。</p>
+      <p>把插件 ZIP 放进 <code>data/plugins/</code>，再点击刷新。</p>
     </div>
-    <div v-else-if="busy && !current" class="plugin-empty" role="status">正在读取插件目录…</div>
+    <div v-else-if="loading" class="plugin-empty" role="status">正在读取插件列表…</div>
 
-    <details v-if="catalog.issues.length" class="plugin-details plugin-warning" open>
-      <summary>{{ catalog.issues.length }} 个插件文件未加载</summary>
-      <ul>
-        <li v-for="issue in catalog.issues" :key="issue.file">
-          <code>{{ issue.file }}</code> {{ issue.message }}
-        </li>
-      </ul>
-    </details>
     <details v-if="current" class="plugin-details">
       <summary><FolderOpened class="plugin-icon" aria-hidden="true" /> 安装与移除</summary>
-      <p>在部署的数据目录中放入或移除 <code>plugins/</code> 下的 JSON 文件，再点击「刷新插件」。</p>
+      <p>把插件 ZIP 复制到 <code>data/plugins/</code> 后，点击「刷新插件」。移除 ZIP 后再次刷新，会从列表撤下插件并保留设置。JSON 卡片也通过同一目录管理。</p>
     </details>
-  </main>
+  </section>
 </template>
 
 <style scoped>
 .star-plugins {
   box-sizing: border-box;
+  flex: 1 1 auto;
   width: 100%;
   max-width: 1180px;
   min-width: 0;
+  min-height: 0;
   margin: 0 auto;
   padding: clamp(18px, 4vw, 48px);
   color: var(--star-ink, #f4f3fb);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .plugin-heading,
@@ -179,7 +237,7 @@ onMounted(() => void load())
 .plugin-refresh:disabled { opacity: 0.68; cursor: wait; }
 .plugin-icon, .plugin-chev { width: 18px; height: 18px; flex: 0 0 auto; }
 .plugin-chev { width: 15px; height: 15px; }
-.plugin-layout { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr); gap: 16px; }
+.plugin-layout { display: grid; grid-template-columns: clamp(160px, 22%, 226px) minmax(0, 1fr); gap: 16px; }
 .plugin-list, .plugin-content, .plugin-empty, .plugin-details {
   border: 1px solid var(--star-border, #293553);
   border-radius: 16px;
@@ -204,10 +262,11 @@ onMounted(() => void load())
   cursor: pointer;
 }
 .plugin-list button span { flex: 1; overflow-wrap: anywhere; }
-.plugin-list button[aria-current='true'], .plugin-list button:hover {
+.plugin-list button[aria-current='page'], .plugin-list button:hover {
   background: var(--star-accent-soft, #251e42);
   color: var(--star-accent, #b8a4ff);
 }
+.plugin-list button:disabled { opacity: 0.72; cursor: wait; }
 .plugin-content { min-width: 0; padding: clamp(16px, 3vw, 28px); }
 .plugin-content h2, .plugin-block { overflow-wrap: anywhere; }
 .plugin-version { color: var(--star-muted, #a8b3cf); font-size: 0.82rem; }
@@ -231,6 +290,10 @@ onMounted(() => void load())
 .plugin-details summary { cursor: pointer; font-weight: 600; }
 .plugin-details summary svg { vertical-align: middle; margin-right: 5px; }
 .plugin-details p { margin-bottom: 0; }
+.plugin-warning { margin-bottom: 16px; }
+.automation-state { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 16px; color: var(--star-muted); }
+.automation-state__active { color: var(--star-accent); }
+.automation-settings { margin-top: 18px; }
 .plugin-warning, .plugin-error {
   border: 1px solid rgb(255 198 98 / 26%);
   color: var(--star-warning-ink, #ffd27a);
@@ -238,8 +301,9 @@ onMounted(() => void load())
 }
 :where(button, a, summary):focus-visible { outline: 2px solid var(--star-accent, #b8a4ff); outline-offset: 2px; }
 
-@media (max-width: 700px) {
+@media (max-width: 780px) {
   .plugin-layout { grid-template-columns: minmax(0, 1fr); }
+  .plugin-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .plugin-heading { align-items: flex-start; }
 }
 </style>

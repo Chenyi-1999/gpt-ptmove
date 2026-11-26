@@ -129,3 +129,15 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 批量补全只修改选中记录缺失的媒体字段。已有可用截图和媒体报告保留。MediaInfo 优先从简介提取，必要时核对相同哈希的已完成 qB 文件。新增视频截图须取得五张互异的有效 Pixhost 图片才会保存。截图和媒体报告各自检查并发写入，各自保存。此接口不会获取源站种子文件、添加 qB 任务或发布。任务进度为当前服务进程内的短期结果，已落库的项目在重启后仍可读取。
 
 维护详情保存可在 `POST /api/migrate/update_db_seed_info` 附带 `maintenance_media_base`，包含打开草稿时的 `screenshots`、`screenshot_review_status` 和 `mediainfo`。未在草稿改动的媒体字段沿用最新数据库值。响应中的 `saved_maintenance_media` 返回最终保存的资料。
+
+
+## 插件目录和可执行动作
+
+原生管理员接口 `GET /api/plugins` 读取已加载的版本；只有 `POST /api/plugins/refresh` 重新扫描插件目录。返回 `{items,issues,metrics}`。ZIP/WASM 项带 `kind:"wasm"`、`enabled`、`fields`、`settings`、`actions` 和 `capabilities`。
+
+- `PUT /api/plugins/{id}/enabled` 接受 `{enabled:bool}`，返回 `{plugin}`。ID `automation` 使用内置自动转种总开关。
+- `PUT /api/plugins/{id}/settings` 接受 `{settings:{...}}`，按插件清单校验表单值。
+- `POST /api/plugins/{id}/actions/{action}` 运行声明的 WASM 操作并返回 `{result:{message,blocks}}`。插件停用时返回 409。
+- `GET /api/plugins/{id}/schedule` 读取定时计划；`PUT` 接受 `{enabled,action,interval_minutes}`。时间戳使用 Unix 秒。定时操作只引用已加载的插件，目录刷新和运行计划相互独立。
+
+现有 `/api/automation` 与 `/api/v1` 自动化接口保留。禁用内置自动转种插件后，手动及定时执行入口停止接受新的下载和发种操作；任务与预览读取继续可用。

@@ -773,3 +773,10 @@
 
 - 两个仓库的 v1.0.16 标签指向源码提交 986138afaa158d43b8b36d7a0e23627150d0d93f。GitHub 公开发行 459005796 附完整镜像、Compose 和校验文件，核对匿名读取、附件字节数及 SHA-256。Gitee 私有发行 1370359 附 Compose 与校验文件，两份附件通过授权接口重新下载，与同版 GitHub 校验一致。
 - D 盘历史 ZIP 已验证并登记，包含标签源码、完整镜像、Compose、校验及恢复说明。ZIP SHA-256 6cf59f1ad47a5220a27d5827890860492d82a8ebdba2e9bc6136e16c42671211。镜像归档重用的 81 个 OCI 对象和 152 原始 tar 的 SHA-256 通过复核。152 继续运行健康的 v1.0.16，本回执仅更新文档。
+
+## PTM-20261126-V110-PLUGIN-V2 — 2026-11-26T17:59:56+08:00 — Codex root、wasm_package_loader、automation_plugin_gate、package_plugin_ui、plugin_v2_review，STARPT 插件重构
+
+- 修改 nexus/server/internal/service/plugins、cmd/server、bootstrap 与 http/handler。Web 手动刷新扫描 ZIP/WASM 与已有 JSON 插件，启停、配置、动作和可选定时计划使用持久化状态。定时动作只运行已装载插件。重启沿用最近装载版本，坏包保留有效旧版。WASM 使用受限工作进程，首版仅向外部插件提供已缓存的下载器概况读取能力。
+- 修改自动转种 repository、migrationflow 和 nexus/webui 插件页、设置页、路由与 dist。为自动转种增加内置插件入口和独立启停；禁用后阻止网页与 AI 新队列及后续写操作，已发请求仍可核对回执，规则、预览和记录保留。更新 docs/STARPT_PLUGINS.md、API 合同、部署记录、README、版本/Compose 与发行说明。examples/plugins 提供 ZIP 打包脚本和下载器统计示例。
+- Windows 定向 Go 测试、Vue 类型检查、局部 ESLint、Vite 构建通过。桌面 1440×900 和移动 390×844 在模拟数据上走通刷新、配置、执行、计划、停用和移除。152 Linux Go 1.23 全量测试与断网 Docker 验收通过，覆盖手动装载、真实 WASI 样例执行、定时、重启恢复、坏包保留、替换、移除重装和自动转种总开关。初测发现 Go/WASM 最小页数与子进程分配开销超出预算，修复后用同一示例复测通过。
+- 152 正式容器已切换到 ptmove-nexus:1.1.0，原下载器配置与停用的自动任务保持。公网健康检查、七处页面和资源及匿名访问拦截已核对。保留 1.0.16 镜像和数据库快照。示例仅在隔离环境安装，未进行实际加种、下载或发种，未操作 81 或 OVH。记录时源代码提交、远端推送、双仓发行与历史归档待完成。

@@ -30,7 +30,7 @@ func (s *AutomationService) processIYUUBatches(ctx context.Context, current poli
 		return
 	}
 	for _, run := range runs {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || s.requirePluginEnabled(ctx) != nil {
 			return
 		}
 		var snapshot automationRunSnapshot
@@ -138,6 +138,9 @@ func (s *AutomationService) finishBatchDuplicate(task repository.AutomationTask,
 		if err == nil && done {
 			finish(duplicateCleanupMessage(action))
 		}
+		return
+	}
+	if s.authorizedTask(task, snapshot) != nil {
 		return
 	}
 	if err = s.repo.Advance(task.ID, task.LeaseToken, task.State, map[string]any{

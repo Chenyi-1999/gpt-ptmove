@@ -1,6 +1,7 @@
 package migrationflow
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -134,10 +135,27 @@ func (s *MigrateService) guardNativePublishEvidence(payload map[string]any, ctx 
 	return s.automation.repo.CheckPublishEvidence(nativeAliases(sources...), unique(normalizedIDs...), unique(hashes...), nativeAliases(target), allowedQueueID)
 }
 
+// automationUploadFence records whether this invocation has ever allowed a site write.
+// Transport retries use the same guard, so a later refusal cannot clear a prior attempt.
+type automationUploadFence struct {
+	writeAuthorized bool
+	pluginRefused   bool
+}
+
+func (f *automationUploadFence) record(err error) error {
+	f.writeAuthorized = f.writeAuthorized || err == nil
+	f.pluginRefused = f.pluginRefused || errors.Is(err, repository.ErrAutomationPluginDisabled)
+	return err
+}
+
+func (f automationUploadFence) stoppedBeforeFirstWrite() bool {
+	return f.pluginRefused && !f.writeAuthorized
+}
+
 // authorizeAutomationUpload 在实际上传 POST 前核对不可回退尝试标记及当前开关、冻结路由。
 func (s *MigrateService) authorizeAutomationUpload(queue repository.PublishQueueTask, paths ...string) error {
-	if !s.automationQueueEnabled() {
-		return errors.New("自动化模块或自动发布已关闭，尚未发出的上传已停止；请保留核对状态")
+	if err := s.automationQueueAuthorization(); err != nil {
+		return err
 	}
 	task, err := s.automation.repo.TaskForQueue(queue.ID)
 	if err != nil {
@@ -177,7 +195,10 @@ func (s *MigrateService) authorizeAutomationUpload(queue repository.PublishQueue
 			return errors.New("截图发布字段不一致，禁止上传")
 		}
 	}
-	return s.automation.validateFrozen(snapshot)
+	if err := s.automation.validateFrozen(snapshot); err != nil {
+		return err
+	}
+	return s.automation.requirePluginEnabled(context.Background())
 }
 
 // verifyAutomationPublishTorrent 在记录尝试及实际发送前核对冻结任务的种子与体积。

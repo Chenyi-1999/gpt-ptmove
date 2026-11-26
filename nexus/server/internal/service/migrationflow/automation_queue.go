@@ -17,18 +17,32 @@ import (
 
 // automationQueueEnabled 让自动化队列独立于原生手动队列开关，但必须同时启用模块和自动发布。
 func (s *MigrateService) automationQueueEnabled() bool {
+	return s.automationQueueAuthorization() == nil
+}
+
+func (s *MigrateService) automationQueueAuthorization() error {
+	disabled := errors.New("自动化模块或自动发布已关闭，尚未发出的上传已停止；请保留核对状态")
 	if s == nil || s.automation == nil {
-		return false
+		return disabled
+	}
+	if err := s.automation.requirePluginEnabled(context.Background()); err != nil {
+		return err
 	}
 	v, err := s.automation.settings(s.automation.repo)
-	return err == nil && v.Enabled && v.AutoPublish
+	if err != nil {
+		return err
+	}
+	if !v.Enabled || !v.AutoPublish {
+		return disabled
+	}
+	return nil
 }
 
 // beginAutomationPublish 在上传授权事务内重读审核状态，刷新媒体资料并返回实际发送的同一份数据。
 // 审核、队列或尝试围栏失败则整体回滚；不访问网络，不刷新冻结的路由和其他发布字段。
-func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTask) (map[string]any, error) {
+func (s *MigrateService) beginAutomationPublish(queue repository.PublishQueueTask, beganAt time.Time) (map[string]any, error) {
 	var upload map[string]any
-	err := s.automation.repo.BeginPublishPrepared(queue.ID, s.automation.now(), func(tx *gorm.DB, task repository.AutomationTask) error {
+	err := s.automation.repo.BeginPublishPrepared(queue.ID, beganAt, func(tx *gorm.DB, task repository.AutomationTask) error {
 		var snapshot automationSnapshot
 		if json.Unmarshal([]byte(task.Snapshot), &snapshot) != nil {
 			return errors.New("自动任务快照损坏")
@@ -98,6 +112,12 @@ func (e *automationTargetCheckError) Error() string {
 
 // prepareAutomationQueue 在任何上传标记前重新校验站点冻结、完整下载、限制和目标缺失。
 func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTask, nativeContext publishworkflow.Context) error {
+	if s == nil || s.automation == nil {
+		return errors.New("自动化服务未初始化")
+	}
+	if err := s.automation.requirePluginEnabled(context.Background()); err != nil {
+		return err
+	}
 	if !s.automationQueueEnabled() {
 		return errors.New("模块或自动发布已关闭")
 	}
@@ -193,7 +213,7 @@ func (s *MigrateService) prepareAutomationQueue(queue repository.PublishQueueTas
 	if candidate.InfoHash != task.InfoHash || candidate.Size != task.Size {
 		return errors.New("发布前候选完整载荷与预留时不一致")
 	}
-	return nil
+	return a.requirePluginEnabled(ctx)
 }
 
 // automationPublishOutcome 持久化规范化的上传回执，供原生发布日志使用。不会自动重试上传。

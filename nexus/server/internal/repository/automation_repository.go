@@ -116,7 +116,10 @@ func NewAutomationRepository(store *Store) (*AutomationRepository, error) {
 		return nil, errors.New("自动化数据库未初始化")
 	}
 	r := &AutomationRepository{db: store.DB}
-	if err := r.db.AutoMigrate(&AutomationSettingsRecord{}, &AutomationRun{}, &AutomationQuota{}, &AutomationTask{}, &AutomationPreviewRecord{}); err != nil {
+	if err := r.db.AutoMigrate(&AutomationSettingsRecord{}, &AutomationRun{}, &AutomationQuota{}, &AutomationTask{}, &AutomationPreviewRecord{}, &AutomationPluginControl{}); err != nil {
+		return nil, err
+	}
+	if err := r.initPluginControl(); err != nil {
 		return nil, err
 	}
 	return r, nil
@@ -152,7 +155,17 @@ func (r *AutomationRepository) SaveSettings(value string, disabled bool, now tim
 }
 
 // CreateRun 插入扫描记录，月度调度键保证重启后同月只扫描一次。
-func (r *AutomationRepository) CreateRun(run *AutomationRun) error { return r.db.Create(run).Error }
+func (r *AutomationRepository) CreateRun(run *AutomationRun) error {
+	if !run.Execute && !run.Scheduled {
+		return r.db.Create(run).Error
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
+		return tx.Create(run).Error
+	})
+}
 
 // FinishRun 保存扫描实际结果，不记录凭据或原始站点正文。
 func (r *AutomationRepository) FinishRun(id, status, message string, selected int, now time.Time) error {
@@ -308,6 +321,7 @@ func (r *AutomationRepository) Task(id string) (AutomationTask, error) {
 func (r *AutomationRepository) Claim(id, token string, now time.Time) (AutomationTask, error) {
 	result := r.db.Model(&AutomationTask{}).
 		Where("id = ? AND state IN ? AND lease_until <= ?", id, automationRunnableStates, now.UnixMilli()).
+		Where("(state IN ? OR EXISTS (?))", automationReconciliationStates, automationPluginEnabledQuery(r.db)).
 		Where("(state <> ? OR media_retry_at IS NULL OR media_retry_at <= ?)", AutomationStateWaitingMedia, now.UnixMilli()).
 		Updates(map[string]any{"lease_token": token, "lease_until": now.Add(15 * time.Minute).UnixMilli()})
 	if result.Error != nil {
@@ -325,11 +339,31 @@ func (r *AutomationRepository) Advance(id, token, expected string, values map[st
 	if values["state"] == "succeeded" || (values["state"] == "needs_review" && (expected == "published" || expected == "seeding")) {
 		values["publish_confirmed_at"] = automationConfirmTime(now)
 	}
-	result := r.db.Model(&AutomationTask{}).Where("id = ? AND lease_token = ? AND lease_until > ? AND state = ?", id, token, now.UnixMilli(), expected).Updates(values)
+	result := r.db.Model(&AutomationTask{}).
+		Where("id = ? AND lease_token = ? AND lease_until > ? AND state = ?", id, token, now.UnixMilli(), expected).
+		Where("(state IN ? OR EXISTS (?))", automationReconciliationStates, automationPluginEnabledQuery(r.db)).
+		Updates(values)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
+		return ErrAutomationFence
+	}
+	return nil
+}
+
+// RestoreUnsentAutomationDownload releases an attempt only when the caller proved that
+// its check rejected the single qB add request before sending it.
+func (r *AutomationRepository) RestoreUnsentAutomationDownload(task AutomationTask, now time.Time) error {
+	res := r.db.Model(&AutomationTask{}).
+		Where("id = ? AND state = ? AND lease_token = ? AND lease_until > ? AND download_attempted = ?",
+			task.ID, "downloading", task.LeaseToken, now.UnixMilli(), true).
+		Updates(map[string]any{"state": "reserved", "download_attempted": false, "message": "自动转种插件已停用，待恢复下载",
+			"torrent_path": "", "updated_at": now.UnixMilli()})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
 		return ErrAutomationFence
 	}
 	return nil
@@ -416,6 +450,9 @@ func (r *AutomationRepository) Cancel(id string, now time.Time) error {
 // Retry 仅恢复未尝试上传的失败或查重待核对任务，失败任务重新核对当月可用名额。
 func (r *AutomationRepository) Retry(id string, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var settings AutomationSettingsRecord
 		var flags struct {
 			MonthlyLimit int `json:"monthly_limit"`
@@ -477,6 +514,9 @@ func (r *AutomationRepository) Retry(id string, now time.Time) error {
 } // Enqueue 将原生队列行与任务唯一关联放在同一事务；交接失败全部回滚。
 func (r *AutomationRepository) Enqueue(task AutomationTask, queue *PublishQueueTask, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var row AutomationTask
 		if err := tx.First(&row, "id = ?", task.ID).Error; err != nil {
 			return err
@@ -509,6 +549,9 @@ func (r *AutomationRepository) BeginPublish(queueID int64, now time.Time) error 
 // prepare 只能通过 tx 读写本地数据库；失败时字段更新与尝试标记一同回滚，禁止执行外部动作。
 func (r *AutomationRepository) BeginPublishPrepared(queueID int64, now time.Time, prepare func(tx *gorm.DB, task AutomationTask) error) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var settings AutomationSettingsRecord
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&settings, 1).Error; err != nil {
 			return err
@@ -753,7 +796,10 @@ func (r *AutomationRepository) RequestReconcile(id, url string, now time.Time) e
 
 // ClaimRun 领取或恢复已登记的扫描，不在数据库事务中执行任何网络请求。
 func (r *AutomationRepository) ClaimRun(id, token string, now time.Time) (AutomationRun, error) {
-	res := r.db.Model(&AutomationRun{}).Where("id = ? AND status IN ? AND lease_until <= ?", id, []string{"queued", "scanning"}, now.UnixMilli()).Updates(map[string]any{"status": "scanning", "lease_token": token, "lease_until": now.Add(15 * time.Minute).UnixMilli()})
+	res := r.db.Model(&AutomationRun{}).
+		Where("id = ? AND status IN ? AND lease_until <= ?", id, []string{"queued", "scanning"}, now.UnixMilli()).
+		Where("((execute = ? AND scheduled = ?) OR EXISTS (?))", false, false, automationPluginEnabledQuery(r.db)).
+		Updates(map[string]any{"status": "scanning", "lease_token": token, "lease_until": now.Add(15 * time.Minute).UnixMilli()})
 	if res.Error != nil {
 		return AutomationRun{}, res.Error
 	}
@@ -777,9 +823,27 @@ func (r *AutomationRepository) FinishRunLeased(run AutomationRun, status, messag
 	return nil
 }
 
+// PauseRunLeased returns an interrupted execution to the same queue and keeps its monthly key.
+func (r *AutomationRepository) PauseRunLeased(run AutomationRun, selected int) error {
+	res := r.db.Model(&AutomationRun{}).
+		Where("id = ? AND lease_token = ? AND status = ?", run.ID, run.LeaseToken, "scanning").
+		Updates(map[string]any{"status": "queued", "message": "自动转种插件已停用，待恢复执行", "selected": selected,
+			"finished_at": 0, "lease_token": "", "lease_until": 0})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return ErrAutomationFence
+	}
+	return nil
+}
+
 // ReserveForRun 将扫描租约围栏与配额预留包含在同一事务，过期扫描不会产生新任务。
 func (r *AutomationRepository) ReserveForRun(task *AutomationTask, maxCount int, maxBytes int64, runID, token string, now time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var run AutomationRun
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND lease_token = ? AND lease_until > ? AND status = ? AND execute = ?", runID, token, now.UnixMilli(), "scanning", true).Take(&run).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -794,14 +858,18 @@ func (r *AutomationRepository) ReserveForRun(task *AutomationTask, maxCount int,
 // PendingRuns 返回最早的未完成扫描意图，避免新历史记录饿死旧任务。
 func (r *AutomationRepository) PendingRuns() ([]AutomationRun, error) {
 	rows := []AutomationRun{}
-	err := r.db.Where("status IN ?", []string{"queued", "scanning"}).Order("created_at ASC").Limit(10).Find(&rows).Error
+	err := r.db.Where("status IN ?", []string{"queued", "scanning"}).
+		Where("((execute = ? AND scheduled = ?) OR EXISTS (?))", false, false, automationPluginEnabledQuery(r.db)).
+		Order("created_at ASC").Limit(10).Find(&rows).Error
 	return rows, err
 }
 
 // WorkTasks 只读取可推进任务，避免终态历史挤出待执行任务。
 func (r *AutomationRepository) WorkTasks() ([]AutomationTask, error) {
 	rows := []AutomationTask{}
-	err := r.db.Where("state IN ?", automationRunnableStates).Order("last_polled_at ASC").
+	err := r.db.Where("state IN ?", automationRunnableStates).
+		Where("(state IN ? OR EXISTS (?))", automationReconciliationStates, automationPluginEnabledQuery(r.db)).
+		Order("last_polled_at ASC").
 		Order("CASE WHEN state = 'reserved' THEN size ELSE 0 END ASC").Order("created_at ASC").Order("id ASC").Limit(50).Find(&rows).Error
 	return rows, err
 }

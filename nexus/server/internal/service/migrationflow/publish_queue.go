@@ -1,6 +1,7 @@
 package migrationflow
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -717,6 +718,12 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 	if taskID <= 0 {
 		return
 	}
+	if taskRecord.Trigger == "automation" && s.automation != nil {
+		if err := s.automation.requirePluginEnabled(context.Background()); err != nil {
+			_ = s.queueRepo.UpdateTaskAfterRequeue(taskID, time.Now().Add(30*time.Second), "自动转种插件未启用", "")
+			return
+		}
+	}
 
 	payload := map[string]any{}
 	if err := json.Unmarshal([]byte(taskRecord.PayloadJSON), &payload); err != nil {
@@ -857,6 +864,8 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 		return
 	}
 
+	var uploadFence automationUploadFence
+	var automationBeganAt time.Time
 	logx.Infof(publishQueueLogModule, "开始执行队列任务 id=%d torrent_id=%s target_site=%s attempt=%d", taskID, torrentID, targetSite, taskRecord.AttemptCount)
 
 	if taskRecord.Trigger == "automation" {
@@ -870,6 +879,10 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			return
 		}
 		if err := s.prepareAutomationQueue(taskRecord, ctx); err != nil {
+			if errors.Is(err, repository.ErrAutomationPluginDisabled) || !s.automationQueueEnabled() {
+				_ = s.queueRepo.UpdateTaskAfterRequeue(taskID, time.Now().Add(30*time.Second), "自动化插件或自动发布已关闭", "")
+				return
+			}
 			var targetCheck *automationTargetCheckError
 			if errors.As(err, &targetCheck) {
 				if err := s.automation.repo.ResolveTargetBeforePublish(taskID, targetCheck.state, s.automation.now()); err != nil && !errors.Is(err, repository.ErrAutomationFence) {
@@ -881,8 +894,13 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, err.Error(), "")
 			return
 		}
-		prepared, err := s.beginAutomationPublish(taskRecord)
+		automationBeganAt = s.automation.now()
+		prepared, err := s.beginAutomationPublish(taskRecord, automationBeganAt)
 		if err != nil {
+			if errors.Is(err, repository.ErrAutomationPluginDisabled) {
+				_ = s.queueRepo.UpdateTaskAfterRequeue(taskID, time.Now().Add(30*time.Second), err.Error(), "")
+				return
+			}
 			reason := "自动发布授权或尝试标记失败，禁止上传：" + err.Error()
 			s.failAutomationBeforePublish(taskRecord, reason)
 			_ = s.queueRepo.UpdateTaskAfterFailure(taskID, taskRecord.AttemptCount+1, nil, reason, "")
@@ -899,12 +917,12 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 	}
 	if taskRecord.Trigger == "automation" {
 		payload[automationUploadGuardKey] = func(path string) error {
-			if err := s.authorizeAutomationUpload(taskRecord, path); err != nil {
-				return err
-			}
 			checked := ctx
 			checked.OriginalTorrentPath = path
-			return s.guardNativePublishEvidence(payload, checked, taskRecord.ID)
+			if err := s.guardNativePublishEvidence(payload, checked, taskRecord.ID); err != nil {
+				return err
+			}
+			return uploadFence.record(s.authorizeAutomationUpload(taskRecord, path))
 		}
 	} else {
 		payload[automationUploadGuardKey] = func(path string) error {
@@ -943,6 +961,12 @@ func (s *MigrateService) executePublishQueueTask(cfg publishQueueConfig, taskRec
 	)
 	cost := time.Since(startedAt)
 	if taskRecord.Trigger == "automation" {
+		if uploadFence.stoppedBeforeFirstWrite() && status >= 400 && !processingshared.ToBool(result["success"]) {
+			if err := s.automation.repo.RestoreUnsentAutomationPublish(taskID, automationBeganAt, s.automation.now()); err != nil {
+				logx.Errorf(publishQueueLogModule, "恢复未发送的自动发布失败，保持尝试标记 id=%d err=%v", taskID, err)
+			}
+			return
+		}
 		safe, err := s.automationPublishOutcome(taskRecord, result, status)
 		if err != nil {
 			logx.Errorf(publishQueueLogModule, "自动发布证据保存失败，保持尝试标记 id=%d", taskID)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,10 +14,18 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/pt-nexus/server/internal/bootstrap"
 	"github.com/pt-nexus/server/internal/platform/logx"
+	"github.com/pt-nexus/server/internal/service/plugins"
 )
 
 // main 是服务启动入口，负责加载环境变量、初始化日志、创建并运行 HTTP 服务。
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--plugin-worker" {
+		if err := plugins.RunPackageWorker(context.Background(), os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--initialize-admin" {
 		if err := initializeAdmin(os.Stdin, envOrDefault("PTNEXUS_DATA_DIR", "/app/data")); err != nil {
 			fmt.Fprintln(os.Stderr, "初始化管理员失败:", err)
@@ -50,6 +59,11 @@ func main() {
 		logx.Infof("启动", "%s", message)
 	}
 
+	executable, err := os.Executable()
+	if err != nil {
+		log.Fatalf("初始化插件运行进程失败: %v", err)
+	}
+	plugins.EnableProcessIsolation(executable)
 	app, err := bootstrap.NewApp()
 	if err != nil {
 		logx.Errorf("启动", "初始化应用失败: %v", err)

@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "id": "downloader-summary",
+  "name": "下载器统计示例",
+  "version": "1.0.0",
+  "description": "读取 STARPT 已记录的累计流量，展示配置、运行按钮和表格。",
+  "capabilities": ["downloader.summary"],
+  "fields": [
+    {"key": "include-disabled", "label": "显示已停用下载器", "type": "boolean", "default": false}
+  ],
+  "actions": [
+    {"id": "summary", "label": "查看下载器统计"}
+  ]
+}

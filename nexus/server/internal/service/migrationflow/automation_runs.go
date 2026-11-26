@@ -33,6 +33,10 @@ func (s *AutomationService) processRuns(ctx context.Context, current policy.Sett
 
 // scanRun 冻结路由、只读候选扫描和原子预留分离，API 幂等事务不会持有网络请求。
 func (s *AutomationService) scanRun(ctx context.Context, run repository.AutomationRun) {
+	if run.Execute && s.requirePluginEnabled(ctx) != nil {
+		_ = s.repo.PauseRunLeased(run, run.Selected)
+		return
+	}
 	var snapshot automationRunSnapshot
 	if json.Unmarshal([]byte(run.Snapshot), &snapshot) != nil {
 		_ = s.repo.FinishRunLeased(run, "failed", "扫描快照损坏", "[]", 0, s.now())
@@ -76,6 +80,11 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 	observed := s.migrate.observeTask("candidate_scan", "执行自动化候选扫描", "/settings/automation")
 	defer observed.finish(false, "候选扫描未完成", "")
 	rows, _, err := s.scan(ctx, snapshot.Route.Settings, observed, excludedIDs)
+	if run.Execute && errors.Is(s.requirePluginEnabled(ctx), repository.ErrAutomationPluginDisabled) {
+		_ = s.repo.PauseRunLeased(run, run.Selected)
+		observed.finish(false, "自动转种插件已停用，扫描等待恢复", "")
+		return
+	}
 	if err != nil {
 		state := "failed"
 		message := err.Error()
@@ -113,6 +122,15 @@ func (s *AutomationService) scanRun(ctx context.Context, run repository.Automati
 			task := repository.AutomationTask{ID: automationID("auto"), RunID: run.ID, Month: run.Month, Source: snapshot.Route.Source.ID, Target: snapshot.Route.Target.ID, SourceID: c.ID, Title: c.Title, InfoHash: c.InfoHash, Size: c.Size, Seeders: c.Seeders, Official: c.Official, Snapshot: string(raw), DownloaderID: snapshot.Route.Settings.DownloaderID, SavePath: snapshot.Route.Settings.SavePath, State: "reserved", Explicit: run.Explicit, CreatedAt: s.now().UnixMilli(), UpdatedAt: s.now().UnixMilli(), BatchCheck: batch}
 			err = s.repo.ReserveForRun(&task, snapshot.Route.Settings.MonthlyLimit, 0, run.ID, run.LeaseToken, s.now())
 			if err != nil {
+				if errors.Is(err, repository.ErrAutomationPluginDisabled) {
+					selected := run.Selected
+					if !batch {
+						selected += count
+					}
+					_ = s.repo.PauseRunLeased(run, selected)
+					observed.finish(false, "自动转种插件已停用，保留已有预留", "")
+					return
+				}
 				if errors.Is(err, repository.ErrAutomationQuota) {
 					message = "扫描结束，本月发布名额已满或已预留"
 					break

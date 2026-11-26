@@ -189,7 +189,27 @@ func NewApp() (*App, error) {
 	registerForkUpdateRoutes(engine)
 	handler.NewSiteProfilesHandler(profilesService).RegisterRoutes(engine.Group("/api"))
 	pluginsAPI := engine.Group("/api/plugins")
-	handler.RegisterPlugins(pluginsAPI, paths.DataDir, store.DB)
+	if err := handler.RegisterPlugins(pluginsAPI, paths.DataDir, store.DB, automationService,
+		func(ctx context.Context) ([]handler.PluginDownloaderSummary, error) {
+			rows := settingsService.DownloadersList(false)
+			totals, err := torrentRepo.TrafficTotals()
+			if err != nil {
+				return nil, err
+			}
+			summaries := make([]handler.PluginDownloaderSummary, 0, len(rows))
+			for _, row := range rows {
+				id, _ := row["id"].(string)
+				name, _ := row["name"].(string)
+				enabled, _ := row["enabled"].(bool)
+				summaries = append(summaries, handler.PluginDownloaderSummary{
+					ID: id, Name: name, Enabled: enabled,
+					Uploaded: totals[id]["total_ul"], Downloaded: totals[id]["total_dl"],
+				})
+			}
+			return summaries, ctx.Err()
+		}); err != nil {
+		return nil, fmt.Errorf("初始化插件目录失败: %w", err)
+	}
 	tjuptPlugin := migrationflow.NewTjuptRSSService(cfgManager)
 	tjuptAutomation, err := migrationflow.NewTjuptAutomation(store.DB, tjuptPlugin)
 	if err != nil {

@@ -69,7 +69,11 @@ const router = createRouter({
         {
           path: 'automation',
           name: 'settings-automation',
-          component: () => import('../components/settings/AutomationSettings.vue'),
+          redirect: (to) => ({
+            name: 'plugins',
+            query: { ...to.query, plugin: 'automation' },
+            hash: to.hash,
+          }),
         },
         {
           path: 'site-profiles',

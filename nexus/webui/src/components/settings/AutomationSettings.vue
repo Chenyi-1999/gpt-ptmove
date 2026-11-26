@@ -2,7 +2,7 @@
   <section class="settings-page" v-loading="loading">
     <header class="page-heading">
       <div>
-        <h2 class="settings-section-title">自动下载与跨站管理</h2>
+        <h3 class="settings-section-title">自动下载与跨站管理</h3>
         <p>规则默认关闭。预览只读取候选和限制状态；确认后才会将选中项目加入下载队列。</p>
       </div>
       <el-tag type="info">{{ quotaLabel }}</el-tag>
@@ -14,9 +14,9 @@
           <strong>自动化规则</strong
           ><el-switch
             v-model="form.enabled"
-            aria-label="启用自动化模块"
-            active-text="启用"
-            inactive-text="停用新任务"
+            aria-label="允许执行自动转种规则"
+            active-text="允许运行规则"
+            inactive-text="暂停运行规则"
           /></div
       ></template>
       <el-form :model="form" label-position="top" class="form-grid">
@@ -49,7 +49,7 @@
         /></el-form-item>
         <el-form-item label="月度计划"
           ><el-switch v-model="form.schedule_enabled" /><span class="hint"
-            >启用模块后按上海时区设置执行月度扫描</span
+            >允许运行规则后按上海时区执行月度扫描</span
           ></el-form-item
         >
         <el-form-item label="每月日期"
@@ -125,7 +125,7 @@
       <div class="actions">
         <el-button type="primary" :loading="saving" @click="save">保存规则</el-button
         ><el-button :loading="previewing" @click="preview">预览候选</el-button
-        ><el-button type="success" :disabled="!form.enabled" :loading="running" @click="run"
+        ><el-button type="success" :disabled="!pluginEnabled || !form.enabled" :loading="running" @click="run"
           >运行计划</el-button
         >
       </div>
@@ -142,7 +142,7 @@
           <strong>候选预览</strong
           ><el-button
             size="small"
-            :disabled="!selected.length || previewSitesMismatch || running"
+            :disabled="!pluginEnabled || !selected.length || previewSitesMismatch || running"
             :loading="running"
             @click="enqueueSelected"
             >将选中项目加入队列</el-button
@@ -243,7 +243,7 @@
               ><template #default="s"
                 ><el-button v-if="canCancel(s.row)" link type="danger" @click="act(s.row, 'cancel')"
                   >取消</el-button
-                ><el-button v-if="canRetry(s.row)" link @click="act(s.row, 'retry')">{{
+                ><el-button v-if="canRetry(s.row)" :disabled="!pluginEnabled" link @click="act(s.row, 'retry')">{{
                   s.row.state === 'waiting_target' ? '重新核对' : '重试'
                 }}</el-button
                 ><el-button v-if="canReconcile(s.row)" link @click="reconcile(s.row)"
@@ -272,6 +272,9 @@
 import axios from 'axios'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const props = defineProps<{ pluginEnabled: boolean }>()
+
 type Site = { id: string; name: string; baseURL: string }
 type Candidate = {
   id: string
@@ -649,6 +652,7 @@ const runRequest = async (
     target_digest?: string | null
   },
 ) => {
+  if (!props.pluginEnabled || running.value) return
   running.value = true
   try {
     const r = await axios.post(
@@ -694,6 +698,7 @@ const enqueueSelected = () => {
   )
 }
 const act = async (task: AutomationTask, action: 'cancel' | 'retry') => {
+  if (action === 'retry' && !props.pluginEnabled) return
   try {
     await axios.post(`/api/automation/tasks/${String(task.id ?? '')}/${action}`)
     ElMessage.success(
@@ -764,6 +769,13 @@ onMounted(load)
   color: var(--star-muted);
   font-size: 0.8125rem;
   line-height: 1.55;
+}
+
+.settings-section-title {
+  margin: 0;
+  color: var(--star-ink);
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  font-weight: 650;
 }
 
 .hint {

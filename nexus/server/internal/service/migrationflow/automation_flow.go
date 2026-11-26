@@ -18,14 +18,25 @@ import (
 	publishworkflow "github.com/pt-nexus/server/internal/service/publish/workflow"
 )
 
-// authorizedTask 在每个新的外部动作前检查租约、模块开关和冻结站点声明。
-func (s *AutomationService) authorizedTask(task repository.AutomationTask, snapshot automationSnapshot) error {
+func (s *AutomationService) automationLeasedTask(task repository.AutomationTask) (repository.AutomationTask, error) {
 	current, err := s.repo.Task(task.ID)
+	if err != nil {
+		return current, err
+	}
+	if current.LeaseToken != task.LeaseToken || current.LeaseUntil <= s.now().UnixMilli() || current.State != task.State {
+		return current, repository.ErrAutomationFence
+	}
+	return current, nil
+}
+
+// authorizedTask verifies the lease, frozen sites, and switches before a new external effect.
+func (s *AutomationService) authorizedTask(task repository.AutomationTask, snapshot automationSnapshot) error {
+	current, err := s.automationLeasedTask(task)
 	if err != nil {
 		return err
 	}
-	if current.LeaseToken != task.LeaseToken || current.LeaseUntil <= s.now().UnixMilli() || current.State != task.State {
-		return repository.ErrAutomationFence
+	if err := s.requirePluginEnabled(context.Background()); err != nil {
+		return err
 	}
 	v, err := s.settings(s.repo)
 	if err != nil {
@@ -34,7 +45,10 @@ func (s *AutomationService) authorizedTask(task repository.AutomationTask, snaps
 	if !v.Enabled && !current.Explicit {
 		return errors.New("模块已关闭，任务保持等待")
 	}
-	return s.validateFrozen(snapshot)
+	if err := s.validateFrozen(snapshot); err != nil {
+		return err
+	}
+	return s.requirePluginEnabled(context.Background())
 }
 
 // advanceTask 只编排获取、完整下载、原生处理和原子队列交接，底层解析在各自分层实现。
@@ -63,8 +77,13 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		s.failTask(task, "原生下载器不可用", false)
 		return
 	}
+	var gateRefusedSourceAdd bool
 	if native, ok := d.(downloaderclient.Downloader); ok {
-		d = native.WithEffectGuard(func() error { return s.authorizedTask(task, snapshot) })
+		d = native.WithEffectGuard(func() error {
+			err := s.authorizedTask(task, snapshot)
+			gateRefusedSourceAdd = errors.Is(err, repository.ErrAutomationPluginDisabled)
+			return err
+		})
 	}
 	if task.State == "reserved" {
 		if task.BatchCheck && task.Month != policy.Month(s.now()) {
@@ -159,10 +178,18 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		task.State = "downloading"
 		task.TorrentPath = torrentPath
 		task.DownloadAttempted = true
-		if s.authorizedTask(task, snapshot) != nil {
+		if err := s.authorizedTask(task, snapshot); err != nil {
+			if errors.Is(err, repository.ErrAutomationPluginDisabled) {
+				_ = s.repo.RestoreUnsentAutomationDownload(task, s.now())
+			}
 			return
 		}
 		if err = d.AddSourceTorrent(candidate.Torrent, task.ID+".torrent", task.SavePath, task.InfoHash); err != nil {
+			if gateRefusedSourceAdd {
+				// AddSourceTorrent has one write; a guard refusal proves it was never sent.
+				_ = s.repo.RestoreUnsentAutomationDownload(task, s.now())
+				return
+			}
 			if errors.Is(err, downloaderclient.ErrAutomationSourceExists) {
 				s.failTask(task, "相同种子在提交前已存在于下载器，未提交新下载", false)
 				return
@@ -264,7 +291,7 @@ func (s *AutomationService) advanceTask(ctx context.Context, task repository.Aut
 		if s.authorizedTask(task, snapshot) != nil {
 			return
 		}
-		if err = s.enqueueNative(task, snapshot); err != nil {
+		if err = s.enqueueNative(task, snapshot); err != nil && !errors.Is(err, repository.ErrAutomationPluginDisabled) {
 			s.failTask(task, "原生队列交接失败，未尝试上传："+err.Error(), false)
 		}
 	}

@@ -89,6 +89,9 @@ func (s *AutomationService) prepareAutomationMedia(ctx context.Context, task rep
 		}
 		return s.authorizedTask(task, snapshot)
 	}
+	if err := guard(); err != nil {
+		return err
+	}
 	row, err := s.automationMediaDraft(task, snapshot, guard)
 	if err != nil {
 		return err

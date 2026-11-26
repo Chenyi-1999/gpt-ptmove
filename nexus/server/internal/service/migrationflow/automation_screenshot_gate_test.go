@@ -124,7 +124,7 @@ func TestAutomationPendingCannotEnqueueOrPreflight(t *testing.T) {
 	if err := m.prepareAutomationQueue(queue, publishworkflow.Context{}); err == nil || !strings.Contains(err.Error(), "截图") {
 		t.Fatalf("preflight: %v", err)
 	}
-	if _, err := m.beginAutomationPublish(queue); err == nil {
+	if _, err := m.beginAutomationPublish(queue, a.now()); err == nil {
 		t.Fatal("pending got attempt marker")
 	}
 	row, _ := a.repo.Task(task.ID)
@@ -147,7 +147,7 @@ func TestAutomationConfirmedQueueRefreshAndBoundaryFence(t *testing.T) {
 	if err := db.Model(&repository.AutomationTask{}).Where("id = ?", task.ID).Updates(map[string]any{"state": "queued_publish", "queue_id": queue.ID}).Error; err != nil {
 		t.Fatal(err)
 	}
-	upload, err := m.beginAutomationPublish(queue)
+	upload, err := m.beginAutomationPublish(queue, a.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestAutomationConfirmedQueueRefreshAndBoundaryFence(t *testing.T) {
 	if err := m.authorizeAutomationUpload(queue); err != nil {
 		t.Fatalf("confirmed blocked: %v", err)
 	}
-	if _, err := m.beginAutomationPublish(queue); err == nil {
+	if _, err := m.beginAutomationPublish(queue, a.now()); err == nil {
 		t.Fatal("second attempt allowed")
 	}
 	if err := db.Table("seed_parameters").Where("torrent_id = ?", task.SourceID).UpdateColumn("screenshot_review_status", "pending").Error; err != nil {

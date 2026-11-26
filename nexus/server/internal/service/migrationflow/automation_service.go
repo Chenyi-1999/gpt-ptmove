@@ -352,6 +352,11 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 	}
 	explicit := len(selected) > 0 || body["enqueue"] == true
 	execute := v.Enabled || explicit
+	if execute || scheduled {
+		if err := s.requirePluginEnabled(ctx); err != nil {
+			return automationError(err, 409)
+		}
+	}
 	if execute {
 		if v.DownloaderID == "" || v.SavePath == "" {
 			return automationError(errors.New("请先选择原生下载器和完整文件保存目录"), 400)
@@ -381,6 +386,9 @@ func (s *AutomationService) run(ctx context.Context, body map[string]any, schedu
 		run.ScheduleKey = &key
 	}
 	if err = repo.CreateRun(&run); err != nil {
+		if errors.Is(err, repository.ErrAutomationPluginDisabled) {
+			return automationError(err, 409)
+		}
 		return automationError(errors.New("当月计划已执行或运行记录写入失败"), 409)
 	}
 	return map[string]any{"success": true, "run": run, "tasks": []repository.AutomationTask{}, "candidates": []policy.Candidate{}, "message": run.Message}, 202
@@ -556,7 +564,11 @@ func (s *AutomationService) Tick(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	if policy.Due(s.now(), v) {
+	enabled, err := s.PluginEnabled(ctx)
+	if err != nil {
+		return
+	}
+	if enabled && policy.Due(s.now(), v) {
 		_, _ = s.run(ctx, map[string]any{}, true)
 	}
 	s.processRuns(ctx, v)
@@ -570,7 +582,7 @@ func (s *AutomationService) Tick(ctx context.Context) {
 		}
 		_ = s.repo.TouchPoll(task.ID, s.now())
 		if task.State == "published" || task.State == "seeding" || task.State == "reconciling" {
-			if (!v.Enabled && !task.Explicit) || (task.State == "published" && !v.AutoPublish && !task.Explicit) {
+			if enabled && ((!v.Enabled && !task.Explicit) || (task.State == "published" && !v.AutoPublish && !task.Explicit)) {
 				continue
 			}
 			token := automationID("lease")
@@ -597,7 +609,9 @@ func (s *AutomationService) Tick(ctx context.Context) {
 		s.advanceTask(ctx, claimed)
 		_ = s.repo.Release(task.ID, token)
 	}
-	s.processIYUUBatches(ctx, v)
+	if enabled {
+		s.processIYUUBatches(ctx, v)
+	}
 }
 func (s *AutomationService) failTask(task repository.AutomationTask, message string, review bool) {
 	state := "failed"

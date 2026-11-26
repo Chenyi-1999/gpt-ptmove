@@ -3,6 +3,7 @@ package migrationflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -13,13 +14,20 @@ import (
 	publishautomation "github.com/pt-nexus/server/internal/service/publish/automation"
 )
 
-// reconcileTask 在已提交事务外验证目标载荷；唯一允许的外部写入是下载器补种。
+func (s *AutomationService) authorizeReconciliation(task repository.AutomationTask, snapshot automationSnapshot) error {
+	if _, err := s.automationLeasedTask(task); err != nil {
+		return err
+	}
+	return s.validateFrozen(snapshot)
+}
+
+// reconcileTask keeps evidence checks available while stopped and guards any qB repair.
 func (s *AutomationService) reconcileTask(ctx context.Context, task repository.AutomationTask) {
 	var snapshot automationSnapshot
 	if json.Unmarshal([]byte(task.Snapshot), &snapshot) != nil {
 		return
 	}
-	if s.authorizedTask(task, snapshot) != nil {
+	if s.authorizeReconciliation(task, snapshot) != nil {
 		return
 	}
 	if len(snapshot.Target.AnnounceHosts) == 0 {
@@ -30,8 +38,13 @@ func (s *AutomationService) reconcileTask(ctx context.Context, task repository.A
 	if err != nil {
 		return
 	}
+	var gateRefusedRepair bool
 	if native, ok := d.(downloaderclient.Downloader); ok {
-		d = native.WithEffectGuard(func() error { return s.authorizedTask(task, snapshot) })
+		d = native.WithEffectGuard(func() error {
+			err := s.authorizedTask(task, snapshot)
+			gateRefusedRepair = errors.Is(err, repository.ErrAutomationPluginDisabled)
+			return err
+		})
 	}
 	if task.State != "seeding" || task.TargetHash == "" {
 		p, _ := acquireautomation.ProfileFrom(snapshot.Target)
@@ -60,7 +73,7 @@ func (s *AutomationService) reconcileTask(ctx context.Context, task repository.A
 		if err != nil {
 			return
 		}
-		if s.authorizedTask(task, snapshot) != nil {
+		if s.authorizeReconciliation(task, snapshot) != nil {
 			return
 		}
 		targetPath := filepath.Join(filepath.Dir(task.TorrentPath), task.ID+".target.torrent")
@@ -76,19 +89,21 @@ func (s *AutomationService) reconcileTask(ctx context.Context, task repository.A
 		task.ResultURL = normalized
 
 	}
-	if s.authorizedTask(task, snapshot) != nil {
+	if err := s.authorizedTask(task, snapshot); err == nil {
+		data, err := os.ReadFile(task.TargetTorrentPath)
+		if err != nil {
+			s.failTask(task, "目标种子元数据不可用，请重新登记核对", true)
+			return
+		}
+		if err = d.EnsureTargetSeeding(data, task.ID+"-target.torrent", task.SavePath, task.TargetHash); err != nil &&
+			!gateRefusedRepair && !errors.Is(err, repository.ErrAutomationPluginDisabled) {
+			s.failTask(task, "目标补种结果未确认，请核对下载器后再登记核对", true)
+			return
+		}
+	} else if !errors.Is(err, repository.ErrAutomationPluginDisabled) {
 		return
 	}
-	data, err := os.ReadFile(task.TargetTorrentPath)
-	if err != nil {
-		s.failTask(task, "目标种子元数据不可用，请重新登记核对", true)
-		return
-	}
-	if err = d.EnsureTargetSeeding(data, task.ID+"-target.torrent", task.SavePath, task.TargetHash); err != nil {
-		s.failTask(task, "目标补种结果未确认，请核对下载器后再登记核对", true)
-		return
-	}
-	if s.authorizedTask(task, snapshot) != nil {
+	if s.authorizeReconciliation(task, snapshot) != nil {
 		return
 	}
 	verified, err := publishautomation.VerifySeeding(d, task.TargetHash, snapshot.Target.AnnounceHosts)

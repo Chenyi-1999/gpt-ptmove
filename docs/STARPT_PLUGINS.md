@@ -1,6 +1,32 @@
 # STARPT 插件
 
-将 UTF-8 JSON 文件放进 STARPT 数据目录中的 `plugins/`。Compose 默认对应宿主机的 `data/plugins/`，容器内为 `/app/data/plugins/`。打开「插件」，点击「刷新插件」。移除文件后再刷新即可移除对应入口。
+## 安装、更新和移除
+
+把发行附件中的 `downloader-summary.zip` 放到 STARPT 容器的 `/app/data/plugins/`，再在「插件」页面点击「刷新插件」。宿主机目录由 Compose 的数据挂载决定；腾讯 152 用 `/opt/gpt-ptmove-nexus/data/plugins/`。首次刷新后示例立即可用。
+
+替换同名 ZIP 再刷新即可更新，校验失败时会显示原因并保留上一版。删除文件并刷新即可移除入口，配置独立保留。STARPT 服务启动时从已保存的缓存恢复，目录只在 Web 手动刷新时读取。首次升级时已有旧 JSON 文件也可通过一次手动刷新恢复。
+
+## 编写可执行插件
+
+以 [下载器统计示例](../examples/plugins/downloader-summary/) 为起点。用 Go 1.23 或更新版本构建，打包机需有 Python 3。在仓库根目录执行：
+
+```sh
+python3 examples/plugins/pack.py examples/plugins/downloader-summary --output-dir ./plugin-build
+```
+
+ZIP 文件名须与插件 ID 相同。包根目录包含 `plugin.json` 和 `plugin.wasm`。清单用 `schema_version: 2`，声明 ID、名称、版本、`fields`、`actions` 及所需能力。ID、字段键和动作 ID 用小写字母、数字与连字符。字段类型支持 `string`、`boolean`、`integer`，字符串可以列出可选值。
+
+模块使用 WASI Preview 1，通过标准输入收到一个 JSON 对象，包含 `action`、`settings` 和 `resources`。标准输出返回 `message` 和 `blocks`，内容可以是文字、统计数值和表格。代码可用其他支持 WASI 的语言编写。STARPT 每次执行动作才启动模块，限制内存、输出和运行时间，按能力提供所需数据。
+
+v1.1.0 的外部插件能力是 `downloader.summary`，返回配置中的下载器名称、启用状态和 STARPT 已记录的累计流量。插件通过工作台运行按钮或单独设置的定时计划执行。计划默认关闭，设定间隔后按到期时间唤醒。支持停用插件、查询最近定时运行状态和重新启用。
+
+## 自动转种
+
+现有自动化面板迁到「插件 → 自动转种」。旧的 `/settings/automation` 入口兼容跳转，已保存规则、候选预览、任务记录和 AI API 沿用。插件开关与每月计划独立。关闭插件暂停新的写操作并保留未完成任务，已提交到站点的结果仍可核对。自动转种继续由内置后端执行源站限制、目标查重与配额检查。
+
+## 旧版 JSON 清单
+
+旧版文字、链接和统计卡片仍可使用。文件放入同一目录，点击「刷新插件」读取。可执行插件与 JSON 同 ID 时显示可执行插件，并在刷新结果中提示冲突。内置插件 ID 保留。
 
 例如保存为 `ops.json`：
 

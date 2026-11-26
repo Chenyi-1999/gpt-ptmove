@@ -63,6 +63,9 @@ func (r *MigrateRepository) withAutomationMediaTask(task AutomationTask, now tim
 		return ErrAutomationFence
 	}
 	return r.store.DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var current AutomationTask
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND lease_token = ? AND lease_until > ? AND state = ? AND download_attempted = ? AND publish_attempted = ?",

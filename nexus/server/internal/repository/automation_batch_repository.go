@@ -104,6 +104,9 @@ func (r *AutomationRepository) ClaimBatchTasks(tasks []AutomationTask, token str
 	}
 	var claimed []AutomationTask
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockAutomationPlugin(tx); err != nil {
+			return err
+		}
 		var run AutomationRun
 		res := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND status = ?", runID, "batch_active").Take(&run)
@@ -169,6 +172,7 @@ func (r *AutomationRepository) ResolveBatchTask(task AutomationTask, duplicate *
 	res := r.db.Model(&AutomationTask{}).
 		Where("id = ? AND run_id = ? AND info_hash = ? AND batch_check = ? AND state = ? AND lease_token = ? AND lease_until > ? AND download_attempted = ? AND publish_attempted = ? AND queue_id IS NULL",
 			task.ID, task.RunID, task.InfoHash, true, AutomationStateWaitingBatch, task.LeaseToken, now.UnixMilli(), true, false).
+		Where("EXISTS (?)", automationPluginEnabledQuery(r.db)).
 		Updates(values)
 	if res.Error != nil {
 		return res.Error
@@ -199,7 +203,7 @@ func (r *AutomationRepository) ResumeBatchRun(run AutomationRun, now time.Time) 
 		Where("(state <> ? OR duplicate_cleanup_attempted IS NULL OR duplicate_cleanup_attempted = ?)", AutomationStateDuplicateCleanup, false)
 	res := r.db.Model(&AutomationRun{}).
 		Where("id = ? AND month = ? AND status = ? AND execute = ? AND lease_until <= ?", run.ID, run.Month, "batch_active", run.Execute, now.UnixMilli()).
-		Where("NOT EXISTS (?)", active).
+		Where("NOT EXISTS (?) AND EXISTS (?)", active, automationPluginEnabledQuery(r.db)).
 		Updates(values)
 	return run.Execute && res.RowsAffected == 1, res.Error
 }

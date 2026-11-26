@@ -52,6 +52,7 @@ type Snapshot struct {
 
 type Catalog struct {
 	root     string
+	cache    string
 	builtins []Manifest
 	mu       sync.Mutex
 	snapshot Snapshot
@@ -59,11 +60,14 @@ type Catalog struct {
 
 // New 创建清单目录索引，并保留内置插件的入口。
 func New(dataDir string, builtins ...Manifest) *Catalog {
-	return &Catalog{
+	c := &Catalog{
 		root:     filepath.Join(dataDir, "plugins"),
+		cache:    filepath.Join(dataDir, "plugin-state", "legacy.json"),
 		builtins: builtins,
 		snapshot: Snapshot{Items: append([]Manifest{}, builtins...), Issues: []Issue{}},
 	}
+	c.restoreLegacy()
+	return c
 }
 
 func (c *Catalog) List() Snapshot {
@@ -82,6 +86,10 @@ func (c *Catalog) Reload() (Snapshot, error) {
 		return c.snapshot, err
 	}
 	seen := make(map[string]bool)
+	lastGood := make(map[string]Manifest)
+	for _, manifest := range c.snapshot.Items {
+		lastGood[manifest.ID] = manifest
+	}
 	for _, manifest := range c.builtins {
 		seen[manifest.ID] = true
 	}
@@ -99,10 +107,18 @@ func (c *Catalog) Reload() (Snapshot, error) {
 		}
 		if err != nil {
 			next.Issues = append(next.Issues, Issue{File: name, Message: err.Error()})
+			id := strings.TrimSuffix(name, ".json")
+			if previous, ok := lastGood[id]; ok && !seen[id] {
+				next.Items = append(next.Items, previous)
+				seen[id] = true
+			}
 			continue
 		}
 		seen[manifest.ID] = true
 		next.Items = append(next.Items, manifest)
+	}
+	if err := c.saveLegacy(next); err != nil {
+		return c.snapshot, errors.New("保存插件清单缓存失败")
 	}
 	c.snapshot = next
 	return next, nil
