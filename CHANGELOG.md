@@ -729,3 +729,10 @@
 - 修改 nexus/server/internal/http/handler/settings/downloader_connection.go、service/downloaderclient、service/tracker/tracker.go、service/processing/repair/screenshot.go 和 service/publish/guard/seeding_limit.go。退役旧 qB 列表及流量代理和相应守卫跳过分支；媒体能力保留原凭据、路径和连接协议。兼容存量设置字段，不迁移配置。添加连接模式回归，并覆盖旧存量字段、凭据隔离、流量路由和截图处理。
 - Linux Go 1.23 全量、Windows 七组相关 Go 包、Vue 类型检查、组件 ESLint、两套 Vite 生产构建和差异检查通过。两地隔离容器用模拟 qB 和媒体代理验证直连、远程、旧载荷、令牌保留及错误反馈。首轮 Linux 测试夹具使用短令牌、低估 qB 请求次数，修正重跑通过。
 - 152 已部署 ptmove-nexus:1.0.13，发布和自动任务空闲才切换，保留 ptmove-nexus:1.0.9-ui.5 与前置数据库快照。飞牛 Hub 通过原配置读回 qB 版本，媒体探针 HTTP 405 符合预期，配置前后一致。OVH 已部署 ptmove-nexus:1.0.13-ovh.1，复核 qB API 与下载器配置一致，原 RSS 循环恢复。新域名公网验证 7 处资源及新版下载器页面，旧域名公开 DNS 已不存在。未修改 DNS、飞牛客户端、领单服务或 81，未手动启动媒体任务、加种或发布种子。记录时发行待完成。
+
+## PTM-20261126-V114-REMOTE-CLIENT-LABELS — 2026-11-26T13:04:26+08:00 — Codex root、downloader_connection_ui，通用远程媒体客户端说明
+
+- 下载器设置组件用「远程客户端」和「远程服务器或 NAS」说明媒体代理，分别列出 API、媒体代理和 HTTPS 领单端口。部署文档保留现有飞牛作为实例，连接方式与配置字段沿用。同步 dist、版本、Compose 及 v1.0.14 发行说明。
+- Linux Go 1.23 全量测试、Vue 类型检查、组件 ESLint、两套 Vite 构建和差异检查通过。桌面 1440×900 和手机 390×844 模拟验证通用文案、两种模式切换、测试请求、保存后地址端口和凭据状态保持。两台断网容器再次通过模拟 qB/媒体/API；现场未触发实际媒体任务。
+- 152 更新至 ptmove-nexus:1.0.14，OVH 更新至 ptmove-nexus:1.0.14-ovh.1。上线前后下载器配置一致，实际飞牛 qB 版本回读和媒体探针通过；OVH 直连及原 RSS 循环正常。公网分别核对 OVH 的 7 处资源及 152 设置资源。未更改客户端、Hub、DNS 或 81，未手动加种、截图或发种。
+- v1.0.13 的源代码与标签已推送双仓。根据用户随后补充的命名要求，停止该中间版镜像打包，正式发行统一使用 v1.0.14。本条记录时 v1.0.14 提交和双仓发行待完成。

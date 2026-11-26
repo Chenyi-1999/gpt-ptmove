@@ -135,8 +135,8 @@
               <span class="credential-hint connection-mode-hint">
                 {{
                   downloader.use_proxy
-                    ? 'qB 列表与统计走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
-                    : 'STARPT 直接连接下载器 API，不调用远程媒体程序。'
+                    ? '种子列表和流量继续走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
+                    : 'STARPT 直接连接下载器 API，有可读媒体目录时在本机处理视频。'
                 }}
               </span>
             </div>
@@ -154,9 +154,11 @@
                 @input="resetConnectionStatus(downloader.id)"
               />
               <span class="credential-hint connection-mode-hint">
-                飞牛领单：主机地址填 Hub 内网地址及下载器 API 端口 28380，媒体代理端口填 29090。
-                28443 是飞牛客户端连接 Hub 的 HTTPS 领单端口，在飞牛客户端设置中填写。独立媒体代理默认端口为
-                19090；直连 qB WebUI 常用 8080。
+                直接连接远程服务器或 NAS 上的媒体代理时，填写代理的服务端口（默认 19090）。
+              </span>
+              <span class="credential-hint connection-mode-hint">
+                远程客户端通过 HTTPS 主动领单时，主机地址填写领单服务（Hub）的内网 API 地址（默认端口
+                28380），媒体代理端口填 29090。HTTPS 领单端口（默认 28443）在远程客户端设置中填写。
               </span>
             </div>
           </el-form-item>
@@ -177,14 +179,14 @@
               </span>
             </el-tooltip>
           </el-form-item>
-          <el-form-item v-if="downloader.use_proxy" label="代理 Token">
+          <el-form-item v-if="downloader.use_proxy" label="媒体代理 Token">
             <div class="api-token-field">
               <el-input
                 v-model="downloader.proxy_token"
                 type="password"
                 show-password
                 autocomplete="new-password"
-                placeholder="留空保留已配置 Token；NAS 程序至少 32 字符"
+                placeholder="留空保留已配置 Token，新增至少 32 字符"
                 @input="onProxyTokenInput(downloader)"
               />
               <span class="api-token-status">{{
@@ -200,11 +202,11 @@
                 v-if="downloader.proxy_token_configured"
                 v-model="downloader.clear_proxy_token"
                 @change="onClearProxyTokenChange(downloader)"
-                >明确清除代理 Token</el-checkbox
+                >清除媒体代理 Token</el-checkbox
               >
               <span class="credential-hint"
-                >填写截图与 MediaInfo 程序的独立 Token，不是 qB API Token。飞牛 HTTPS 领单使用 Hub 的
-                controller.token；直连飞牛媒体代理使用 PTMOVE_PROXY_TOKEN。</span
+                >通过 HTTPS 领单时填写 Hub 的 controller.token。直接连接媒体代理时填写该程序的
+                PTMOVE_PROXY_TOKEN。</span
               >
             </div>
           </el-form-item>
@@ -221,8 +223,8 @@
             <span class="credential-hint connection-mode-hint">
               {{
                 downloader.use_proxy
-                  ? '填写 STARPT 能访问的下载器 API 地址（含端口）。媒体代理使用同一个主机名和上面的独立端口。飞牛领单示例：ptmove-pull-hub:28380。'
-                  : '填写 STARPT 能直接访问的下载器 WebUI 地址及其端口，例如 http://192.168.1.10:8080。'
+                  ? '填写 STARPT 能访问的下载器 API 地址（含端口）。媒体代理使用同一个主机名和上面的独立端口。HTTPS 领单的 API 地址示例为 ptmove-pull-hub:28380。'
+                  : '填写 STARPT 能访问的下载器 WebUI 或 RPC 地址及端口。'
               }}
             </span>
           </el-form-item>
