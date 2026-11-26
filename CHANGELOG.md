@@ -768,3 +768,8 @@
 - 更新 nexus/webui/src/App.vue 和 components/settings/SitesSettings.vue，菜单的「项目源码」「问题反馈」使用 GitHub 仓库与 Issues，站点设置的浏览器扩展使用 GitHub 目录。更新 README、镜像源码标注、版本历史、Compose、dist 和 v1.0.16 发行说明。
 - 正式源码仓库、Issues 与扩展目录匿名访问通过。Vue 类型检查、两组件 ESLint、Vite 构建、41 个产物 SHA-256、Linux Go 1.23 全量测试和断网容器验收通过。镜像检查了前端入口和设置组件中的 GitHub 链接。
 - 152 已切换到 ptmove-nexus:1.0.16，健康、后端版本和八处资源核对通过。原下载器及 RSS 设置保留，前一版镜像与一致性数据库快照可用。此次部署范围为 152。记录时源码提交、推送及 v1.0.16 双仓发行待完成。
+
+## PTM-20261126-STARPT-V116-GITHUB-LINKS-PUBLISHED — 2026-11-26T13:45:28+08:00 — Codex root，v1.0.16 双仓发行与归档回执
+
+- 两个仓库的 v1.0.16 标签指向源码提交 986138afaa158d43b8b36d7a0e23627150d0d93f。GitHub 公开发行 459005796 附完整镜像、Compose 和校验文件，核对匿名读取、附件字节数及 SHA-256。Gitee 私有发行 1370359 附 Compose 与校验文件，两份附件通过授权接口重新下载，与同版 GitHub 校验一致。
+- D 盘历史 ZIP 已验证并登记，包含标签源码、完整镜像、Compose、校验及恢复说明。ZIP SHA-256 6cf59f1ad47a5220a27d5827890860492d82a8ebdba2e9bc6136e16c42671211。镜像归档重用的 81 个 OCI 对象和 152 原始 tar 的 SHA-256 通过复核。152 继续运行健康的 v1.0.16，本回执仅更新文档。
