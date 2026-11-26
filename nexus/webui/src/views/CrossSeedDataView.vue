@@ -36,8 +36,15 @@
         {{ batchCrossSeedButtonText }}
       </el-button>
 
+      <HoldButton
+        v-if="isMaintenanceMode && isDeleteMode && selectedRows.length > 0"
+        :key="JSON.stringify(selectedRows.map(row => [row.site_name, row.torrent_id]))"
+        :label="getDeleteButtonText()"
+        style="margin-right: 15px"
+        @hold="executeBatchDelete"
+      />
       <el-button
-        v-if="isMaintenanceMode"
+        v-else-if="isMaintenanceMode"
         type="info"
         :icon="Document"
         @click="openRecordViewDialog"
@@ -81,7 +88,7 @@
         v-if="isMaintenanceMode"
         type="danger"
         :icon="Delete"
-        @click="isDeleteMode && selectedRows.length > 0 ? executeBatchDelete() : toggleDeleteMode()"
+        @click="toggleDeleteMode"
         plain
         style="margin-right: 15px"
       >
@@ -580,6 +587,7 @@ import {
   Warning,
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
+import HoldButton from '@/components/HoldButton.vue'
 import type { ElTable, ElTree } from 'element-plus'
 import axios from 'axios'
 import BatchFetchPanel from '@/components/BatchFetchPanel.vue'
@@ -1744,14 +1752,15 @@ const toggleDeleteMode = () => {
 }
 
 const executeBatchDelete = async () => {
-  if (selectedRows.value.length === 0) {
+  const items = selectedRows.value.map(({ torrent_id, site_name }) => ({ torrent_id, site_name }))
+  if (items.length === 0) {
     ElMessage.warning('请先选择要删除的行')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `确定要删除选中的 ${selectedRows.value.length} 条种子数据吗？此操作无法恢复！`,
+      `确定要删除选中的 ${items.length} 条种子数据吗？此操作无法恢复！`,
       '确认批量删除',
       {
         confirmButtonText: '确定',
@@ -1760,14 +1769,7 @@ const executeBatchDelete = async () => {
       },
     )
 
-    const deleteData = {
-      items: selectedRows.value.map((row) => ({
-        torrent_id: row.torrent_id,
-        site_name: row.site_name,
-      })),
-    }
-
-    const response = await axios.post('/api/cross-seed-data/delete', deleteData)
+    const response = await axios.post('/api/cross-seed-data/delete', { items })
     const result = response.data
 
     if (!result.success) {

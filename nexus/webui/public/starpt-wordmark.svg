@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 142 32" fill="none">
+  <title>STARPT</title>
+  <defs>
+    <linearGradient id="star" x1="6" y1="29" x2="26" y2="4" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9c83ff"/>
+      <stop offset=".57" stop-color="#d0baff"/>
+      <stop offset="1" stop-color="#e2e7ff"/>
+    </linearGradient>
+    <linearGradient id="letters" x1="38" x2="138" y1="24" y2="8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8f1ff"/>
+      <stop offset="1" stop-color="#d7caff"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#star)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 3.6C16.8 10.7 19.3 13.2 26.4 15c-7.1 1.8-9.6 4.3-11.4 11.4C13.2 19.3 10.7 16.8 3.6 15 10.7 13.2 13.2 10.7 15 3.6Z" stroke-width="2.25"/>
+    <path d="M27 3v6m-3-3h6M5.5 23.5v6m-3-3h6" stroke-width="1.65"/>
+  </g>
+  <g stroke="url(#letters)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M50 9.8c-1.3-1.5-3.1-2.1-5.2-2.1-3.2 0-5.5 1.7-5.5 4.2 0 6.1 11.2 2.6 11.2 8.1 0 2.8-2.4 4.4-5.7 4.4-2.5 0-4.6-.9-6.1-2.6"/>
+    <path d="M55 8h14m-7 0v16"/>
+    <path d="m72 24 7.1-16L86 24m-11.8-5.4h9.7"/>
+    <path d="M92 24V8h6.3c3.6 0 5.5 1.8 5.5 4.5 0 2.8-2 4.7-5.5 4.7H92m6.1 0 6.1 6.8"/>
+    <path d="M110 24V8h6.1c3.5 0 5.4 1.9 5.4 4.8s-1.9 4.8-5.4 4.8H110"/>
+    <path d="M125 8h14m-7 0v16"/>
+  </g>
+</svg>

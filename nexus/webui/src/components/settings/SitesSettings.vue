@@ -62,6 +62,18 @@
       </el-form>
     </section>
 
+    <div class="settings-filter">
+      <el-radio-group
+        v-model="siteFilter"
+        aria-label="站点显示范围"
+        @change="handleFilterChange"
+      >
+        <el-radio-button label="existing_supported">已有支持站点</el-radio-button>
+        <el-radio-button label="supported">所有支持站点</el-radio-button>
+        <el-radio-button label="all">所有站点</el-radio-button>
+      </el-radio-group>
+    </div>
+
     <div class="settings-view" v-loading="isSitesLoading">
       <el-table
         :data="paginatedSites"
@@ -220,20 +232,13 @@
             <el-button type="primary" :icon="Edit" link @click="handleOpenDialog(scope.row)">
               编辑
             </el-button>
-            <el-button type="danger" :icon="Delete" link @click="handleDelete(scope.row)">
-              删除
-            </el-button>
+            <HoldButton :key="scope.row.id" compact label="删除站点" @hold="handleDelete(scope.row)" />
           </template>
         </el-table-column>
       </el-table>
     </div>
 
     <div class="settings-footer star-surface">
-      <el-radio-group v-model="siteFilter" @change="handleFilterChange">
-        <el-radio-button label="existing_supported">已有支持站点</el-radio-button>
-        <el-radio-button label="supported">所有支持站点</el-radio-button>
-        <el-radio-button label="all">所有站点</el-radio-button>
-      </el-radio-group>
       <div class="pagination-container">
         <div class="page-size-text">{{ pagination.pageSize }} 条/页</div>
         <el-pagination
@@ -359,7 +364,8 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
-import { Delete, Edit, Refresh, Search } from '@element-plus/icons-vue'
+import { Edit, Refresh, Search } from '@element-plus/icons-vue'
+import HoldButton from '@/components/HoldButton.vue'
 import { ElMessage } from '@/utils/uiNotify'
 
 type SiteConfig = {
@@ -948,15 +954,32 @@ const handleDelete = (site: SiteConfig) => {
   border-radius: 12px;
 }
 
-.settings-footer :deep(.el-radio-group),
-.pagination-container :deep(.el-pagination) {
+.settings-filter {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.settings-filter :deep(.el-radio-group) {
+  display: flex;
+  max-width: 100%;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.settings-footer :deep(.el-radio-button__inner) {
+.settings-filter :deep(.el-radio-button__inner) {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 7px 12px;
   border: 1px solid var(--star-border);
   border-radius: 6px;
+  line-height: 16px;
+}
+
+.pagination-container :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .page-size-text,

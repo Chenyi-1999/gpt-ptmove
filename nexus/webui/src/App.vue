@@ -14,10 +14,7 @@
     class="star-titlebar desktop-drag-region"
     @dblclick="handleDesktopNavDoubleClick"
   >
-    <div class="star-brand">
-      <img src="/starpt.svg" width="24" height="24" alt="" />
-      <span>STARPT</span>
-    </div>
+    <img class="star-titlebar__brand" src="/starpt-wordmark.svg" width="106" height="24" alt="STARPT" />
     <DesktopWindowControls
       compact
       :is-maximised="isMaximised"
@@ -29,11 +26,9 @@
 
   <header v-if="!isLoginPage" class="star-shell" :class="{ 'star-shell--mobile': showMobileNav }">
     <div class="star-shell__bar desktop-drag-region" @dblclick="handleDesktopNavDoubleClick">
-      <RouterLink to="/" class="star-brand desktop-no-drag">
-        <img src="/starpt.svg" width="34" height="34" alt="" />
-        <span>STARPT</span>
-      </RouterLink>
-      <span class="star-shell__location">{{ currentRouteTitle }}</span>
+      <NeonLogo />
+      <span v-if="showMobileNav" class="star-shell__location">{{ currentRouteTitle }}</span>
+      <PillNav v-else class="desktop-no-drag" :items="primaryNavigation" :active-href="activeRoute" />
       <div class="star-shell__actions desktop-no-drag">
         <button
           v-if="!showMobileNav && canRefresh"
@@ -86,19 +81,6 @@
         @close="hideWindowToTray"
       />
     </div>
-
-    <nav v-if="!showMobileNav" aria-label="主导航" class="star-shell__nav">
-      <RouterLink
-        v-for="item in primaryNavigation"
-        :key="item.to"
-        :to="item.to"
-        class="star-nav-link"
-        :class="{ 'star-nav-link--active': activeRoute === item.to }"
-      >
-        <component :is="item.icon" aria-hidden="true" />
-        {{ item.label }}
-      </RouterLink>
-    </nav>
   </header>
 
   <el-drawer
@@ -118,6 +100,7 @@
         :to="item.to"
         class="star-drawer__action"
         :class="{ 'star-drawer__action--active': activeRoute === item.to }"
+        :aria-current="activeRoute === item.to ? 'page' : undefined"
         @click="closeDrawerOnLink"
       >
         <component :is="item.icon" aria-hidden="true" />
@@ -290,6 +273,8 @@ import {
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import DesktopWindowControls from '@/components/desktop/DesktopWindowControls.vue'
+import NeonLogo from '@/components/NeonLogo.vue'
+import PillNav from '@/components/PillNav.vue'
 import { useDesktopWindowControls } from '@/desktop/windowControls'
 import VersionUpdate from '@/components/VersionUpdate.vue'
 import {
@@ -337,6 +322,7 @@ const navigationDrawerVisible = ref(false)
 const taskDrawerVisible = ref(false)
 const showMobileNav = ref(false)
 const MOBILE_BREAKPOINT = 880
+const WINDOWS_COMPACT_BREAKPOINT = 980
 const backgroundUrl = ref('')
 const backgroundImage = computed(() => {
   if (isLoginPage.value || !backgroundUrl.value) return ''
@@ -788,8 +774,11 @@ const handleDesktopNavDoubleClick = (event: MouseEvent) => {
 }
 
 const updateIsMobile = () => {
-  showMobileNav.value = window.innerWidth <= MOBILE_BREAKPOINT
+  const breakpoint = isWindowsDesktop.value ? WINDOWS_COMPACT_BREAKPOINT : MOBILE_BREAKPOINT
+  showMobileNav.value = window.innerWidth <= breakpoint
 }
+
+watch(isWindowsDesktop, updateIsMobile)
 
 watch(
   () => route.path,

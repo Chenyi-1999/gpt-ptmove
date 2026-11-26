@@ -853,3 +853,24 @@
 - 扩充 docs/SITE_PROFILES.md，说明脱敏素材、站点映射、路径占位符、CSS 选择器、转载与查重证据、凭据录入及导入检查。新增 docs/sites/AI_PROMPT.md 和虚构来源站示例 docs/sites/example.json，在 README.md 和 docs/STARPT_GUIDE.md 增加入口。
 - 根据当前 HTTP Schema 生成器更新 docs/sites/schema.json，补齐做种人数、下载人数、官种、转载限制和搜索结果字段。未修改运行时与部署配置。
 - 本地通过 Go 后端模板及示例解析、四种 URL 展开、模拟 HTML 选择器和 Schema 同步核对。站点档案、只读扫描、转载限制和查重证据定向 Go 测试、Markdown 链接及 JSON 格式检查均通过。真实站点兼容性由各站配置导入后独立验证。本次未访问站点、152、OVH 或 81。记录时文档提交与两仓同步待执行，无版本发行或部署。
+
+## PTM-20261126-UI-CONTROLS — 2026-11-26T23:40:31+08:00 — Codex root，STARPT 胶囊导航、霓虹品牌、长按删除与开关
+
+- 以 v1.1.4 源码 376f90e 为基线。修改 nexus/webui/src/App.vue、main.ts 和 assets/styles/star-shell.scss，新增 components/{PillNav,NeonLogo,HoldButton}.vue 和 assets/styles/star-switch.css。PillNav 在现有 8 个路由上使用胶囊填充、滚动文字和随路由移动的选中圆点，手机继续使用导航抽屉。右上角采用现有 starpt.svg 和 STARPT 的 CSS 霓虹文字与光晕，维持首页链接。页面不显示第三方品牌或水印。
+- 两份 React Bits JS-CSS registry 已获取，dependencies 与 registryDependencies 均为空。Vue 原生实现，无 shadcn 脚手架、React 运行时或新增依赖。霓虹按附件视觉做紧凑的 CSS 版本，未引入 WebGL。基于 Uiverse 的滑移开关沿用 Element Plus 表单和事件保留原权限、保存行为及可用性，样式源码顶部保留指定署名。
+- 删除入口。接入 views/{CrossSeedDataView,PublishLogsView}.vue 和 components/settings/{SitesSettings,DownloaderSettings,GeneralSettings,PTGenSourcesSettings,AISettings}.vue。按住鼠标、触屏或空格/回车 2 秒才调用原操作，提前松开、拖离、焦点丢失或控件禁用会取消。有既有确认框的操作继续确认后才执行。批量删除锁定确认时的选中记录，撤销筛选之类的普通操作保持即点即用。
+- 验证。Vue 类型检查、修改文件 ESLint、Vite 生产构建、9 项前端单测及 git diff --check 通过。Edge 使用隔离夹具验证桌面与手机、881px 桌面及 320px 手机的布局、导航填充和圆点、嵌套路由、ON/OFF 键盘和触摸、长按进度、点击/提前松开/拖离取消、禁用及确认。真实 UI 流程仅对模拟发布记录产生一次预期 DELETE，无外网请求或页面错误。修复预览中发现的待机填充露边，最终截图复查通过。源码、构建、浏览器夹具与报告见独立工作区及 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/starpt-controls-20261126。真实手机和原生 Wails 未验证，构建仍有既有分包体积提示。
+- Git 与部署。Bash 不在环境中，使用原生 Git 创建 codex/starpt-controls 独立工作区。构建输出到 D 盘验证目录，未写入跟踪的 dist，未提交、推送、合并或部署，未访问项目服务器。
+
+## PTM-20261126-COMPACT-TASK-FIRST — 2026-11-26T23:56:32+08:00 — Codex root、design_review、compact_switch、site_filters，单行顶栏、紧凑开关、筛选归位及任务优先
+
+- 承接 PTM-20261126-UI-CONTROLS。调整 nexus/webui/src/App.vue、assets/styles/star-shell.scss、components/{PillNav,NeonLogo}.vue，品牌、导航和工具共用 58px 单行。窄屏沿用菜单抽屉，Windows 窗口控件留有空间。裁切导航活动点的装饰溢出，避免缩放时短暂出现滚动条。新增 public/starpt-wordmark.svg，星形与 STARPT 均为路径。public/starpt.svg 同步替换为透明紫色星形，用于登录与 favicon。鼠标高光只照亮标志笔画。
+- 缩小 assets/styles/star-switch.css 的可见轨道至 18px，整体宽度 50px。保留 ON/OFF、原始 Element Plus 事件、键盘操作和减少动画偏好，粗指针点击区高至少 32px。修改 components/settings/SitesSettings.vue，把三项筛选放到 CookieCloud 与站点表之间，分页保留在表下。参考 shadcn/ui、Ant Design、Motion 和 Radix 的尺寸、单选分组、动效与可访问性。设计复核使用 GPT-6.2 Astra，无新增运行时依赖。
+- 任务优先。views/HomeView.vue 把全宽任务移到统计摘要下、实时速度前。实时速度与流量趋势在宽屏并排，窄屏按阅读顺序堆叠。components/HomeTaskMonitor.vue 将查看全部对齐到标题右侧，收紧空状态高度，保留列表与任务抽屉入口。
+- 检查通过。Vite 生产构建、Vue 类型检查、修改文件 ESLint、9 项前端测试、两份 SVG 资产核对和 git diff --check。Edge 隔离夹具覆盖桌面与手机的单行顶栏、字号和开关位置、鼠标/键盘/触屏、三个筛选结果、筛选/分页 DOM 顺序、任务前置和查看全部。模拟 Windows 桥接覆盖 320–1281px 的窗口按钮与导航边界。原有长按和删除确认回归通过，无页面错误或外部请求，仅产生一个隔离 fixture 删除请求。已复查桌面、667px 站点页和手机照片。截图、构建与报告位于 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/starpt-controls-refine-20261126。
+- Git 与部署。改动保留在 codex/starpt-controls 独立工作区，未提交、合并、推送或部署。未访问项目服务器。实际 Wails 和物理手机未运行，Vite 仍提示既有主分包体积。
+
+## PTM-20261127-UI-ROLLOUT — 2026-11-27T00:02:11+08:00 — Codex root / rollout_review，合并 STARPT 界面改动
+
+- 从最新 origin/master 5ab7286 建立独立集成工作区，合入已审核的 UI 源码、SVG 和 44 个 Vite 产物，保留前两条 UI 开发记录。未改变服务端源码、应用版本和依赖。重新构建通过，44 个文件逐个比对与通过浏览器验收的资产字节一致，git diff --check 通过。
+- 按用户要求准备将相同的前端产物分别叠加到两台各自的 v1.1.4 镜像，候选标签 ptmove-nexus:1.1.4-ui.1。已确认 152 与 OVH 原容器健康及挂载路径，152 系统盘余量约 1.1 GB。记录时提交、推送和生产切换待执行；未对 81 或任何站点执行操作。

@@ -57,63 +57,33 @@ body {
   padding-inline-start: 12px;
 }
 
+.star-titlebar__brand {
+  display: block;
+  flex: none;
+}
+
 .star-shell {
   padding-top: env(safe-area-inset-top, 0px);
   border-color: var(--star-data-border);
   background: linear-gradient(115deg, #141329 0%, #111626 65%);
 }
-.star-shell .star-brand {
-  color: var(--star-data-ink);
-}
-.star-shell .star-brand:hover {
-  color: var(--star-data-accent);
-}
-
-.star-shell__bar,
-.star-shell__nav {
+.star-shell__bar {
   box-sizing: border-box;
   width: min(100%, 1680px);
   margin: 0 auto;
-  padding-inline: clamp(14px, 3vw, 40px);
-}
-
-.star-shell__bar {
+  padding-inline: clamp(14px, 2vw, 36px);
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 64px;
+  gap: clamp(8px, 1vw, 16px);
+  min-height: 58px;
 }
 
 .star-shell__bar:has(.star-shell__window-controls) {
   padding-inline-end: 0;
 }
 
-.star-brand {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 9px;
-  color: var(--star-ink);
-  font-size: 1.27rem;
-  font-weight: 750;
-  letter-spacing: -0.028em;
-  text-decoration: none;
-}
-
-.star-brand img {
-  flex: none;
-  display: block;
-}
-
-.star-titlebar .star-brand {
-  font-size: 14px;
-}
-
 .star-shell__location {
   min-width: 0;
-  margin-left: 1px;
-  padding-left: 16px;
-  border-left: 1px solid var(--star-data-border);
   color: var(--star-data-muted);
   font-size: 13px;
   overflow: hidden;
@@ -125,11 +95,11 @@ body {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
+  gap: 2px;
 }
 
 .star-shell__actions .star-icon-button {
+  width: 40px;
   border-color: transparent;
   color: var(--star-data-muted);
   background: transparent;
@@ -161,66 +131,13 @@ body {
   height: auto;
 }
 
-.star-shell__nav {
-  display: flex;
-  align-items: stretch;
-  gap: clamp(2px, 0.55vw, 9px);
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.star-nav-link {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 7px;
-  min-height: 44px;
-  padding-inline: clamp(8px, 0.9vw, 13px);
-  border-radius: 7px 7px 0 0;
-  color: var(--star-data-muted);
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.star-nav-link > svg {
-  width: 17px;
-  height: 17px;
-}
-
-.star-nav-link:hover,
-.star-nav-link--active {
-  color: var(--star-data-ink);
-  background-color: #211d39;
-}
-
-.star-nav-link--active {
-  color: var(--star-data-accent);
-}
-
-.star-nav-link--active::after {
-  position: absolute;
-  right: 12px;
-  bottom: 0;
-  left: 12px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--star-data-accent);
-  content: '';
-}
-
-.star-shell .star-nav-link:focus-visible,
-.star-shell .star-icon-button:focus-visible,
-.star-shell .star-brand:focus-visible {
+.star-shell .star-icon-button:focus-visible {
   outline: 2px solid var(--star-data-accent);
   outline-offset: -3px;
 }
 
 .star-shell--mobile .star-shell__bar {
-  min-height: 62px;
-  gap: 8px;
+  gap: 10px;
   padding-left: max(12px, env(safe-area-inset-left, 0px));
 }
 
@@ -228,19 +145,8 @@ body {
   padding-right: max(12px, env(safe-area-inset-right, 0px));
 }
 
-.star-shell--mobile .star-shell__location {
-  padding-left: 8px;
-  margin-left: 2px;
-}
-
-.star-shell--mobile .star-brand {
-  font-size: 17px;
-  gap: 8px;
-}
-
-.star-shell--mobile .star-brand img {
-  width: 30px;
-  height: 30px;
+.star-shell--mobile .star-shell__actions {
+  margin-inline-start: auto;
 }
 
 .desktop-drag-region {
@@ -507,14 +413,18 @@ body {
   .task-monitor-item__actions .el-button {
     min-height: 44px;
   }
-
-  .star-shell--mobile .star-shell__bar:has(.star-shell__window-controls) .star-shell__location {
-    display: none;
-  }
 }
 
-@media (max-width: 380px) {
-  .star-shell--mobile .star-shell__location {
+@media (max-width: 420px) {
+  .star-shell__bar:has(.star-shell__window-controls) {
+    gap: 4px;
+  }
+
+  .star-shell__bar:has(.star-shell__window-controls) .star-shell__location {
     display: none;
+  }
+
+  .star-shell__bar:has(.star-shell__window-controls) > .star-shell__window-controls {
+    --desktop-window-control-width: 34px;
   }
 }

@@ -85,13 +85,10 @@
                 :aria-label="downloader.name ? '启用 ' + downloader.name : '启用下载器'"
               />
 
-              <el-button
-                type="danger"
-                :icon="Delete"
-                circle
-                plain
-                :aria-label="downloader.name ? '删除 ' + downloader.name : '删除下载器'"
-                @click="confirmDeleteDownloader(downloader.id)"
+              <HoldButton
+                compact
+                :label="downloader.name ? '删除 ' + downloader.name : '删除下载器'"
+                @hold="confirmDeleteDownloader(downloader.id)"
               />
             </div>
           </div>
@@ -306,7 +303,7 @@
           <el-input v-model="mapping.local" placeholder="例如：/app/data/qb1" class="mapping-input">
             <template #prepend>视频文件路径</template>
           </el-input>
-          <el-button type="danger" :icon="Delete" aria-label="删除此映射规则" circle @click="deletePathMapping(index)" />
+          <HoldButton compact label="删除此映射规则" @hold="deletePathMapping(mapping)" />
         </div>
       </div>
 
@@ -331,7 +328,8 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
-import { Plus, Delete, Select, Link, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import { Plus, Select, Link, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import HoldButton from '@/components/HoldButton.vue'
 import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import { ElMessage } from '@/utils/uiNotify'
 
@@ -691,8 +689,8 @@ const addPathMapping = () => {
   })
 }
 
-const deletePathMapping = (index: number) => {
-  currentPathMappings.value.splice(index, 1)
+const deletePathMapping = (mapping: (typeof currentPathMappings.value)[number]) => {
+  currentPathMappings.value = currentPathMappings.value.filter(item => item !== mapping)
 }
 
 const savePathMappings = async () => {

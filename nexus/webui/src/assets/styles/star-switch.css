@@ -1,0 +1,118 @@
+/*
+ * From Uiverse.io by andrew-demchenk0 - https://uiverse.io/andrew-demchenk0/empty-penguin-100
+ * MIT License, Copyright (c) andrew-demchenk0 (A)
+ */
+
+/* Keep Element Plus in charge of input events, focus and form validation. */
+.el-switch {
+  --star-switch-track: #242d49;
+  --star-switch-checked: #6d52c8;
+  --star-switch-rim: #8d86a8;
+  --star-switch-shadow: #080812;
+  min-height: 24px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-switch .el-switch__core.el-switch__core {
+  width: 50px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.el-switch .el-switch__core::before {
+  position: absolute;
+  inset: 50% 2px auto;
+  height: 18px;
+  box-sizing: border-box;
+  border: 1px solid var(--star-switch-rim);
+  border-radius: 100px;
+  background-color: var(--star-switch-track);
+  box-shadow: 1px 1px var(--star-switch-shadow);
+  transform: translateY(-50%);
+  transition: background-color 180ms;
+  content: '';
+}
+
+.el-switch .el-switch__core::after {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  color: #f2ebff;
+  font: 700 9px/1 system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  transform: translateY(-50%);
+  content: 'OFF';
+}
+
+.el-switch.is-checked .el-switch__core::before {
+  background-color: var(--star-switch-checked);
+}
+
+.el-switch.is-checked .el-switch__core::after {
+  right: auto;
+  left: 5px;
+  content: 'ON';
+}
+
+.el-switch .el-switch__core .el-switch__inner {
+  display: none;
+}
+
+.el-switch .el-switch__core.el-switch__core .el-switch__action {
+  display: block;
+  top: 50%;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--star-switch-rim);
+  border-radius: 50%;
+  background: #f2ebff;
+  box-shadow: 0 1px 2px rgb(8 8 18 / 32%);
+  transform: translateY(-50%);
+  transition: transform 180ms;
+}
+
+.el-switch.is-checked .el-switch__core.el-switch__core .el-switch__action {
+  left: 4px;
+  transform: translate(28px, -50%);
+}
+
+.el-switch:has(.el-switch__input:focus-visible) .el-switch__core {
+  outline: 2px solid var(--star-accent);
+  outline-offset: 2px;
+}
+
+.el-switch.is-disabled {
+  opacity: 0.52;
+}
+
+@media (pointer: coarse) {
+  .el-switch,
+  .el-switch .el-switch__core.el-switch__core { min-height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .el-switch .el-switch__core::before,
+  .el-switch .el-switch__core.el-switch__core .el-switch__action {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .el-switch .el-switch__core::before,
+  .el-switch .el-switch__core.el-switch__core .el-switch__action {
+    border-color: ButtonText;
+  }
+
+  .el-switch .el-switch__core::after {
+    color: ButtonText;
+  }
+
+  .el-switch.is-checked .el-switch__core::before {
+    border-color: Highlight;
+  }
+}

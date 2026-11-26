@@ -211,14 +211,7 @@
             ></div>
             <div class="background-picker-meta">
               <span class="background-picker-name" :title="item.name">{{ item.name }}</span>
-              <el-button
-                link
-                type="danger"
-                size="small"
-                @click.stop="deleteBackgroundImage(item.name)"
-              >
-                删除
-              </el-button>
+              <HoldButton compact :label="'删除背景 ' + item.name" @hold="deleteBackgroundImage(item.name)" />
             </div>
           </div>
           <el-empty
@@ -801,15 +794,14 @@
                   v-if="tagsForm.tags.tags.length > 0"
                   style="display: flex; flex-wrap: wrap; gap: 8px"
                 >
-                  <el-tag
+                  <span
                     v-for="(tag, index) in tagsForm.tags.tags"
-                    :key="index"
-                    closable
-                    @close="removeCustomTag(index)"
-                    size="small"
+                    :key="tag + '-' + index"
+                    class="settings-inline-actions"
                   >
-                    {{ tag }}
-                  </el-tag>
+                    <el-tag size="small">{{ tag }}</el-tag>
+                    <HoldButton compact :label="'删除标签 ' + tag" @hold="removeCustomTag(index)" />
+                  </span>
                 </div>
               </el-form-item>
             </template>
@@ -947,6 +939,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import HoldButton from '@/components/HoldButton.vue'
 import axios from 'axios'
 import {
   User,

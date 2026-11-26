@@ -54,10 +54,10 @@
         </div>
       </dl>
 
-      <HomeSpeedPanel class="star-home__speed" />
+      <HomeTaskMonitor class="star-home__task" />
 
       <div class="star-home__panels">
-        <HomeTaskMonitor />
+        <HomeSpeedPanel />
 
         <section class="home-card home-panel" aria-labelledby="home-traffic-title">
           <div class="home-panel__heading">
@@ -618,7 +618,8 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
 }
 
-.star-home__speed {
+.star-home__task {
+  min-width: 0;
   margin-bottom: 14px;
 }
 

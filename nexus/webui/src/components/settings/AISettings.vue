@@ -200,13 +200,12 @@
         </el-table-column>
         <el-table-column label="操作" width="90" fixed="right">
           <template #default="scope">
-            <el-button
+            <HoldButton
               v-if="keyStatus(scope.row) !== 'revoked'"
-              link
-              type="danger"
-              @click="revoke(scope.row)"
-              >撤销</el-button
-            >
+              :key="scope.row.id"
+              label="撤销"
+              @hold="revoke(scope.row)"
+            />
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
@@ -341,6 +340,7 @@
 import axios from 'axios'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import HoldButton from '@/components/HoldButton.vue'
 
 type KeyStatus = 'active' | 'expired' | 'revoked' | 'unknown'
 type MachineKey = {

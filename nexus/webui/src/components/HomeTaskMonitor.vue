@@ -1,6 +1,6 @@
 <template>
   <section class="home-card home-panel task-progress" aria-labelledby="home-task-progress-title">
-    <div class="home-panel__heading">
+    <div class="task-progress__header">
       <div>
         <h2 id="home-task-progress-title">任务</h2>
         <p>
@@ -78,12 +78,33 @@ function openMonitor() {
 </script>
 
 <style scoped>
+.task-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-progress__header h2 {
+  margin: 0;
+  color: var(--star-data-ink);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.task-progress__header p {
+  margin: 4px 0 0;
+  color: var(--star-data-muted);
+  font-size: 13px;
+}
+
 .task-progress__link {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   flex: none;
-  padding: 4px;
+  min-height: 36px;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   color: var(--star-data-muted);
@@ -175,10 +196,20 @@ function openMonitor() {
 }
 
 .task-progress__empty {
-  display: grid;
-  min-height: 88px;
-  align-content: center;
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  margin-top: 10px;
+  border-top: 1px solid var(--star-data-border);
   color: var(--star-data-muted);
   font-size: 13px;
+}
+
+.task-progress__empty p {
+  margin: 0;
+}
+
+@media (pointer: coarse) {
+  .task-progress__link { min-height: 44px; }
 }
 </style>

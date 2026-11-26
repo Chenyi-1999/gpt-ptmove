@@ -109,13 +109,12 @@
               class="record-link"
               >查看种子 <el-icon><TopRight /></el-icon
             ></a>
-            <el-button
+            <HoldButton
               class="record-action-remove"
-              :icon="Delete"
-              text
+              compact
               :disabled="!canDeleteLog(row)"
-              aria-label="删除发布记录"
-              @click="deleteLog(row)"
+              label="删除发布记录"
+              @hold="deleteLog(row)"
             />
           </div>
         </li>
@@ -150,7 +149,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import { Delete, Document, EditPen, Refresh, Search, TopRight } from '@element-plus/icons-vue'
+import { Document, EditPen, Refresh, Search, TopRight } from '@element-plus/icons-vue'
+import HoldButton from '@/components/HoldButton.vue'
 import LogViewerCard from '@/components/LogViewerCard.vue'
 import PublishedTorrentEditDialog from '@/components/PublishedTorrentEditDialog.vue'
 import {
@@ -790,11 +790,6 @@ watch(
 
 .record-actions .record-action-remove {
   grid-area: remove;
-  color: var(--el-text-color-secondary);
-}
-
-.record-actions .record-action-remove:hover {
-  color: var(--el-color-danger);
 }
 
 .pagination-controls {
