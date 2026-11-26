@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,18 +21,14 @@ const (
 )
 
 type downloaderConfig struct {
-	ID             string
-	Name           string
-	Type           string
-	Host           string
-	Username       string
-	Password       string
-	Enabled        bool
-	UseProxy       bool
-	APIKey         string
-	ProxyToken     string
-	ProxyMediaOnly bool
-	ProxyPort      int
+	ID       string
+	Name     string
+	Type     string
+	Host     string
+	Username string
+	Password string
+	Enabled  bool
+	APIKey   string
 }
 
 type speedBucket struct {
@@ -43,8 +38,8 @@ type speedBucket struct {
 
 // Service 负责周期性采集下载器速度与累计流量，并批量写入 traffic_stats。
 // 参数/返回：由配置管理器提供下载器列表，由仓储层落库并执行小时聚合。
-// 失败场景：下载器连接失败、代理不可达或数据库写入异常时仅记录日志，不中断主循环。
-// 副作用：持续发起下载器/代理网络请求并写入数据库表 traffic_stats、traffic_stats_hourly。
+// 失败场景：下载器连接失败或数据库写入异常时仅记录日志，不中断主循环。
+// 副作用：持续请求下载器 API 并写入数据库表 traffic_stats、traffic_stats_hourly。
 type Service struct {
 	repo *repository.StatsRepository
 	cfg  *config.Manager
@@ -261,19 +256,14 @@ func (s *Service) collectTrafficRecords() []repository.TrafficStatRecord {
 
 func (s *Service) fetchDownloaderStats(d downloaderConfig) (downloaderclient.TrafficStats, error) {
 	client := downloaderclient.Downloader{
-		ID:             d.ID,
-		Name:           d.Name,
-		Type:           d.Type,
-		Host:           d.Host,
-		Username:       d.Username,
-		Password:       d.Password,
-		Enabled:        d.Enabled,
-		APIKey:         d.APIKey,
-		ProxyToken:     d.ProxyToken,
-		ProxyMediaOnly: d.ProxyMediaOnly,
-	}
-	if d.UseProxy && d.Type == "qbittorrent" {
-		return client.FetchProxyTrafficStats(d.ProxyPort)
+		ID:       d.ID,
+		Name:     d.Name,
+		Type:     d.Type,
+		Host:     d.Host,
+		Username: d.Username,
+		Password: d.Password,
+		Enabled:  d.Enabled,
+		APIKey:   d.APIKey,
 	}
 	return client.FetchTrafficStats()
 }
@@ -411,18 +401,14 @@ func parseEnabledDownloaders(settings map[string]any) []downloaderConfig {
 		}
 
 		result = append(result, downloaderConfig{
-			ID:             downloaderID,
-			Name:           toString(item["name"], downloaderID),
-			Type:           downloaderType,
-			Host:           host,
-			Username:       toString(item["username"], ""),
-			Password:       toString(item["password"], ""),
-			Enabled:        true,
-			UseProxy:       toBool(item["use_proxy"], false),
-			ProxyPort:      toInt(item["proxy_port"], 9090),
-			APIKey:         toString(item["api_key"], ""),
-			ProxyToken:     toString(item["proxy_token"], ""),
-			ProxyMediaOnly: toBool(item["proxy_media_only"], false),
+			ID:       downloaderID,
+			Name:     toString(item["name"], downloaderID),
+			Type:     downloaderType,
+			Host:     host,
+			Username: toString(item["username"], ""),
+			Password: toString(item["password"], ""),
+			Enabled:  true,
+			APIKey:   toString(item["api_key"], ""),
 		})
 	}
 	return result
@@ -480,29 +466,6 @@ func toBool(value any, fallback bool) bool {
 			return false
 		}
 		return fallback
-	default:
-		return fallback
-	}
-}
-
-func toInt(value any, fallback int) int {
-	switch typed := value.(type) {
-	case int:
-		return typed
-	case int64:
-		return int(typed)
-	case float64:
-		return int(typed)
-	case string:
-		trimmed := strings.TrimSpace(typed)
-		if trimmed == "" {
-			return fallback
-		}
-		parsed, err := strconv.Atoi(trimmed)
-		if err != nil {
-			return fallback
-		}
-		return parsed
 	default:
 		return fallback
 	}

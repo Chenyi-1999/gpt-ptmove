@@ -722,3 +722,10 @@
 - D 盘历史 ZIP 已完成，包含标签源码、完整镜像、Compose、校验和恢复说明。已核对 77 个 OCI 对象并登记归档索引。ZIP SHA-256 f376f874ac18997f0259d9cd485e7c47497beb16d200c4256b60ed4ff00d5b28。
 - 腾讯 152 使用同一发行镜像的断网容器实测限速开关和已保存的站点设置，隔离实例的 RSS 循环保持关闭。
 - OVH 生产运行 v1.0.12，限速开关按默认关闭，页面读取现有站点值。腾讯 152 生产容器保持原部署。本条与 docs/DEPLOYMENT.json 为独立回执提交，标签不变。未访问 81，未重新发种。
+
+## PTM-20261126-V113-DOWNLOADER-MODES — 2026-11-26T12:54:45+08:00 — Codex root、downloader_connection_core、downloader_connection_ui、downloader_legacy_trace，下载器连接方式简化
+
+- 修改 nexus/webui/src/components/settings/DownloaderSettings.vue，显示「直连下载器」和「远程截图与 MediaInfo」。远程模式区分 qB API 地址及端口、媒体代理端口和飞牛客户端的 HTTPS 领单端口。保留下载器状态、凭据保存和出种限速。同步 dist、版本、Compose、API 与媒体部署文档。
+- 修改 nexus/server/internal/http/handler/settings/downloader_connection.go、service/downloaderclient、service/tracker/tracker.go、service/processing/repair/screenshot.go 和 service/publish/guard/seeding_limit.go。退役旧 qB 列表及流量代理和相应守卫跳过分支；媒体能力保留原凭据、路径和连接协议。兼容存量设置字段，不迁移配置。添加连接模式回归，并覆盖旧存量字段、凭据隔离、流量路由和截图处理。
+- Linux Go 1.23 全量、Windows 七组相关 Go 包、Vue 类型检查、组件 ESLint、两套 Vite 生产构建和差异检查通过。两地隔离容器用模拟 qB 和媒体代理验证直连、远程、旧载荷、令牌保留及错误反馈。首轮 Linux 测试夹具使用短令牌、低估 qB 请求次数，修正重跑通过。
+- 152 已部署 ptmove-nexus:1.0.13，发布和自动任务空闲才切换，保留 ptmove-nexus:1.0.9-ui.5 与前置数据库快照。飞牛 Hub 通过原配置读回 qB 版本，媒体探针 HTTP 405 符合预期，配置前后一致。OVH 已部署 ptmove-nexus:1.0.13-ovh.1，复核 qB API 与下载器配置一致，原 RSS 循环恢复。新域名公网验证 7 处资源及新版下载器页面，旧域名公开 DNS 已不存在。未修改 DNS、飞牛客户端、领单服务或 81，未手动启动媒体任务、加种或发布种子。记录时发行待完成。

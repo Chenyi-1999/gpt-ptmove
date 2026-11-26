@@ -73,7 +73,6 @@ type seedingLimitDownloader struct {
 	Password string
 	APIKey   string
 	Enabled  bool
-	UseProxy bool
 }
 
 type qbTorrent struct {
@@ -149,11 +148,6 @@ func CheckDownloaderGateStats(downloaderID string) (SeedingLimitStats, error) {
 		stats.Message = "未找到下载器配置"
 		return stats, nil
 	}
-	if target.UseProxy {
-		stats.Message = "下载器开启代理，跳过预检查"
-		return stats, nil
-	}
-
 	subnetID, err := resolveDownloaderSubnet(*target)
 	if err != nil {
 		return SeedingLimitStats{}, err
@@ -162,7 +156,7 @@ func CheckDownloaderGateStats(downloaderID string) (SeedingLimitStats, error) {
 
 	group := make([]seedingLimitDownloader, 0, len(downloaders))
 	for _, downloader := range downloaders {
-		if !downloader.Enabled || downloader.UseProxy {
+		if !downloader.Enabled {
 			continue
 		}
 		downloaderSubnet, parseErr := resolveDownloaderSubnet(downloader)
@@ -247,10 +241,6 @@ func checkByLocalGuard(downloaderID string) (bool, string) {
 		logx.Warnf(seedingLimitGuardLogModule, "%s downloader_id=%s", message, downloaderID)
 		return false, message
 	}
-	if target.UseProxy {
-		return true, ""
-	}
-
 	targetSubnet, err := resolveDownloaderSubnet(*target)
 	if err != nil {
 		message := "解析下载器地址失败，已停止发布: " + err.Error()
@@ -260,7 +250,7 @@ func checkByLocalGuard(downloaderID string) (bool, string) {
 
 	group := make([]seedingLimitDownloader, 0, len(downloaders))
 	for _, downloader := range downloaders {
-		if !downloader.Enabled || downloader.UseProxy {
+		if !downloader.Enabled {
 			continue
 		}
 		subnetID, parseErr := resolveDownloaderSubnet(downloader)
@@ -303,7 +293,6 @@ func loadDownloadersConfig() ([]seedingLimitDownloader, error) {
 			Password: toStringAny(item["password"]),
 			APIKey:   toStringAny(item["api_key"]),
 			Enabled:  toBoolAny(item["enabled"], true),
-			UseProxy: toBoolAny(item["use_proxy"], false) && !toBoolAny(item["proxy_media_only"], false),
 		}
 		if downloader.ID == "" || downloader.Type == "" || downloader.Host == "" {
 			continue

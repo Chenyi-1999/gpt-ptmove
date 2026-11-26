@@ -117,68 +117,65 @@
               </el-select>
             </div>
           </el-form-item>
-          <el-form-item label="盒子端口">
+          <el-form-item label="连接方式">
             <div class="proxy-settings-row">
-              <el-tooltip
-                :content="
-                  downloader.type === 'transmission'
-                    ? '通过代理获取截图、MediaInfo等媒体信息。注意：TR代理不包括统计数据获取。'
-                    : '通过Go语言编写的专用代理连接，可解决网络延迟、获取数据不准等问题。'
+              <el-switch
+                v-model="downloader.use_proxy"
+                inline-prompt
+                active-text="远程"
+                inactive-text="直连"
+                :aria-label="
+                  '连接方式：' + (downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器')
                 "
-                placement="top"
-                :hide-after="0"
-              >
-                <el-input
-                  v-model="downloader.proxy_port"
-                  type="number"
-                  placeholder="19090"
-                  class="proxy-port-input"
-                  :min="1"
-                  :max="65535"
-                  @input="resetConnectionStatus(downloader.id)"
-                >
-                  <template #append>
-                    <div class="input-append-wrapper">
-                      <el-switch
-                        v-model="downloader.use_proxy"
-                        inline-prompt
-                        active-text="远程"
-                        inactive-text="本地"
-                        @change="resetConnectionStatus(downloader.id)"
-                      />
-                    </div>
-                  </template>
-                </el-input>
-              </el-tooltip>
-              <el-tooltip
-                content="开启后，此下载器将参与基于站点分享率阈值的出种限速"
-                placement="top"
-                :hide-after="0"
-              >
-                <span class="ratio-limiter-label">
-                  <span class="ratio-limiter-text">出种限速</span>
-                  <el-switch
-                    v-model="downloader.enable_ratio_limiter"
-                    inline-prompt
-                    active-text="开"
-                    inactive-text="关"
-                  />
-                </span>
-              </el-tooltip>
+                @change="onConnectionModeChange(downloader)"
+              />
+              <strong class="connection-mode-title">
+                {{ downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器' }}
+              </strong>
+              <span class="credential-hint connection-mode-hint">
+                {{
+                  downloader.use_proxy
+                    ? 'qB 列表与统计走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
+                    : 'STARPT 直接连接下载器 API，不调用远程媒体程序。'
+                }}
+              </span>
             </div>
           </el-form-item>
-          <el-form-item v-if="downloader.use_proxy" label="代理用途">
-            <div class="api-token-field">
-              <el-checkbox
-                v-model="downloader.proxy_media_only"
-                @change="resetConnectionStatus(downloader.id)"
-                >仅媒体代理（NAS Docker 程序）</el-checkbox
-              >
-              <span class="credential-hint"
-                >截图、MediaInfo 走 NAS；qB
-                列表、统计及发布前检查直连下载器。旧版全功能代理可取消勾选。</span
-              >
+          <el-form-item v-if="downloader.use_proxy" label="媒体代理端口">
+            <div class="proxy-settings-row">
+              <el-input
+                v-model="downloader.proxy_port"
+                type="number"
+                placeholder="19090"
+                class="proxy-port-input"
+                :min="1"
+                :max="65535"
+                aria-label="媒体代理端口"
+                @input="resetConnectionStatus(downloader.id)"
+              />
+              <span class="credential-hint connection-mode-hint">
+                飞牛领单：主机地址填 Hub 内网地址及下载器 API 端口 28380，媒体代理端口填 29090。
+                28443 是飞牛客户端连接 Hub 的 HTTPS 领单端口，在飞牛客户端设置中填写。独立媒体代理默认端口为
+                19090；直连 qB WebUI 常用 8080。
+              </span>
             </div>
+          </el-form-item>
+          <el-form-item label="出种限速">
+            <el-tooltip
+              content="开启后，此下载器将参与基于站点分享率阈值的出种限速"
+              placement="top"
+              :hide-after="0"
+            >
+              <span class="ratio-limiter-label">
+                <el-switch
+                  v-model="downloader.enable_ratio_limiter"
+                  inline-prompt
+                  active-text="开"
+                  inactive-text="关"
+                  aria-label="出种限速"
+                />
+              </span>
+            </el-tooltip>
           </el-form-item>
           <el-form-item v-if="downloader.use_proxy" label="代理 Token">
             <div class="api-token-field">
@@ -206,9 +203,8 @@
                 >明确清除代理 Token</el-checkbox
               >
               <span class="credential-hint"
-                >使用独立的 PTMOVE_PROXY_TOKEN，不是 qB API Token。NAS 运行
-                nexus/proxy/compose.nas.yaml；代理端口填映射端口（默认 19090），媒体路径须与 NAS
-                只读挂载路径一致。跨机器连接请使用可信专网或加密隧道。</span
+                >填写截图与 MediaInfo 程序的独立 Token，不是 qB API Token。飞牛 HTTPS 领单使用 Hub 的
+                controller.token；直连飞牛媒体代理使用 PTMOVE_PROXY_TOKEN。</span
               >
             </div>
           </el-form-item>
@@ -222,6 +218,13 @@
               "
               @input="resetConnectionStatus(downloader.id)"
             ></el-input>
+            <span class="credential-hint connection-mode-hint">
+              {{
+                downloader.use_proxy
+                  ? '填写 STARPT 能访问的下载器 API 地址（含端口）。媒体代理使用同一个主机名和上面的独立端口。飞牛领单示例：ptmove-pull-hub:28380。'
+                  : '填写 STARPT 能直接访问的下载器 WebUI 地址及其端口，例如 http://192.168.1.10:8080。'
+              }}
+            </span>
           </el-form-item>
           <el-form-item label="用户名">
             <el-input
@@ -494,7 +497,7 @@ const fetchSettings = async () => {
         proxy_port:
           typeof record.proxy_port === 'number'
             ? record.proxy_port
-            : Number(record.proxy_port) || 9090,
+            : Number(record.proxy_port) || 19090,
         color:
           typeof record.color === 'string' && record.color.trim()
             ? record.color
@@ -521,13 +524,15 @@ const fetchSettings = async () => {
 
 const settingsPayload = () => ({
   ...settings.value,
-  downloaders: settings.value.downloaders.map((downloader) =>
-    Object.fromEntries(
+  downloaders: settings.value.downloaders.map((downloader) => {
+    const payload = Object.fromEntries(
       Object.entries(downloader).filter(
         ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
       ),
-    ),
-  ),
+    )
+    if (downloader.use_proxy) payload.proxy_media_only = true
+    return payload
+  }),
 })
 
 const saveSettings = async () => {
@@ -598,6 +603,11 @@ const resetConnectionStatus = (downloaderId: string) => {
   }
 }
 
+const onConnectionModeChange = (downloader: DownloaderConfig) => {
+  if (downloader.use_proxy) downloader.proxy_media_only = true
+  resetConnectionStatus(downloader.id)
+}
+
 const testConnection = async (downloader: DownloaderConfig) => {
   resetConnectionStatus(downloader.id)
   const hasToken =
@@ -618,6 +628,7 @@ const testConnection = async (downloader: DownloaderConfig) => {
         ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
       ),
     )
+    if (downloader.use_proxy) testConfig.proxy_media_only = true
     const response = await axios.post(`${API_BASE_URL}/test_connection`, testConfig)
     const result = response.data as { success?: boolean; message?: string }
     if (result.success) {
@@ -884,6 +895,12 @@ const savePathMappings = async () => {
   font-size: 0.8125rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.connection-mode-title {
+  color: var(--star-text);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .credential-hint {

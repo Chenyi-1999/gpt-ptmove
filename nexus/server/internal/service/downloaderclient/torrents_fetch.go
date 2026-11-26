@@ -1,14 +1,10 @@
 package downloaderclient
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // TorrentSnapshot 表示从下载器读取的一条标准化种子快照。
@@ -34,10 +30,6 @@ type TorrentSnapshot struct {
 // 失败场景：连接失败、认证失败、RPC 异常、响应解析失败时返回错误。
 // 副作用：会向下载器发起网络请求。
 func (d Downloader) FetchTorrents() ([]TorrentSnapshot, error) {
-	if d.Type == "qbittorrent" && d.UseProxy && !d.ProxyMediaOnly {
-		return d.fetchQBTorrentsByProxy()
-	}
-
 	switch d.Type {
 	case "qbittorrent":
 		return d.fetchQBTorrents()
@@ -46,111 +38,6 @@ func (d Downloader) FetchTorrents() ([]TorrentSnapshot, error) {
 	default:
 		return nil, fmt.Errorf("不支持的下载器类型: %s", d.Type)
 	}
-}
-
-// fetchQBTorrentsByProxy 通过盒子代理拉取 qBittorrent 全量种子。
-// 参数/返回：使用配置中的 host/use_proxy/proxy_port 生成代理请求，成功返回标准化快照列表。
-// 失败场景：代理地址解析失败、请求失败、HTTP 返回异常或响应解析失败时返回错误。
-// 副作用：会向代理服务发起 HTTP 请求。
-func (d Downloader) fetchQBTorrentsByProxy() ([]TorrentSnapshot, error) {
-	proxyPort := d.ProxyPort
-	if proxyPort <= 0 {
-		proxyPort = 9090
-	}
-
-	parsedURL, err := parseHostURL(d.Host)
-	if err != nil {
-		return nil, fmt.Errorf("解析 host 失败: %w", err)
-	}
-	proxyIP := strings.TrimSpace(parsedURL.Hostname())
-	if proxyIP == "" {
-		proxyIP = extractHostFallback(d.Host)
-	}
-	if proxyIP == "" {
-		return nil, fmt.Errorf("无法解析代理地址: host=%s", d.Host)
-	}
-
-	originPort := strings.TrimSpace(parsedURL.Port())
-	if originPort == "" {
-		originPort = "8080"
-	}
-	requestPayload := map[string]any{
-		"downloaders": []map[string]any{
-			{
-				"id":       d.ID,
-				"type":     d.Type,
-				"host":     "http://127.0.0.1:" + originPort,
-				"username": d.Username,
-				"password": d.Password,
-			},
-		},
-		"include_comment":  true,
-		"include_trackers": true,
-	}
-	payloadBytes, err := json.Marshal(requestPayload)
-	if err != nil {
-		return nil, fmt.Errorf("构造代理请求失败: %w", err)
-	}
-
-	proxyURL := fmt.Sprintf("http://%s:%d/api/torrents/all", proxyIP, proxyPort)
-	request, err := http.NewRequest(http.MethodPost, proxyURL, bytes.NewReader(payloadBytes))
-	if err != nil {
-		return nil, fmt.Errorf("创建代理请求失败: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-
-	client := d.proxyHTTPClient(10 * time.Minute)
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("代理请求失败: %w", err)
-	}
-	defer response.Body.Close()
-
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("代理返回异常: HTTP %d %s", response.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	rows := make([]map[string]any, 0)
-	if err := json.Unmarshal(body, &rows); err != nil {
-		return nil, fmt.Errorf("解析代理响应失败: %w", err)
-	}
-
-	result := make([]TorrentSnapshot, 0, len(rows))
-	for _, row := range rows {
-		hash := strings.TrimSpace(toString(row["hash"], ""))
-		name := strings.TrimSpace(toString(row["name"], ""))
-		if hash == "" || name == "" {
-			continue
-		}
-
-		trackers := extractProxyTrackers(row["trackers"])
-		group := strings.TrimSpace(toString(row["category"], ""))
-		if group == "" {
-			group = firstCSVItem(toString(row["tags"], ""))
-		}
-
-		progress := normalizeProgressPercent(row["progress"])
-		seeders := toInt64Any(row["seeders"])
-		if seeders <= 0 {
-			seeders = toInt64Any(row["num_seeds"])
-		}
-
-		result = append(result, TorrentSnapshot{
-			Hash:     hash,
-			Name:     name,
-			SavePath: strings.TrimSpace(toString(row["save_path"], "")),
-			Size:     toInt64Any(row["size"]),
-			Progress: progress,
-			State:    formatTorrentState(toString(row["state"], "")),
-			Trackers: trackers,
-			Comment:  strings.TrimSpace(toString(row["comment"], "")),
-			Group:    group,
-			Seeders:  seeders,
-			Uploaded: toInt64Any(row["uploaded"]),
-		})
-	}
-	return result, nil
 }
 
 func (d Downloader) fetchQBTorrents() ([]TorrentSnapshot, error) {
@@ -339,31 +226,6 @@ func extractTransmissionTrackers(row map[string]any) []string {
 		appendTracker(toString(tracker["host"], ""))
 	}
 
-	return result
-}
-
-func extractProxyTrackers(raw any) []string {
-	result := make([]string, 0, 4)
-	seen := map[string]struct{}{}
-
-	appendTracker := func(value string) {
-		trimmed := strings.TrimSpace(value)
-		if trimmed == "" {
-			return
-		}
-		if _, exists := seen[trimmed]; exists {
-			return
-		}
-		seen[trimmed] = struct{}{}
-		result = append(result, trimmed)
-	}
-
-	for _, item := range toSlice(raw) {
-		tracker := toMap(item)
-		appendTracker(toString(tracker["url"], ""))
-		appendTracker(toString(tracker["announce"], ""))
-		appendTracker(toString(tracker["host"], ""))
-	}
 	return result
 }
 

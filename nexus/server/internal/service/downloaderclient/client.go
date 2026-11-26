@@ -22,19 +22,18 @@ import (
 )
 
 type Downloader struct {
-	effectGuard    func() error
-	ID             string
-	Name           string
-	Type           string
-	Host           string
-	Username       string
-	Password       string
-	APIKey         string
-	Enabled        bool
-	UseProxy       bool
-	ProxyPort      int
-	ProxyToken     string
-	ProxyMediaOnly bool
+	effectGuard func() error
+	ID          string
+	Name        string
+	Type        string
+	Host        string
+	Username    string
+	Password    string
+	APIKey      string
+	Enabled     bool
+	UseProxy    bool
+	ProxyPort   int
+	ProxyToken  string
 }
 
 // TrafficStats 统一描述下载器实时速度与累计流量统计。
@@ -67,18 +66,17 @@ func FromConfig(root map[string]any, downloaderID string) (Downloader, error) {
 			continue
 		}
 		result := Downloader{
-			ID:             toString(downloader["id"], ""),
-			Name:           toString(downloader["name"], ""),
-			Type:           strings.ToLower(strings.TrimSpace(toString(downloader["type"], ""))),
-			Host:           normalizeHost(toString(downloader["host"], "")),
-			Username:       toString(downloader["username"], ""),
-			Password:       toString(downloader["password"], ""),
-			APIKey:         strings.TrimSpace(toString(downloader["api_key"], "")),
-			Enabled:        toBool(downloader["enabled"], true),
-			UseProxy:       toBool(downloader["use_proxy"], false),
-			ProxyPort:      toInt(downloader["proxy_port"], 9090),
-			ProxyToken:     strings.TrimSpace(toString(downloader["proxy_token"], "")),
-			ProxyMediaOnly: toBool(downloader["proxy_media_only"], false),
+			ID:         toString(downloader["id"], ""),
+			Name:       toString(downloader["name"], ""),
+			Type:       strings.ToLower(strings.TrimSpace(toString(downloader["type"], ""))),
+			Host:       normalizeHost(toString(downloader["host"], "")),
+			Username:   toString(downloader["username"], ""),
+			Password:   toString(downloader["password"], ""),
+			APIKey:     strings.TrimSpace(toString(downloader["api_key"], "")),
+			Enabled:    toBool(downloader["enabled"], true),
+			UseProxy:   toBool(downloader["use_proxy"], false),
+			ProxyPort:  toInt(downloader["proxy_port"], 9090),
+			ProxyToken: strings.TrimSpace(toString(downloader["proxy_token"], "")),
 		}
 		if result.ID == "" || result.Type == "" || result.Host == "" {
 			return Downloader{}, fmt.Errorf("下载器配置不完整: id=%s", downloaderID)
@@ -161,86 +159,6 @@ func (d Downloader) FetchTrafficStats() (TrafficStats, error) {
 	default:
 		return TrafficStats{}, fmt.Errorf("不支持的下载器类型: %s", d.Type)
 	}
-}
-
-// FetchProxyTrafficStats 通过盒子代理获取 qBittorrent 的速度与累计流量。
-// 参数/返回：proxyPort 为空时使用 9090，成功返回代理汇总结构。
-// 失败场景：代理地址解析失败、代理请求失败、返回为空或格式非法时返回错误。
-// 副作用：会向 proxy 服务发起 HTTP 请求。
-func (d Downloader) FetchProxyTrafficStats(proxyPort int) (TrafficStats, error) {
-	if d.ProxyMediaOnly {
-		return d.FetchTrafficStats()
-	}
-	if d.Type != "qbittorrent" {
-		return TrafficStats{}, fmt.Errorf("代理统计仅支持 qBittorrent: %s", d.Type)
-	}
-	if proxyPort <= 0 {
-		proxyPort = 9090
-	}
-
-	parsedURL, err := parseHostURL(d.Host)
-	if err != nil {
-		return TrafficStats{}, fmt.Errorf("解析 host 失败: %w", err)
-	}
-	proxyIP := strings.TrimSpace(parsedURL.Hostname())
-	if proxyIP == "" {
-		proxyIP = extractHostFallback(d.Host)
-	}
-	if proxyIP == "" {
-		return TrafficStats{}, errors.New("无法解析代理地址")
-	}
-
-	originPort := parsedURL.Port()
-	if strings.TrimSpace(originPort) == "" {
-		originPort = "8080"
-	}
-	proxyDownloaderConfig := map[string]any{
-		"id":       d.ID,
-		"type":     d.Type,
-		"host":     "http://127.0.0.1:" + originPort,
-		"username": d.Username,
-		"password": d.Password,
-	}
-	payload, err := json.Marshal([]map[string]any{proxyDownloaderConfig})
-	if err != nil {
-		return TrafficStats{}, fmt.Errorf("构造代理请求失败: %w", err)
-	}
-
-	proxyURL := fmt.Sprintf("http://%s:%d/api/stats/server", proxyIP, proxyPort)
-	req, err := http.NewRequest(http.MethodPost, proxyURL, bytes.NewReader(payload))
-	if err != nil {
-		return TrafficStats{}, fmt.Errorf("创建代理请求失败: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := d.proxyHTTPClient(30 * time.Second)
-	resp, err := client.Do(req)
-	if err != nil {
-		return TrafficStats{}, fmt.Errorf("代理请求失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return TrafficStats{}, fmt.Errorf("代理返回异常: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	statsData := make([]map[string]any, 0)
-	if err := json.Unmarshal(body, &statsData); err != nil {
-		return TrafficStats{}, fmt.Errorf("解析代理响应失败: %w", err)
-	}
-	if len(statsData) == 0 {
-		return TrafficStats{}, errors.New("代理返回空统计信息")
-	}
-
-	row := statsData[0]
-	return TrafficStats{
-		DownloadSpeed: toInt64Any(row["download_speed"]),
-		UploadSpeed:   toInt64Any(row["upload_speed"]),
-		TotalDownload: toInt64Any(row["total_download"]),
-		TotalUpload:   toInt64Any(row["total_upload"]),
-		Version:       strings.TrimSpace(toString(row["version"], "")),
-	}, nil
 }
 
 // FetchVersion 连接下载器并返回版本号字符串。

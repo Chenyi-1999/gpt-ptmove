@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -31,10 +30,10 @@ func (h *Handler) AllDownloaders(c *gin.Context) {
 	c.JSON(http.StatusOK, h.settings.DownloadersList(false))
 }
 
-// TestConnection 测试与单个下载器的连接（语义对齐 Python：真实登录/握手）。
+// TestConnection 测试与单个下载器的连接。
 // 参数/返回：读取 JSON 配置并返回 success/message。
 // 失败场景：参数非法、认证失败、API 不可达或代理不可达时返回 success=false。
-// 副作用：会向下载器或盒子代理发起网络请求。
+// 副作用：查询下载器 API 的版本，启用远程媒体时验证媒体服务。
 func (h *Handler) TestConnection(c *gin.Context) {
 	payload := map[string]any{}
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -68,11 +67,9 @@ func (h *Handler) TestConnection(c *gin.Context) {
 			}
 		}
 	}
-	mediaOnly := handlerToBool(payload["proxy_media_only"], false)
 	useProxy := handlerToBool(payload["use_proxy"], false)
 	proxyPort := handlerToInt(payload["proxy_port"], 9090)
 
-	// Python 侧：type 不合法时返回 400。
 	if typ != "qbittorrent" && typ != "transmission" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "无效的客户端类型。"})
 		return
@@ -83,60 +80,32 @@ func (h *Handler) TestConnection(c *gin.Context) {
 	}
 
 	downloader := downloaderclient.Downloader{
-		ID:             handlerToString(payload["id"], ""),
-		Name:           name,
-		Type:           typ,
-		Host:           strings.TrimSpace(host),
-		Username:       username,
-		Password:       password,
-		APIKey:         apiKey,
-		Enabled:        true,
-		UseProxy:       useProxy,
-		ProxyPort:      proxyPort,
-		ProxyToken:     proxyToken,
-		ProxyMediaOnly: mediaOnly,
+		ID:         handlerToString(payload["id"], ""),
+		Name:       name,
+		Type:       typ,
+		Host:       strings.TrimSpace(host),
+		Username:   username,
+		Password:   password,
+		APIKey:     apiKey,
+		Enabled:    true,
+		UseProxy:   useProxy,
+		ProxyPort:  proxyPort,
+		ProxyToken: proxyToken,
 	}
 
-	switch typ {
-	case "qbittorrent":
-		if useProxy && !mediaOnly {
-			if _, err := downloader.FetchProxyTrafficStats(proxyPort); err != nil {
-				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 代理连接测试成功", name)})
-			return
-		}
-		if _, err := downloader.FetchVersion(); err != nil {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, false)})
-			return
-		}
-		if useProxy && mediaOnly {
-			if err := downloader.ProbeMediaProxy(); err != nil {
-				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
-				return
-			}
-		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 连接测试成功", name)})
-		return
-	case "transmission":
-		// Transmission：代理仅用于媒体/盒子能力，不用于 RPC 连接测试（对齐 Python 行为：始终直连）。
-		if _, err := downloader.FetchVersion(); err != nil {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, false)})
-			return
-		}
-		if useProxy && mediaOnly {
-			if err := downloader.ProbeMediaProxy(); err != nil {
-				c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
-				return
-			}
-		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 连接测试成功", name)})
-		return
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "无效的客户端类型。"})
+	if _, err := downloader.FetchVersion(); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, false)})
 		return
 	}
+	if useProxy {
+		if err := downloader.ProbeMediaProxy(); err != nil {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": formatDownloaderConnectError(name, err, true)})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 与媒体代理连接测试成功", name)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("下载器 '%s' 连接测试成功", name)})
 }
 
 func formatDownloaderConnectError(name string, err error, isProxy bool) string {
@@ -147,13 +116,16 @@ func formatDownloaderConnectError(name string, err error, isProxy bool) string {
 	lowered := strings.ToLower(errMsg)
 	switch {
 	case strings.Contains(lowered, "401") || strings.Contains(lowered, "unauthorized"):
-		errMsg = "认证失败，请检查用户名和密码。"
+		errMsg = "认证失败，请检查下载器 API Token 或用户名和密码。"
 	case strings.Contains(lowered, "403"):
 		errMsg = "禁止访问，请检查权限设置。"
 	}
 	prefix := "连接失败"
 	if isProxy {
-		prefix = "代理连接失败"
+		prefix = "媒体代理连接失败"
+		if strings.Contains(lowered, "401") || strings.Contains(lowered, "403") || strings.Contains(lowered, "unauthorized") {
+			errMsg = "认证失败，请检查媒体代理令牌。"
+		}
 	}
 	return fmt.Sprintf("'%s' %s: %s", name, prefix, errMsg)
 }
@@ -161,7 +133,7 @@ func formatDownloaderConnectError(name string, err error, isProxy bool) string {
 // DownloaderInfo 返回首页下载器状态与流量统计，语义对齐 Python 版本。
 // 参数/返回：无请求体，返回每个下载器的状态、版本和今日/累计流量信息。
 // 失败场景：DB 查询失败时流量字段回退为 0；连接探测失败时状态为“连接失败”并附错误信息。
-// 副作用：会对启用下载器发起网络探测（直连或代理）以获取连接状态和版本号。
+// 副作用：查询启用下载器的 API 版本。
 func (h *Handler) DownloaderInfo(c *gin.Context) {
 	totals, err := h.torrents.TrafficTotals()
 	if err != nil {
@@ -236,18 +208,6 @@ func resolveDownloaderVersion(cfg map[string]any) (string, error) {
 	if typ == "" {
 		return "", errors.New("缺少下载器类型配置")
 	}
-	if typ == "qbittorrent" && handlerToBool(cfg["use_proxy"], false) && !handlerToBool(cfg["proxy_media_only"], false) {
-		stats, err := getProxyDownloaderStats(cfg)
-		if err != nil {
-			return "", err
-		}
-		version := strings.TrimSpace(handlerToString(stats["version"], "未知"))
-		if version == "" {
-			version = "未知"
-		}
-		return version, nil
-	}
-
 	downloader := downloaderclient.Downloader{
 		ID:       handlerToString(cfg["id"], ""),
 		Name:     handlerToString(cfg["name"], ""),
@@ -262,40 +222,6 @@ func resolveDownloaderVersion(cfg map[string]any) (string, error) {
 		return "", errors.New("缺少 host 配置")
 	}
 	return downloader.FetchVersion()
-}
-
-func getProxyDownloaderStats(cfg map[string]any) (map[string]any, error) {
-	d := downloaderclient.Downloader{ID: handlerToString(cfg["id"], ""), Type: handlerToString(cfg["type"], ""), Host: handlerToString(cfg["host"], ""), Username: handlerToString(cfg["username"], ""), Password: handlerToString(cfg["password"], ""), APIKey: handlerToString(cfg["api_key"], ""), ProxyToken: handlerToString(cfg["proxy_token"], ""), ProxyMediaOnly: handlerToBool(cfg["proxy_media_only"], false)}
-	stats, err := d.FetchProxyTrafficStats(handlerToInt(cfg["proxy_port"], 9090))
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{"version": stats.Version, "download_speed": stats.DownloadSpeed, "upload_speed": stats.UploadSpeed, "total_upload": stats.TotalUpload, "total_download": stats.TotalDownload}, nil
-}
-
-func parseHostURL(hostValue string) (*url.URL, error) {
-	normalized := hostValue
-	if !strings.HasPrefix(normalized, "http://") && !strings.HasPrefix(normalized, "https://") {
-		normalized = "http://" + normalized
-	}
-	return url.Parse(normalized)
-}
-
-func extractHostFallback(hostValue string) string {
-	value := strings.TrimSpace(hostValue)
-	if value == "" {
-		return ""
-	}
-	if index := strings.Index(value, "://"); index >= 0 {
-		value = value[index+3:]
-	}
-	if index := strings.Index(value, "/"); index >= 0 {
-		value = value[:index]
-	}
-	if index := strings.Index(value, ":"); index >= 0 {
-		value = value[:index]
-	}
-	return strings.TrimSpace(value)
 }
 
 func handlerToBool(value any, fallback bool) bool {

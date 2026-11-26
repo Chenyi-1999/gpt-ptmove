@@ -51,6 +51,10 @@ Settings keys: `source_cookie`, `target_cookie`, `source_rss_url`, `qb_url`, `qb
 - Admin API keys: GET/POST `/api/api-keys`; DELETE `/api/api-keys/{id}`. Creation {name,scopes:[read],expires_days:30} returns {token,key}; token is never returned again. GET `/api/ai-guide` returns copyable integration guide.
 - AI Bearer endpoints and scope/idempotency rules are documented in AI_API.md. Authenticated `/api/v1/openapi.json` contains only machine routes. Global `/openapi.json` is disabled.
 
+## Native downloader connection settings
+
+The native administrator submits downloader settings with `POST /api/settings` and uses `POST /api/test_connection` to validate them. Downloader state, version, torrent lists and traffic use the URL in `host` for both modes. `use_proxy=true` also enables remote media processing and tests the selected host name on `proxy_port`. The read-only test validates the downloader API and, when enabled, makes a credentialed media route probe without opening a file or creating a job. `proxy_media_only` is still accepted and retained for configuration compatibility, while `use_proxy` determines the mode. Empty or omitted credential fields retain their saved values unless explicitly cleared.
+
 ## File ownership
 
 Native Go/Vue 0.3.1 API management is documented in [API_MANAGEMENT.md](API_MANAGEMENT.md) and authenticated `/api/v1/openapi.json`. The Python interface descriptions above are retained for the legacy 0.2 service. Native `/api/v1/connection` checks a dedicated machine key without business effects; native administrator key management uses `/api/machine-keys`.

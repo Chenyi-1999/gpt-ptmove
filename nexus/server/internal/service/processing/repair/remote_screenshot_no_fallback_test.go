@@ -49,7 +49,7 @@ func TestRemoteScreenshotFallbackPolicy(t *testing.T) {
 				{"gateway timeout", http.StatusGatewayTimeout, true, true, fixtureToken, 1, http.StatusGatewayTimeout},
 				{"route not found", http.StatusNotFound, true, true, fixtureToken, 1, http.StatusNotFound},
 				{"next path", http.StatusBadRequest, true, true, fixtureToken, 2, 0},
-				{"ordinary proxy fallback", http.StatusBadGateway, true, false, fixtureToken, 1, 0},
+				{"old full proxy config uses remote media", http.StatusBadGateway, true, false, fixtureToken, 1, http.StatusBadGateway},
 				{"legacy unauthenticated fallback", http.StatusBadGateway, true, true, "", 1, 0},
 				{"local only", http.StatusBadGateway, false, false, "", 0, 0},
 			} {

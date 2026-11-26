@@ -14,9 +14,9 @@ import (
 
 func TestProxyCallsUseDedicatedBearer(t *testing.T) {
 	expected := "separate-proxy-secret"
-	calls := 0
+	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		if r.Header.Get("Authorization") != "Bearer "+expected {
 			t.Errorf("missing dedicated proxy credential on %s", r.URL.Path)
 		}
@@ -34,10 +34,6 @@ func TestProxyCallsUseDedicatedBearer(t *testing.T) {
 			fmt.Fprint(w, `{"success":true}`)
 		case "/api/media/bdinfo/progress/task":
 			fmt.Fprint(w, `{"success":true,"task":{"task_id":"task"}}`)
-		case "/api/stats/server":
-			fmt.Fprint(w, `[{"version":"fixture"}]`)
-		case "/api/torrents/all":
-			fmt.Fprint(w, `[]`)
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -65,17 +61,11 @@ func TestProxyCallsUseDedicatedBearer(t *testing.T) {
 	if _, err := d.FetchBDInfoProgressByProxy("task"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.FetchProxyTrafficStats(number); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.FetchTorrents(); err != nil {
-		t.Fatal(err)
-	}
 	if exists, err := d.CheckMediaPathByProxy(context.Background(), "/media/a.mkv"); exists || err != nil {
 		t.Fatalf("file check exists=%v error=%v", exists, err)
 	}
-	if calls != 8 {
-		t.Fatalf("calls=%d", calls)
+	if calls.Load() != 6 {
+		t.Fatalf("calls=%d", calls.Load())
 	}
 }
 
@@ -117,17 +107,18 @@ type roundTripFixture func(*http.Request) (*http.Response, error)
 
 func (f roundTripFixture) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-func TestMediaOnlyProxyListsAndStatsDirectly(t *testing.T) {
-	calls := 0
+func TestDownloaderListsAndStatsAlwaysUseNativeAPI(t *testing.T) {
+	var listCalls, statsCalls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
 		if r.Header.Get("Authorization") != "Bearer qb-key" {
 			t.Error("direct qB key missing")
 		}
 		switch r.URL.Path {
 		case "/api/v2/torrents/info":
+			listCalls.Add(1)
 			fmt.Fprint(w, `[]`)
 		case "/api/v2/sync/maindata":
+			statsCalls.Add(1)
 			fmt.Fprint(w, `{"server_state":{"dl_info_speed":7}}`)
 		case "/api/v2/app/version":
 			fmt.Fprint(w, "fixture")
@@ -136,15 +127,35 @@ func TestMediaOnlyProxyListsAndStatsDirectly(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	d := Downloader{Type: "qbittorrent", Host: server.URL, APIKey: "qb-key", UseProxy: true, ProxyMediaOnly: true, ProxyPort: 1, ProxyToken: "proxy-key"}
-	if _, err := d.FetchTorrents(); err != nil {
-		t.Fatal(err)
-	}
-	stats, err := d.FetchProxyTrafficStats(1)
-	if err != nil || stats.DownloadSpeed != 7 {
-		t.Fatalf("direct stats %+v %v", stats, err)
-	}
-	if calls < 3 {
-		t.Fatal("did not use direct qB API")
+	for _, mode := range []struct {
+		name      string
+		useProxy  bool
+		mediaOnly bool
+	}{
+		{name: "direct"},
+		{name: "remote media", useProxy: true, mediaOnly: true},
+		{name: "old full proxy settings", useProxy: true},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			listBefore, statsBefore := listCalls.Load(), statsCalls.Load()
+			config := map[string]any{"downloaders": []any{map[string]any{
+				"id": "test", "type": "qbittorrent", "host": server.URL, "api_key": "qb-key",
+				"use_proxy": mode.useProxy, "proxy_media_only": mode.mediaOnly, "proxy_port": 1, "proxy_token": "proxy-key",
+			}}}
+			d, err := FromConfig(config, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := d.FetchTorrents(); err != nil {
+				t.Fatal(err)
+			}
+			stats, err := d.FetchTrafficStats()
+			if err != nil || stats.DownloadSpeed != 7 {
+				t.Fatalf("native stats %+v %v", stats, err)
+			}
+			if listCalls.Load()-listBefore != 1 || statsCalls.Load()-statsBefore != 1 {
+				t.Fatalf("native list calls %d, stats calls %d", listCalls.Load()-listBefore, statsCalls.Load()-statsBefore)
+			}
+		})
 	}
 }

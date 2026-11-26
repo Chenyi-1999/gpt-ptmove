@@ -341,13 +341,13 @@ func GenerateAndUploadScreenshots(input ScreenshotGenerateInput) ([]string, erro
 }
 
 func remoteOnlyScreenshotError(downloader downloaderclient.Downloader, err error) error {
-	if !downloader.ProxyMediaOnly || downloader.ProxyToken == "" {
+	if !downloader.UseProxy || downloader.ProxyToken == "" {
 		return nil
 	}
 	if err == nil {
-		return errors.New("仅媒体代理截图未命中有效路径")
+		return errors.New("远程截图未命中有效路径")
 	}
-	return fmt.Errorf("仅媒体代理截图失败: %w", err)
+	return fmt.Errorf("远程截图失败: %w", err)
 }
 
 func buildRemotePathCandidatesForProxy(savePath, torrentName, contentName string) []string {
