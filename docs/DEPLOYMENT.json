@@ -42,7 +42,54 @@
       "isolated_network": "none",
       "assets_verified": 7
     },
-    "server_binary_sha256": "80856f6b4018de73ab523a2f0d3ed199a3e89397aa512dd5dfc2495b774327f1"
+    "server_binary_sha256": "80856f6b4018de73ab523a2f0d3ed199a3e89397aa512dd5dfc2495b774327f1",
+    "publish_receipt": {
+      "source_commit": "fa89da2966cd641f5756a013564217b73529fbad",
+      "released_at": "2026-11-26T13:22:35+08:00",
+      "ovh_label_migration": {
+        "migrated_existing_tasks": 22,
+        "confirmed_owned_public_tasks": 22,
+        "original_random_tags": 23,
+        "remaining_random_tags": 0,
+        "empty_legacy_shared_tag_removed": true
+      },
+      "github": {
+        "private": true,
+        "id": 458992048,
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.0.15",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "id": 794439001,
+            "size": 499,
+            "sha256": "fc7e9301fa4812accc9945d35b658a86b1199e780432f49b2df30b464f49a2b4"
+          },
+          {
+            "name": "starpt-v1.0.15-linux-amd64.tar.gz.sha256",
+            "id": 794439039,
+            "size": 100,
+            "sha256": "3f2fd79a26342223a3b7e74f313abf4d33716c4f270450f05370c6386c162ee4"
+          },
+          {
+            "name": "starpt-v1.0.15-linux-amd64.tar.gz",
+            "id": 794439075,
+            "size": 896891353,
+            "sha256": "b9d72206902a11f66f0c702898980375000b15eb215cb089ec30d26b7c61ca0d"
+          }
+        ]
+      },
+      "gitee": {
+        "source_tag_pushed": true,
+        "repository_public": true,
+        "release_assets_published": false,
+        "public_release_pending_decision": true
+      },
+      "archive": {
+        "zip_bytes": 914119214,
+        "zip_sha256": "db1fda3276259838ea6f5fc38ac5375a98b41c606e1bfd332a4581183c893855",
+        "oci_reused_blobs_verified": 78
+      }
+    }
   },
   "release_v1_0_14": {
     "version": "1.0.14",
