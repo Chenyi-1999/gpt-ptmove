@@ -93,6 +93,84 @@
       },
       "migrated_site_settings_unchanged": true,
       "isolated_network": "none"
+    },
+    "publish_receipt": {
+      "source_commit": "30f9070b43391558e0d087a4f22f0f1a7ec19780",
+      "checked_at": "2026-11-26T21:41:34+08:00",
+      "github": {
+        "public": true,
+        "id": 459462521,
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.1.2",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "size": 498,
+            "digest": "sha256:ac94afec76813032b7c049ee541a50590db4127f07532e46a4f2cd768f96b41a",
+            "id": 796060366
+          },
+          {
+            "name": "starpt-v1.1.2-linux-amd64.tar.gz.sha256",
+            "size": 100,
+            "digest": "sha256:61eadb247f9b96663e75c94aec9dfdd793065aa5de99840f6fc9645374b46dc0",
+            "id": 796060368
+          },
+          {
+            "name": "downloader-summary.zip",
+            "size": 860405,
+            "digest": "sha256:c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22",
+            "id": 796060367
+          },
+          {
+            "name": "starpt-v1.1.2-linux-amd64.tar.gz",
+            "size": 980290088,
+            "digest": "sha256:bed676a2b6875ec3b57057e8aa58693b4f79a3720871dc00f2b9215fc7a0a649",
+            "id": 796060726
+          }
+        ],
+        "published_at": "2026-11-26T13:41:27Z"
+      },
+      "gitee": {
+        "id": 1372359,
+        "url": "https://gitee.com/star1999/starpt/releases/tag/v1.1.2",
+        "assets": [
+          {
+            "id": 3845587,
+            "name": "compose.starpt.yaml",
+            "size": 498,
+            "sha256": "ac94afec76813032b7c049ee541a50590db4127f07532e46a4f2cd768f96b41a"
+          },
+          {
+            "id": 3845588,
+            "name": "starpt-v1.1.2-linux-amd64.tar.gz.sha256",
+            "size": 100,
+            "sha256": "61eadb247f9b96663e75c94aec9dfdd793065aa5de99840f6fc9645374b46dc0"
+          },
+          {
+            "id": 3845589,
+            "name": "downloader-summary.zip",
+            "size": 860405,
+            "sha256": "c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22"
+          }
+        ]
+      },
+      "image_archive": {
+        "name": "starpt-v1.1.2-linux-amd64.tar.gz",
+        "bytes": 980290088,
+        "sha256": "bed676a2b6875ec3b57057e8aa58693b4f79a3720871dc00f2b9215fc7a0a649",
+        "raw_sha256": "583e8b51a97b608c9f4755a941e02bf924dbb847f0c147720468f4831344f93c",
+        "image_id": "sha256:bbff94bed7c693c28557b45ca02afc6b5d61f440e63bc77b633ef4a4b030d841"
+      },
+      "history_archive": {
+        "project": "GPT-PTMOVE",
+        "timestamp": "2026-11-26T21:37:15.789070+08:00",
+        "type": "历史发布",
+        "version": "v1.1.2",
+        "path": "D:\\A_GPT\\GPT-BackUp\\GPT-PTMOVE\\2026-11\\GPT-PTMOVE__2026-11-26_213715__历史发布__STARPT-v1.1.2.zip",
+        "bytes": 998470013,
+        "sha256": "afeadf7c7a52eae131d6202bdc6f89a8d5062752648bbbd85ae79b9241f05a2e",
+        "oci_blobs_verified": 96,
+        "source_commit": "30f9070b43391558e0d087a4f22f0f1a7ec19780"
+      }
     }
   },
   "release_v1_1_1": {
