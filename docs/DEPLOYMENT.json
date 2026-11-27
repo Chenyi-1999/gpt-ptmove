@@ -3322,5 +3322,46 @@
     "protected_81_host_operated": false,
     "ovh_deployed": false,
     "release_published": false
+  },
+  "starpt_v1_1_7_remote_scan_ovh": {
+    "source_commit": "4fb6e6d4e1de40ffaa2053ef61b17530c64a5714",
+    "image": "ptmove-nexus:1.1.7-remote-scan.1",
+    "archive_sha256": "622cb38509981f689c4f460152ef4ba401be3581e345f0131265acee882e6d1e",
+    "archive_bytes": 1041809753,
+    "verified_152": {
+      "image_index": "sha256:a7d7b2a5e543535f2b60a7b9195e1a51be4d87186f8fc293063b4d7c9cafdbe1",
+      "server_sha256": "32f326941758f6d81648c567f8d592a459a6cda54cd99bb9802ee56adb49c662",
+      "rootfs_sha256": "afd9ab4766fa43d2342159704bd4503d3266d2ebff0095786f9bd8096af772b5",
+      "network": "none",
+      "go_packages_passed": 30,
+      "assets_and_routes_verified": 47,
+      "wasm_and_scan_tested": true
+    },
+    "ovh": {
+      "url": "https://ovh-starpt.star1999.de/",
+      "container": "starpt",
+      "image_config": "sha256:8ddfedfabd7032351a46081053abcdc796303126c609e28ed72319283022271a",
+      "rootfs_sha256": "afd9ab4766fa43d2342159704bd4503d3266d2ebff0095786f9bd8096af772b5",
+      "assets_and_routes_verified": 47,
+      "persistence": "/docker/starpt/data",
+      "config_and_plugins_verified": true,
+      "db_counts_during_switch": {
+        "torrents": 0,
+        "sites": 136,
+        "tjupt_feed_tasks": 124
+      },
+      "public_https_verified": true,
+      "scan_auth_http": 401,
+      "restart_count": 0,
+      "rss_enabled": true,
+      "rss_interval_minutes": 1,
+      "rollback_image": "ptmove-nexus:1.1.7",
+      "rollback_container": "starpt-v117-remote-scan-rollback"
+    },
+    "repository_branches": {
+      "gitee_master": "4fb6e6d4e1de40ffaa2053ef61b17530c64a5714",
+      "github_master": "4fb6e6d4e1de40ffaa2053ef61b17530c64a5714"
+    },
+    "protected_81_operated": false
   }
 }
