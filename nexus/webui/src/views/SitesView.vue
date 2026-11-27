@@ -178,24 +178,80 @@
         <div class="scan-header">
           <div class="scan-header-left">
             <h2 class="quadrant-title">本地文件扫描</h2>
-            <p class="scan-description">检查种子保存目录的顶层文件和内容目录。远程下载器由 HTTPS 领单客户端核验，只返回缺失和孤立文件的结果。</p>
+            <p class="scan-description">核验保存目录的顶层项目，检查缺失和孤立文件。远程目录由 HTTPS 领单客户端核验。</p>
           </div>
           <div class="scan-controls">
             <el-select v-model="selectedPath" clearable placeholder="选择路径(可选)" filterable size="default"
-              class="scan-path-select">
+              class="scan-path-select" :disabled="scanning || syncingDownloaders">
               <el-option-group v-for="downloader in downloadersWithPaths" :key="downloader.id" :label="downloader.name">
                 <el-option v-for="pathItem in downloader.paths" :key="pathItem.path" :label="pathItem.path"
                   :value="pathItem.path">
                   <span>{{ pathItem.path }}</span>
-                  <span style="float: right; color: #8492a6; font-size: 13px">({{ pathItem.count }})</span>
+                  <span v-if="pathItem.access_status === 'unavailable'" class="path-option-status path-option-unavailable">目录不可访问</span>
+                  <span v-else-if="pathItem.access_status === 'remote'" class="path-option-status">远程核验</span>
+                  <span v-else class="path-option-count">({{ pathItem.count }})</span>
                 </el-option>
               </el-option-group>
             </el-select>
-            <el-button type="primary" @click="startScan" :loading="scanning" :icon="Search">
+            <el-button @click="syncDownloaders" :loading="syncingDownloaders" :disabled="scanning" :icon="Refresh">
+              同步下载器
+            </el-button>
+            <el-button type="primary" @click="startScan" :loading="scanning" :disabled="syncingDownloaders" :icon="Search">
               {{ selectedPath ? '扫描选定路径' : '扫描全部路径' }}
             </el-button>
           </div>
         </div>
+
+        <el-alert
+          v-if="downloadersLoadError"
+          class="scan-status-alert"
+          type="error"
+          :title="downloadersLoadError"
+          :closable="false"
+          show-icon
+        />
+        <el-alert
+          v-else-if="downloadersLoading"
+          class="scan-status-alert"
+          type="info"
+          title="正在读取下载器和保存目录…"
+          :closable="false"
+          :show-icon="false"
+        />
+        <el-alert
+          v-else-if="downloaderPathHint"
+          class="scan-status-alert"
+          :type="downloaderPathHint.type"
+          :title="downloaderPathHint.title"
+          :description="downloaderPathHint.description"
+          :closable="false"
+          show-icon
+        />
+        <el-alert
+          v-if="downloaderSyncError"
+          class="scan-status-alert"
+          type="error"
+          :title="downloaderSyncError"
+          :closable="false"
+          show-icon
+        />
+        <el-alert
+          v-else-if="downloaderSyncMessage"
+          class="scan-status-alert"
+          :type="downloaderSyncMessage.type"
+          :title="downloaderSyncMessage.title"
+          :closable="false"
+          show-icon
+        />
+        <el-alert
+          v-if="unavailablePathCount > 0 && !downloadersLoadError"
+          class="scan-status-alert"
+          type="warning"
+          :title="`${formatCount(unavailablePathCount)} 个保存目录在服务端不可访问`"
+          description="请检查 STARPT 容器的只读挂载。若容器路径与下载器保存路径不同，请配置路径映射。"
+          :closable="false"
+          show-icon
+        />
 
         <el-alert
           v-if="scanRequestError"
@@ -218,7 +274,7 @@
               <p class="scan-status-description">
                 {{ scanStatus === 'partial'
                   ? '下方数量只统计已核验的路径；未核验或失败的路径不会按 0 缺失、0 孤立显示。'
-                  : '当前结果无法确认文件状态；请确认远程客户端在线并重新扫描。' }}
+                  : '请按下方原因处理后重新扫描。' }}
               </p>
               <p v-if="legacyScanNote" class="scan-status-description">{{ legacyScanNote }}</p>
               <ul v-if="scanIssues.length" class="scan-issue-list">
@@ -418,12 +474,14 @@ interface GroupStat {
 interface PathItem {
   path: string
   count: number
+  access_status?: 'available' | 'unavailable' | 'remote'
 }
 
 interface Downloader {
   id: string | number
   name: string
   paths: PathItem[]
+  indexed_count?: number
 }
 
 interface ScanSummary {
@@ -513,6 +571,50 @@ let scanRevision = 0
 const scanRequestError = ref('')
 const selectedPath = ref<string>('')
 const downloadersWithPaths = ref<Downloader[]>([])
+let downloadersRequest = 0
+const downloadersLoading = ref(false)
+const downloadersLoadError = ref('')
+const syncingDownloaders = ref(false)
+const downloaderSyncMessage = ref<{ type: 'warning' | 'success'; title: string } | null>(null)
+const downloaderSyncError = ref('')
+
+const unavailablePathCount = computed(() => downloadersWithPaths.value
+  .flatMap(downloader => downloader.paths || [])
+  .filter(pathItem => pathItem.access_status === 'unavailable').length)
+const indexedDownloaderCount = computed(() => downloadersWithPaths.value
+  .reduce((sum, downloader) => sum + Math.max(0, Number(downloader.indexed_count) || 0), 0))
+const visiblePathCount = computed(() => downloadersWithPaths.value
+  .reduce((sum, downloader) => sum + (downloader.paths?.length || 0), 0))
+const downloaderPathHint = computed(() => {
+  if (downloadersLoadError.value || downloadersLoading.value || unavailablePathCount.value) return null
+  if (!downloadersWithPaths.value.length) {
+    return {
+      type: 'info' as const,
+      title: '尚未配置可用下载器',
+      description: '请先在设置中配置下载器，再点击“同步下载器”读取任务和保存目录。',
+    }
+  }
+  if (visiblePathCount.value > 0) return null
+  if (downloadersWithPaths.value.every(downloader => downloader.indexed_count !== undefined) && indexedDownloaderCount.value === 0) {
+    return {
+      type: 'warning' as const,
+      title: '下载器索引为空',
+      description: '点击“同步下载器”读取任务和保存目录，更新后再扫描。',
+    }
+  }
+  if (contentFiltersStore.videoOnly) {
+    return {
+      type: 'info' as const,
+      title: '当前没有符合筛选条件的保存目录',
+      description: '视频筛选已开启，列表只显示符合视频筛选的任务路径。可在内容筛选中关闭视频筛选，或先同步下载器。',
+    }
+  }
+  return {
+    type: 'info' as const,
+    title: '暂无可扫描保存目录',
+    description: '点击“同步下载器”更新任务和保存目录。',
+  }
+})
 
 const scanStatus = computed<NonNullable<ScanResult['scan_status']>>(() => {
   if (!scanResult.value) return 'unverified'
@@ -665,6 +767,9 @@ const refreshStats = async () => {
 
 // 获取下载器路径列表
 const fetchDownloadersWithPaths = async () => {
+  const request = ++downloadersRequest
+  downloadersLoading.value = true
+  downloadersLoadError.value = ''
   try {
     await contentFiltersStore.load()
     const params = new URLSearchParams()
@@ -672,9 +777,54 @@ const fetchDownloadersWithPaths = async () => {
     const res = await axios.get<{ downloaders: Downloader[] }>(
       `/api/local_query/downloaders_with_paths?${params.toString()}`,
     )
-    downloadersWithPaths.value = res.data.downloaders || []
+    if (request === downloadersRequest) downloadersWithPaths.value = res.data.downloaders || []
+    return true
   } catch (error) {
     console.error('获取路径列表失败:', error)
+    if (request === downloadersRequest) downloadersLoadError.value = '读取下载器路径失败，请检查服务连接后重试。'
+    return false
+  } finally {
+    if (request === downloadersRequest) downloadersLoading.value = false
+  }
+}
+
+const syncDownloaders = async () => {
+  if (syncingDownloaders.value || scanning.value) return
+  syncingDownloaders.value = true
+  downloaderSyncMessage.value = null
+  downloaderSyncError.value = ''
+  try {
+    const response = await axios.post<{
+      success?: boolean
+      message?: string
+      stats?: { failed_downloaders?: number }
+    }>('/api/refresh_data')
+    if (response.data?.success !== true) {
+      throw new Error(response.data.message || '下载器同步失败')
+    }
+    if (scanResult.value) scanFromCache.value = true
+    const [, pathsLoaded] = await Promise.all([refreshStats(), fetchDownloadersWithPaths()])
+    const failedCount = Math.max(0, Number(response.data?.stats?.failed_downloaders) || 0)
+    if (!pathsLoaded) {
+      downloaderSyncError.value = '下载器同步请求已完成，但保存目录读取失败。请检查服务连接后重试。'
+      ElMessage.warning(downloaderSyncError.value)
+    } else if (failedCount > 0) {
+      const title = `同步已完成，${formatCount(failedCount)} 个下载器未能更新。请检查下载器连接。`
+      downloaderSyncMessage.value = { type: 'warning', title }
+      ElMessage.warning(title)
+    } else {
+      const title = '下载器任务索引和保存目录已更新。'
+      downloaderSyncMessage.value = { type: 'success', title }
+      ElMessage.success(title)
+    }
+  } catch (error) {
+    const message = axios.isAxiosError(error)
+      ? (error.response?.data as { message?: string } | undefined)?.message || error.message
+      : error instanceof Error ? error.message : '下载器同步失败，请检查连接后重试。'
+    downloaderSyncError.value = message
+    ElMessage.error(message)
+  } finally {
+    syncingDownloaders.value = false
   }
 }
 
@@ -698,7 +848,7 @@ const fetchCachedScanResult = async () => {
 
 // 开始扫描
 const startScan = async () => {
-  if (scanning.value) return
+  if (scanning.value || syncingDownloaders.value) return
   scanRevision++
   scanning.value = true
   scanResult.value = null
@@ -849,11 +999,31 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  gap: 10px;
+}
+
+.scan-controls :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .scan-path-select {
   width: 280px;
-  margin-right: 10px;
+}
+
+.path-option-status {
+  float: right;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.path-option-unavailable {
+  color: var(--el-color-warning);
+}
+
+.path-option-count {
+  float: right;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .scan-summary {

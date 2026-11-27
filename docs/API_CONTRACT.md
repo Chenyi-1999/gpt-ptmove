@@ -150,8 +150,12 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 ## 本地文件查询
 
+`GET /api/local_query/downloaders_with_paths?video_only=1` 按下载器返回种子索引中的保存路径。每台下载器的 `indexed_count` 是显隐规则下有保存路径的任务数，在视频筛选前计数。保存路径的 `access_status` 为 `available`、`unavailable` 或 `remote`。本地目录不存在或容器无法访问时保留路径，标为 `unavailable`。远程目录要在扫描时核验。
+
+同步调用已有的 `POST /api/refresh_data`，从启用的下载器读取种子清单并更新 STARPT 本地缓存。HTTP 200 仍须检查结果的 `success` 和 `stats.failed_downloaders`。直连 qB 的保存目录需以只读方式挂到 STARPT 容器内。若容器路径与 qB 返回路径不同，在下载器中配置映射。
+
 管理员使用 `POST /api/local_query/scan?path=...&video_only=1` 扫描选定范围。省略 `path` 时扫描所选任务的保存目录。结果包含 `scan_summary`、`missing_files`、`orphaned_files`、`synced_torrents` 和 `scanned_at`。缺失、孤立和已找到的计数只覆盖完成核验的目录。总种子数是数据库中本次选中的任务数。
 
-`scan_status` 为 `complete`、`partial` 或 `unverified`。详情 `scan_issues` 按目录返回 `path`、`downloader_name`、`status` 和 `message`。客户端离线、目录不可访问、引用不完整或达到扫描限制时，该范围没有可用于计数的结果。`GET /api/local_query/scan/cache` 返回上次的扫描结果。
+`scan_status` 为 `complete`、`partial` 或 `unverified`。详情 `scan_issues` 按目录返回 `path`、`downloader_name`、`status` 和 `message`。无可核验任务、客户端离线、目录不可访问、引用不完整或达到扫描限制时，该范围没有可用于计数的结果。`GET /api/local_query/scan/cache` 返回上次的扫描结果。
 
 远程 qB 引用清单经已有 HTTPS 领单通道返回，只含哈希、保存路径和内容路径。媒体客户端只扫描白名单目录的顶层项目，返回缺失名称以及孤立文件的名称和体积。此流程不传输文件内容，也不提供删除操作。
