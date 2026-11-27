@@ -3401,5 +3401,34 @@
     },
     "ovh_updated": false,
     "protected_81_operated": false
+  },
+  "starpt_sites_layout_20261128": {
+    "source_commit": "3a54eab1e88a70713d98193eed1e946dc032dbac",
+    "verified_152": {
+      "url": "http://152.136.236.238:18120/sites",
+      "image": "ptmove-nexus:1.1.7-sites-layout.1",
+      "id": "sha256:5fcd4021cbf047255db6cd71184991cc437c58fd3e0325344905dd4743a444e0",
+      "source": "3a54eab1e88a70713d98193eed1e946dc032dbac",
+      "previous_image": "ptmove-nexus:1.1.7-local-query.1",
+      "configuration_unchanged": true,
+      "hub_unchanged": true,
+      "cached_torrents": 467,
+      "tracked_sites": 136,
+      "assets_and_routes_verified": 48,
+      "restart_count": 0,
+      "isolated_settings_restart_verified": true,
+      "isolated_auth_http": 401,
+      "isolated_invalid_columns_http": 400,
+      "public_pages_and_assets_verified": true,
+      "backend_sha256": "fef45ddb7338b8b2ff84e02e75a0266fdbaee9cbfdda39723bd1b3859dd72b16"
+    },
+    "browser_fixture": {
+      "desktop_single_and_double": true,
+      "row_major_priority": true,
+      "save_error_and_retry": true,
+      "mobile_portrait_and_landscape_single": true
+    },
+    "ovh_updated": false,
+    "protected_81_operated": false
   }
 }

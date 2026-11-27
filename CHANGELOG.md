@@ -1034,3 +1034,10 @@
 - 更新 nexus/webui/src/views/SitesView.vue、src/components/settings/{GeneralSettings,SitesLayoutSettings}.vue、src/stores/sitesLayout.ts 和 nexus/webui/dist。独立的认证布局 API 由 nexus/server/internal/bootstrap/app.go 与 internal/{http/handler,service}/settings/sites_layout.go 提供，持久化到 ui_settings.sites_layout。docs/API_CONTRACT.md 补充接口。
 - Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和 152 断网 Go 全量测试及构建通过。浏览器夹具验证 1440px 双列和单列、保存失败保留草稿及重试、刷新恢复排序，以及手机竖屏和横屏单列。Vite 保留原有大包提示。
 - 本条随隔离工作分支提交。完整镜像的 152 断网验收及上线待执行，结果另记。未推送或发布，未访问 OVH 或 81。
+
+
+## PTM-20261128-SITES-LAYOUT-152 — 2026-11-28T01:05:50+08:00 — Codex root，做种检索布局部署回执
+
+- 152 从 ptmove-nexus:1.1.7-local-query.1 更新至 ptmove-nexus:1.1.7-sites-layout.1，源码 3a54eab。保留旧镜像和切换前 Compose。新旧 Compose 仅镜像项不同，容器挂载、配置、467 条种子索引、136 个站点和领单 Hub 均核对一致。
+- 152 断网候选经实际接口验证默认双列、单列和双列保存、排序、重启持久化、其他界面设置保留、非法列数 400 和匿名请求 401。上线后核对 48 个资源及路由、后端哈希、容器健康。公网做种检索、通用设置、新版 JS 与健康接口均通过。
+- docs/DEPLOYMENT.json 记录镜像摘要、源码和实测结果。功能和部署回执在隔离工作分支提交。未推送或发布，未部署 OVH、未接触 81，也没有实际下载、发种或调整 qB 任务。
