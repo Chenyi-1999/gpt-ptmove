@@ -961,3 +961,11 @@
 - 对照 152 的 Hub 0.3.1-pull.3 与飞牛 0.3.1-pull.5 源码。同步 nexus/proxy/pull/{agent,hub,protocol,qb_add,admin_link,admin_server}.go、原有回归测试、admin.html、Dockerfile、compose.agent-admin.yaml。保留局域网管理页、原有连接状态、旧 qB 许可和 81 应用连接限制。扫描只增加原有 HTTPS 通道上的两项只读请求。保持 media Dockerfile.nas 的 UTF-8 和 runtime_helpers.go 的 ffprobe stderr 回退，同步媒体构建产物与 docs/REMOTE_SCREENSHOTS.md。
 - Windows 两个 Go 模块测试通过。152 断网容器领单 29 项和媒体代理 12 项均通过，涵盖原有管理和 qB 请求校验、扫描回传与路径保护。此时已核对飞牛目录 /keep/TEST 的 29 项选中任务有 3 个预期路径缺失及 0 个孤立，正式 STARPT 链路复测待切换。
 - 首轮提交 bdf2bd5。记录时本次兼容修正提交、最终切换和实扫待执行，未推送或发布，未操作 81 本机或中转配置。
+
+
+## PTM-20261127-REMOTE-LOCAL-QUERY-DEPLOY — 2026-11-27T21:36:14+08:00 — Codex root，152 与飞牛生产更新及只读实扫
+
+- 代码提交 bdf2bd5 和 0ce4b62。152 已先完成本体与兼容 Hub 更新，飞牛随后完成领单客户端和媒体代理更新。四个组件的新镜像、回滚标签和真实结果写入 docs/DEPLOYMENT.json。原有 Compose 配置与挂载核对一致，回滚镜像和改动前 Compose 文件已保留。
+- 152 健康检查、45 个前端文件的隔离验证、生产扫描页面 HTTP 200、新资源及匿名 401 核对通过。Hub 在断网候选和生产中均通过 TLS 与匿名 401。飞牛 LAN 管理页 LAN 地址未变，匿名 401 和既有密码登录 HTTP 200。媒体容器 /keep、/temp 仍为只读挂载。
+- 2026-11-27 21:34:52（Asia/Shanghai），152 发起 /keep/TEST 的 HTTPS 远程只读扫描，耗时 339 ms，状态 complete。29 个显示任务中 26 个找到，目录 59 项、缺失 3、孤立 0。飞牛独立读取 384 项 qB 任务引用并据本地目录交叉核对，缺失路径及孤立结果一致。152 的页面缓存与本次扫描响应一致。
+- 未删除或修改飞牛文件、qB 任务，未手动触发下载或发种。管理连接只使用用户确认的独立飞牛 SSH 中转入口，未操作 81 本机或中转配置。未部署 OVH、推送远端或发布发行版。此回执将随本地 Git 记录保留。

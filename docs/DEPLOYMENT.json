@@ -3210,5 +3210,55 @@
       "ovh_rss_cycle_completed": true,
       "protected_81_accessed": false
     }
+  },
+  "starpt_remote_local_scan_20261127": {
+    "source_commits": {
+      "starpt": "bdf2bd5fd3c7896597a04a1bdd6455a5f2732d0b",
+      "pull_and_media": "0ce4b62c3042006121487a867ccbd77416da65f2"
+    },
+    "starpt_152": {
+      "url": "http://152.136.236.238:18120/sites",
+      "image": "ptmove-nexus:1.1.6-remote-scan.1",
+      "image_id": "sha256:97599aee02a375302bbe85f682bd09aad7d33c0d8e896e435475de0cad6937fe",
+      "rollback_image": "ptmove-nexus:1.1.6",
+      "pull_hub": {
+        "image": "ptmove-pull:0.3.1-pull-remote-scan.2",
+        "image_id": "sha256:1449377967fc098446b09877598c8d1affcc02b583b92c003e56cf92fb3f9af6",
+        "rollback_image": "ptmove-pull:0.3.1-pull.3"
+      }
+    },
+    "feiniu": {
+      "pull_agent": {
+        "image": "ptmove-pull:0.3.1-pull-remote-scan.2",
+        "image_id": "sha256:be74c645244ba0c98756b58848ec8171901a111f21287e5cd684f4593d5e06d9",
+        "rollback_image": "ptmove-pull:0.3.1-pull.5",
+        "existing_lan_admin_verified": true
+      },
+      "media_agent": {
+        "image": "ptmove-media-agent:0.3.1-media-remote-scan.2",
+        "image_id": "sha256:95b60f4d5bbde7c1ee1ec36245b0dae7c078ad9a23aec5c4839facaafe662af8",
+        "rollback_image": "ptmove-media-agent:0.3.1-mediainfo.1",
+        "read_only_mounts": [
+          "/keep",
+          "/temp"
+        ]
+      }
+    },
+    "live_read_only_scan": {
+      "at": "2026-11-27T13:34:52.791542054Z",
+      "path": "/keep/TEST",
+      "elapsed_ms": 339,
+      "status": "complete",
+      "qb_references_checked": 384,
+      "selected_tasks": 29,
+      "directory_items": 59,
+      "missing": 3,
+      "orphaned": 0,
+      "verified_against_nas": true,
+      "cached_result_matched": true
+    },
+    "protected_81_host_operated": false,
+    "ovh_deployed": false,
+    "release_published": false
   }
 }
