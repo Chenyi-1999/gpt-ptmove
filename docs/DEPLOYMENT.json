@@ -3038,5 +3038,177 @@
       "ovh_rss_cycle_completed": true,
       "protected_81_accessed": false
     }
+  },
+  "starpt_v1_1_6": {
+    "verified_at": "2026-11-27T18:21:40+08:00",
+    "version": "1.1.6",
+    "source_commit": "7e2cfc2bd7299ac2eb2c45bf585ce76e40140da4",
+    "deployments": {
+      "152": {
+        "site": "152",
+        "image": "ptmove-nexus:1.1.6",
+        "image_id": "sha256:1d38124bd299e868ac01d7f4cc3e71f5400ed69ab7dd69e43eb79cabad5d3d6d",
+        "base_image": "sha256:b79ef4110649b8c1423a46aea8125fd18349c11b999b436c6f272456ebc50a8f",
+        "backend_sha256": "ef3d5feb2297a298b626dd072edb375ca3366f6b0aa625b499fbfc2228519168",
+        "archive_sha256": "f6b30046f3ab8bfca9dd0bff39176759ef72b66081bee5ed71f62c32ba389fc0",
+        "canary": "network-none",
+        "network": "none",
+        "version": "1.1.6",
+        "verified_assets": 45,
+        "index_sha256": "f5fb4e32bae94994e3bfd41b2625908b15dcebc2650e64e4d83b07d190d3d388",
+        "docker_health": "healthy",
+        "server_version": "1.1.6",
+        "config_preserved": true,
+        "rss_enabled": false,
+        "rollback_image": "ptmove-nexus:1.1.5-ui.1",
+        "rollback_container": null,
+        "container": "ptmove-nexus-ptmove-nexus-1",
+        "url": "http://152.136.236.238:18120/",
+        "hashed_paths": 51,
+        "protected_settings": 401
+      },
+      "ovh": {
+        "site": "ovh",
+        "image": "ptmove-nexus:1.1.6",
+        "image_id": "sha256:3596499887f134c5adc93645301e0b27e3dfa834efa7c78a5a3085350fffd719",
+        "base_image": "sha256:701e2b36f0bd3da85a6d81738a4b525b8aa1934c0d7a749c59dd216655d4109d",
+        "backend_sha256": "ef3d5feb2297a298b626dd072edb375ca3366f6b0aa625b499fbfc2228519168",
+        "archive_sha256": "f6b30046f3ab8bfca9dd0bff39176759ef72b66081bee5ed71f62c32ba389fc0",
+        "canary": "network-none",
+        "network": "none",
+        "version": "1.1.6",
+        "verified_assets": 45,
+        "index_sha256": "f5fb4e32bae94994e3bfd41b2625908b15dcebc2650e64e4d83b07d190d3d388",
+        "docker_health": "healthy",
+        "server_version": "1.1.6",
+        "config_preserved": true,
+        "rss_enabled": true,
+        "rollback_image": "ptmove-nexus:1.1.5-ui.1",
+        "rollback_container": "starpt-v1_1_6-delete-rollback",
+        "container": "starpt",
+        "url": "https://ovh-starpt.star1999.de/",
+        "hashed_paths": 51,
+        "protected_settings": 401
+      }
+    },
+    "image_archive": {
+      "version": "1.1.6",
+      "name": "starpt-v1.1.6-linux-amd64.tar.gz",
+      "bytes": 1066126572,
+      "sha256": "c681a21b30c50282f89a3173a8069b23a5ee0b7413361d2c4ff4f46a596ad4fc",
+      "raw_sha256": "bfa33284776eb9680614c376722304973c44fa34acaf8e2649bfcfb2f8cf62c8",
+      "image_id": "sha256:1d38124bd299e868ac01d7f4cc3e71f5400ed69ab7dd69e43eb79cabad5d3d6d",
+      "source_commit": "7e2cfc2bd7299ac2eb2c45bf585ce76e40140da4",
+      "base_archive_sha256": "bfd6efeaab66ba6f1e6a0d231ffba5b1edfd656eebf1bad3dc4b8b16c18ff285",
+      "config_digest": "sha256:7d48f9a195c3d553ee160d9022c252abe57827d51128bc2be132993b7bb0d792",
+      "oci_blobs": 108
+    },
+    "archive": {
+      "project": "GPT-PTMOVE",
+      "timestamp": "2026-11-27T18:17:14.557785+08:00",
+      "type": "历史发布",
+      "version": "v1.1.6",
+      "path": "D:\\A_GPT\\GPT-BackUp\\GPT-PTMOVE\\2026-11\\GPT-PTMOVE__2026-11-27_181714__历史发布__STARPT-v1.1.6.zip",
+      "bytes": 1084341292,
+      "sha256": "932c37b49ad945d1bf88111604fac16d1fae282f95a0848bbcc174f16e0ddbd7",
+      "oci_blobs_verified": 108,
+      "source_commit": "7e2cfc2bd7299ac2eb2c45bf585ce76e40140da4",
+      "files": {
+        "starpt-v1.1.6-linux-amd64.tar.gz": {
+          "bytes": 1066126572,
+          "sha256": "c681a21b30c50282f89a3173a8069b23a5ee0b7413361d2c4ff4f46a596ad4fc"
+        },
+        "starpt-v1.1.6-linux-amd64.tar.gz.sha256": {
+          "bytes": 100,
+          "sha256": "88f0cf4c9e982abec8117167b21592d64dc6d568cfa4d0f663705ca99df48b9a"
+        },
+        "starpt-v1.1.6-source.zip": {
+          "bytes": 17351357,
+          "sha256": "ee826bef0653a7ed0647373d4a66441927059f83b5928bb4292681b5c0d25f46"
+        },
+        "compose.starpt.yaml": {
+          "bytes": 519,
+          "sha256": "254896964968f45359084332d02e4062fc47f38d2215c91b5b59d270506e5d9b"
+        },
+        "downloader-summary.zip": {
+          "bytes": 860405,
+          "sha256": "c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22"
+        }
+      }
+    },
+    "releases": {
+      "github": {
+        "public": true,
+        "id": 460440886,
+        "url": "https://github.com/Chenyi-1999/gpt-ptmove/releases/tag/v1.1.6",
+        "source_commit": "7e2cfc2bd7299ac2eb2c45bf585ce76e40140da4",
+        "image_sha256": "c681a21b30c50282f89a3173a8069b23a5ee0b7413361d2c4ff4f46a596ad4fc",
+        "assets": [
+          {
+            "name": "compose.starpt.yaml",
+            "size": 519,
+            "digest": "sha256:254896964968f45359084332d02e4062fc47f38d2215c91b5b59d270506e5d9b",
+            "id": 799988879
+          },
+          {
+            "name": "starpt-v1.1.6-linux-amd64.tar.gz.sha256",
+            "size": 100,
+            "digest": "sha256:88f0cf4c9e982abec8117167b21592d64dc6d568cfa4d0f663705ca99df48b9a",
+            "id": 799988878
+          },
+          {
+            "name": "downloader-summary.zip",
+            "size": 860405,
+            "digest": "sha256:c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22",
+            "id": 799988877
+          },
+          {
+            "name": "starpt-v1.1.6-linux-amd64.tar.gz",
+            "size": 1066126572,
+            "digest": "sha256:c681a21b30c50282f89a3173a8069b23a5ee0b7413361d2c4ff4f46a596ad4fc",
+            "id": 799989138
+          }
+        ],
+        "published_at": "2026-11-27T10:21:00Z"
+      },
+      "gitee": {
+        "id": 1376030,
+        "url": "https://gitee.com/star1999/starpt/releases/tag/v1.1.6",
+        "github_image": "https://github.com/Chenyi-1999/gpt-ptmove/releases/download/v1.1.6/starpt-v1.1.6-linux-amd64.tar.gz",
+        "assets": [
+          {
+            "id": 3856276,
+            "name": "compose.starpt.yaml",
+            "size": 519,
+            "sha256": "254896964968f45359084332d02e4062fc47f38d2215c91b5b59d270506e5d9b"
+          },
+          {
+            "id": 3856277,
+            "name": "starpt-v1.1.6-linux-amd64.tar.gz.sha256",
+            "size": 100,
+            "sha256": "88f0cf4c9e982abec8117167b21592d64dc6d568cfa4d0f663705ca99df48b9a"
+          },
+          {
+            "id": 3856278,
+            "name": "downloader-summary.zip",
+            "size": 860405,
+            "sha256": "c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22"
+          }
+        ]
+      }
+    },
+    "verification": {
+      "go_linux_full_suite": true,
+      "frontend_tests": 10,
+      "browser_viewports_px": [
+        1440,
+        390,
+        320
+      ],
+      "browser_primary_scenarios": 4,
+      "browser_failure_scenarios": 2,
+      "ovh_rss_cycle_completed": true,
+      "protected_81_accessed": false
+    }
   }
 }
