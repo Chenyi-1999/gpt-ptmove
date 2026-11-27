@@ -889,3 +889,10 @@
 - 更新 nexus/VERSION、nexus/server/internal/bootstrap/fork_update.go、nexus/Dockerfile.ptmove、两个 STARPT Compose 和 docs/RELEASE-v1.1.5.md。没有修改站点档案接口和导入规则。
 - Vue 类型检查、定向 ESLint、Vite 生产构建及 10 项 Node 测试通过。隔离 Edge 实测 1440、390 和 320px，下载内容与文档逐字节相同，复制与回退、焦点和原导入入口正常，无写 API、外网访问或页面错误。截图及报告位于 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/site-profile-guide-20261127。未验证物理手机，Vite 保留已有大分包提示。
 - 152 的 Linux Go 全量测试、离线容器中的健康、版本、示例 JSON 和匿名 401 检查通过。152 已上线 v1.1.5，源站文件哈希、数据挂载和配置核对通过。保留原镜像与 SQLite 一致性快照。记录时本次源码提交、双仓发行、完整镜像归档和 OVH 切换待执行。未手动下载或发种，未操作 81。
+
+
+## PTM-20261127-SITE-PROFILE-GUIDE-V115-RELEASE — 2026-11-27T13:23:11+08:00 — Codex root，v1.1.5 部署、发行和归档回执
+
+- 更新 docs/DEPLOYMENT.json。152 与 OVH 的隔离候选和生产容器验证通过，均运行 v1.1.5，后端与前端内容哈希分别一致。公网入口分别核对 49 个页面或文件、健康及未认证 401。配置和数据挂载比对一致，保留回退镜像或容器以及 SQLite 一致性快照。OVH 已观测到切换后完成一次原有 RSS 周期且重启次数为 0。
+- 源码 b036d208154cc2d8dbe983994afea459e1ebce69 与 v1.1.5 标签已同步两仓。GitHub 公开发行 460196648 已核对完整 Docker 镜像、Compose、校验文件和示例插件。Gitee 私有发行 1374617 提供同版完整镜像入口及三个小附件，附件已授权回读并比对。
+- 152 验证的完整镜像 SHA-256 为 bfd6efeaab66ba6f1e6a0d231ffba5b1edfd656eebf1bad3dc4b8b16c18ff285，D 盘发布 ZIP 验证 105 个 OCI 对象和 ZIP CRC，已登记归档索引。未手动下载、发种或操作 81。原主工作区仍有未提交改动，本次使用独立工作树。记录时本回执的单独提交和推送待执行。
