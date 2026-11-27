@@ -99,11 +99,14 @@
                   :disabled="saving || index === sources.length - 1"
                   @click="moveSource(index, 1)"
                 />
-                <HoldButton
-                  compact
-                  :label="'删除第 ' + (index + 1) + ' 条来源'"
+                <el-button
+                  plain
+                  type="danger"
+                  :icon="Delete"
+                  :aria-label="'删除第 ' + (index + 1) + ' 条来源'"
+                  :title="'删除第 ' + (index + 1) + ' 条来源'"
                   :disabled="saving"
-                  @hold="sources.splice(index, 1)"
+                  @click="sources.splice(index, 1)"
                 />
               </div>
               <p
@@ -121,8 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, Plus } from '@element-plus/icons-vue'
-import HoldButton from '@/components/HoldButton.vue'
+import { ArrowDown, ArrowUp, Delete, Plus } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { onMounted, ref } from 'vue'
 import { ElMessage } from '@/utils/uiNotify'

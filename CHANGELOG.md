@@ -921,3 +921,11 @@
 ## PTM-20261127-ALIGNMENT-RECEIPT — 2026-11-27T16:08:20+08:00 — Codex root，部署回执推送与时区补记
 
 - 前条回执的公网验收时间为 2026-11-27T16:07:06+08:00（Asia/Shanghai），以 docs/DEPLOYMENT.json 为准。回执提交 bdc03132d7100dc95cdd6636325ea37ec7f4114b 已核对 GitHub 与 Gitee master。此条只追加于 CHANGELOG.md，无代码变更或再次部署。记录时此条的提交及推送待执行。
+
+
+## PTM-20261127-DELETE-IMPACT — 2026-11-27T18:13:47+08:00 — Codex root / site_guide_review / ptgen_review，按影响区分点击和长按删除
+
+- 修改 nexus/webui/src/components/settings/{DownloaderSettings,PTGenSourcesSettings}.vue。下载器路径映射、PTGen 来源在草稿中点击移除，保存才生效。新添加的下载器可点击移除，成功保存后改用原有 2 秒长按。站点、已保存下载器、背景文件、批量种子资料、发布记录及机器密钥的长按保护沿用原流程，自定义标签使用原有 ×。
+- 路径映射保存只把新规则放进提交的请求，成功后才更新表单记录，避免失败后取消仍隐性删规则。保存期间禁止重复提交。同步 nexus/VERSION、版本接口、Docker 标签、两个 Compose 和 docs/RELEASE-v1.1.6.md。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 生产构建和差异检查通过。Edge 隔离夹具 4 组主流程和 2 组故障回归通过，覆盖 1440/390/320px、普通点击与受保护长按、保存后状态切换、保存失败取消。没有真实删除、外部请求或页面错误。报告和七张截图在 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/starpt-delete-by-impact-20261127。Vite 保留既有分包提示。
+- 152 Linux Go 全量测试、断网候选健康/版本/资源/匿名 401 通过。152 已上线 v1.1.6，45 个静态文件、配置及挂载完成核对，保留回滚镜像、Compose 与 SQLite 一致性快照。未手动下载、发种或操作 81。记录时提交、发行、OVH 切换及归档待执行。

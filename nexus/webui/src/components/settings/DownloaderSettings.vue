@@ -3,7 +3,9 @@
     <header class="downloader-page__header star-surface">
       <h2 id="downloaders-title" class="settings-section-title">下载器</h2>
       <div class="top-actions">
-        <el-button @click="addDownloader" :icon="Plus">添加下载器</el-button>
+        <el-button @click="addDownloader" :icon="Plus" :disabled="isLoading || isSaving">
+          添加下载器
+        </el-button>
         <el-button type="primary" @click="saveSettings" :loading="isSaving" :icon="Select">
           保存所有设置
         </el-button>
@@ -85,10 +87,23 @@
                 :aria-label="downloader.name ? '启用 ' + downloader.name : '启用下载器'"
               />
 
+              <el-button
+                v-if="draftDownloaderIds.has(downloader.id)"
+                class="delete-draft-button"
+                plain
+                type="danger"
+                :icon="Delete"
+                :disabled="isLoading || isSaving"
+                aria-label="移除未保存的下载器"
+                title="移除未保存的下载器"
+                @click="deleteDownloader(downloader.id)"
+              />
               <HoldButton
+                v-else
                 compact
                 appearance="toolbar"
                 :label="downloader.name ? '删除 ' + downloader.name : '删除下载器'"
+                :disabled="isLoading || isSaving"
                 @hold="confirmDeleteDownloader(downloader.id)"
               />
             </div>
@@ -304,12 +319,15 @@
           <el-input v-model="mapping.local" placeholder="例如：/app/data/qb1" class="mapping-input">
             <template #prepend>视频文件路径</template>
           </el-input>
-          <HoldButton
+          <el-button
             class="mapping-item__remove"
-            compact
-            appearance="toolbar"
-            label="删除此映射规则"
-            @hold="deletePathMapping(mapping)"
+            plain
+            type="danger"
+            :icon="Delete"
+            :disabled="isSaving"
+            aria-label="删除此映射规则"
+            title="删除此映射规则"
+            @click="deletePathMapping(mapping)"
           />
         </div>
       </div>
@@ -326,7 +344,7 @@
 
     <template #footer>
       <el-button @click="pathMappingDialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="savePathMappings">确定</el-button>
+      <el-button type="primary" :loading="isSaving" @click="savePathMappings">确定</el-button>
     </template>
   </el-dialog>
 </template>
@@ -335,7 +353,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
-import { Plus, Select, Link, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import { Delete, Plus, Select, Link, FolderOpened, Refresh } from '@element-plus/icons-vue'
 import HoldButton from '@/components/HoldButton.vue'
 import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import { ElMessage } from '@/utils/uiNotify'
@@ -385,6 +403,7 @@ const settings = ref<SettingsState>({
 })
 const isLoading = ref(true)
 const isSaving = ref(false)
+const draftDownloaderIds = ref(new Set<string>())
 const testingConnectionId = ref<string | null>(null)
 const connectionTestResults = ref<Record<string, ConnectionTestStatus | undefined>>({})
 const API_BASE_URL = '/api'
@@ -521,6 +540,7 @@ const fetchSettings = async () => {
       realtime_speed_enabled:
         typeof raw.realtime_speed_enabled === 'boolean' ? raw.realtime_speed_enabled : true,
     }
+    draftDownloaderIds.value.clear()
   } catch (error) {
     ElMessage.error('加载设置失败！')
     console.error(error)
@@ -529,9 +549,10 @@ const fetchSettings = async () => {
   }
 }
 
-const settingsPayload = () => ({
+const settingsPayload = (editedDownloader?: DownloaderConfig) => ({
   ...settings.value,
-  downloaders: settings.value.downloaders.map((downloader) => {
+  downloaders: settings.value.downloaders.map((item) => {
+    const downloader = editedDownloader?.id === item.id ? editedDownloader : item
     const payload = Object.fromEntries(
       Object.entries(downloader).filter(
         ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
@@ -542,10 +563,17 @@ const settingsPayload = () => ({
   }),
 })
 
+const persistSettings = async (payload = settingsPayload()) => {
+  const savedIds = settings.value.downloaders.map(({ id }) => id)
+  await axios.post(`${API_BASE_URL}/settings`, payload)
+  for (const id of savedIds) draftDownloaderIds.value.delete(id)
+}
+
 const saveSettings = async () => {
+  if (isSaving.value) return
   isSaving.value = true
   try {
-    await axios.post(`${API_BASE_URL}/settings`, settingsPayload())
+    await persistSettings()
     ElMessage.success('设置已成功保存并应用！')
     // 关键：删除/停用下载器后，TorrentsView 的下载器筛选列表使用缓存，
     // 不强制刷新会导致“已删除下载器仍可筛选”的错觉。
@@ -561,6 +589,7 @@ const saveSettings = async () => {
 
 const addDownloader = () => {
   const id = `new_${Date.now()}`
+  draftDownloaderIds.value.add(id)
   settings.value.downloaders.push({
     id,
     enabled: true,
@@ -585,7 +614,7 @@ const addDownloader = () => {
 }
 
 const confirmDeleteDownloader = (downloaderId: string) => {
-  ElMessageBox.confirm('您确定要删除这个下载器配置吗？此操作不可撤销。', '警告', {
+  ElMessageBox.confirm('保存设置后会移除该下载器连接。', '删除下载器', {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
     type: 'warning',
@@ -602,6 +631,7 @@ const confirmDeleteDownloader = (downloaderId: string) => {
 
 const deleteDownloader = (downloaderId: string) => {
   settings.value.downloaders = settings.value.downloaders.filter((d) => d.id !== downloaderId)
+  draftDownloaderIds.value.delete(downloaderId)
 }
 
 const resetConnectionStatus = (downloaderId: string) => {
@@ -701,21 +731,21 @@ const deletePathMapping = (mapping: (typeof currentPathMappings.value)[number]) 
 }
 
 const savePathMappings = async () => {
+  if (isSaving.value) return
   // 过滤掉空的映射规则
   const validMappings = currentPathMappings.value.filter(
     (mapping) => mapping.remote.trim() !== '' && mapping.local.trim() !== '',
   )
-  // 更新当前下载器的路径映射
-  if (!currentDownloader.value) {
+  const downloader = currentDownloader.value
+  if (!downloader) {
     ElMessage.error('未选择要保存的下载器')
     return
   }
-  currentDownloader.value.path_mappings = validMappings
 
-  // 立即保存到配置文件
   isSaving.value = true
   try {
-    await axios.post(`${API_BASE_URL}/settings`, settingsPayload())
+    await persistSettings(settingsPayload({ ...downloader, path_mappings: validMappings }))
+    downloader.path_mappings = validMappings
     pathMappingDialogVisible.value = false
     ElMessage.success('路径映射已保存！')
     fetchSettings()
@@ -951,6 +981,13 @@ const savePathMappings = async () => {
 
 .mapping-input {
   min-width: 0;
+}
+
+.header-controls > .delete-draft-button,
+.mapping-item__remove {
+  width: var(--settings-action-height);
+  height: var(--settings-action-height);
+  padding: 0;
 }
 
 .mapping-input :deep(.el-input-group__prepend) {
