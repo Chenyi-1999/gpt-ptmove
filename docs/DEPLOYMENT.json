@@ -3363,5 +3363,43 @@
       "github_master": "4fb6e6d4e1de40ffaa2053ef61b17530c64a5714"
     },
     "protected_81_operated": false
+  },
+  "starpt_local_query_visibility_20261128": {
+    "source_commit": "191725e99706278b4494ccbd12d41f2746af3246",
+    "ovh_read_only_diagnosis": {
+      "downloader": "ovh-qb",
+      "qb_version": "v5.3.1",
+      "qb_task_count": 86,
+      "indexed_torrents": 0,
+      "save_path": "/mnt/data/01PTDoenLoad",
+      "exists_on_host": true,
+      "mounted_in_starpt": false
+    },
+    "verified_152": {
+      "url": "http://152.136.236.238:18120/sites",
+      "image": "ptmove-nexus:1.1.7-local-query.1",
+      "id": "sha256:d8cfdcb9d734b0d8c3c3f6262ace0cf37507ec8bde48a0e24fc32716b32f19b9",
+      "revision": "191725e99706278b4494ccbd12d41f2746af3246",
+      "previous_image": "ptmove-nexus:1.1.6-remote-scan.1",
+      "runtime_config_preserved": true,
+      "sqlite_index_preserved": true,
+      "cached_torrents": 467,
+      "visible_indexed": 332,
+      "preserved_remote_paths": 5,
+      "assets_and_routes_verified": 47,
+      "wasm_bundle_installed_to_keep_existing_plugin": true,
+      "rss_still_disabled": true,
+      "restart_count": 0,
+      "isolated_qb_reads_only": true,
+      "isolated_local_scan": {
+        "test_tasks": 3,
+        "missing_in_mounted_path": 1,
+        "orphaned_in_mounted_path": 1,
+        "unmounted_path_unverified": true
+      },
+      "public_page_and_asset_verified": true
+    },
+    "ovh_updated": false,
+    "protected_81_operated": false
   }
 }
