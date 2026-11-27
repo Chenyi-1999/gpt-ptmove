@@ -953,3 +953,11 @@
 - 同步已通过浏览器验收的 nexus/webui/dist 45 个文件和 nexus/proxy/pt-nexus-box-proxy 的 Linux amd64 构建。飞牛领单端和媒体代理构建 Linux amd64 与 arm64 二进制。本次不创建发行标签。
 - 152 当前 STARPT 为 1.1.6，Hub 为 0.3.1-pull.3。经用户确认的专用中转登录独立飞牛 star-SSD，实际领单端为 0.3.1-pull.5、媒体代理为 0.3.1-mediainfo.1，现场确认 /keep、/temp 均只读挂载。没有操作 81 本机或中转配置。
 - 既有模拟测试结果见 PTM-20261127-REMOTE-LOCAL-QUERY。记录时构建产物已生成，候选容器、生产切换和实扫待验证，提交、推送和发布待执行。
+
+
+## PTM-20261127-REMOTE-LOCAL-QUERY-COMPAT — 2026-11-27T21:33:13+08:00 — Codex root / deploy_plan / client_route，保留线上领单能力
+
+- 首轮 152 本体与 Hub 切换通过基础探针。飞牛管理页验收未通过，两次飞牛候选切换均恢复原容器。核对发现仓库领单源码早于运行版本，152 Hub 也恢复旧版以保留既有 qB 添加能力，STARPT 扫描页面继续上线。
+- 对照 152 的 Hub 0.3.1-pull.3 与飞牛 0.3.1-pull.5 源码。同步 nexus/proxy/pull/{agent,hub,protocol,qb_add,admin_link,admin_server}.go、原有回归测试、admin.html、Dockerfile、compose.agent-admin.yaml。保留局域网管理页、原有连接状态、旧 qB 许可和 81 应用连接限制。扫描只增加原有 HTTPS 通道上的两项只读请求。保持 media Dockerfile.nas 的 UTF-8 和 runtime_helpers.go 的 ffprobe stderr 回退，同步媒体构建产物与 docs/REMOTE_SCREENSHOTS.md。
+- Windows 两个 Go 模块测试通过。152 断网容器领单 29 项和媒体代理 12 项均通过，涵盖原有管理和 qB 请求校验、扫描回传与路径保护。此时已核对飞牛目录 /keep/TEST 的 29 项选中任务有 3 个预期路径缺失及 0 个孤立，正式 STARPT 链路复测待切换。
+- 首轮提交 bdf2bd5。记录时本次兼容修正提交、最终切换和实扫待执行，未推送或发布，未操作 81 本机或中转配置。

@@ -18,9 +18,11 @@ import (
 )
 
 const (
-	maxRequestBytes  = 64 << 10
-	maxResponseBytes = 32 << 20
-	claimWait        = 20 * time.Second
+	maxRequestBytes        = 64 << 10
+	maxResponseBytes       = 32 << 20
+	claimWait              = 20 * time.Second
+	qbAddURI               = "/api/v2/torrents/add"
+	maxTorrentRequestBytes = 4 << 20
 )
 
 type Job struct {
@@ -45,10 +47,18 @@ type Result struct {
 	Body        []byte `json:"body,omitempty"`
 }
 
-// validateJob 保留截图和 qB 只读请求的必要接口。每端独立校验。
+func jobRequestLimit(lane, method, uri string) int64 {
+	if lane == "qb" && method == http.MethodPost && uri == qbAddURI {
+		return maxTorrentRequestBytes
+	}
+	return maxRequestBytes
+}
+
+// validateJob 在 Hub 和 Agent 分别校验允许转发的请求。
 func validateJob(j Job) error {
 	if len(j.URI) > 16<<10 || !strings.HasPrefix(j.URI, "/") || strings.HasPrefix(j.URI, "//") ||
-		strings.ContainsAny(j.URI, "\\#\r\n\x00") || len(j.Body) > maxRequestBytes || !validContentType(j.ContentType) {
+		strings.ContainsAny(j.URI, "\\#\r\n\x00") ||
+		int64(len(j.Body)) > jobRequestLimit(j.Lane, j.Method, j.URI) || !validContentType(j.ContentType) {
 		return errors.New("invalid task request")
 	}
 	u, err := url.ParseRequestURI(j.URI)
@@ -57,8 +67,11 @@ func validateJob(j Job) error {
 	}
 	switch j.Lane {
 	case "qb":
+		if j.Method == http.MethodPost && j.URI == qbAddURI {
+			return validateQBAdd(j.ContentType, j.Body)
+		}
 		if j.Method != http.MethodGet || len(j.Body) != 0 {
-			return errors.New("qB endpoint is read-only")
+			return errors.New("qB endpoint or method not allowed")
 		}
 		if j.URI == localScanReferencesURI {
 			return nil

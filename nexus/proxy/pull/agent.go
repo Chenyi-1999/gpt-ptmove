@@ -26,7 +26,7 @@ import (
 const (
 	agentQBOrigin    = "http://127.0.0.1:8080"
 	agentMediaOrigin = "http://127.0.0.1:19090"
-	agentClaimLimit  = 2 * maxRequestBytes
+	agentClaimLimit  = maxTorrentRequestBytes*4/3 + 8192
 	agentMinBackoff  = 250 * time.Millisecond
 )
 
@@ -45,18 +45,6 @@ type pullAgent struct {
 }
 
 func runAgent() error {
-	origin, err := agentCoordinatorOrigin(os.Getenv("PTMOVE_PULL_URL"))
-	if err != nil {
-		return err
-	}
-	roots, err := agentRootCAs(os.Getenv("PTMOVE_PULL_CA"))
-	if err != nil {
-		return err
-	}
-	token, err := secret("PTMOVE_PULL_TOKEN")
-	if err != nil {
-		return err
-	}
 	qbToken, err := secret("PTMOVE_QB_TOKEN")
 	if err != nil {
 		return err
@@ -66,20 +54,50 @@ func runAgent() error {
 		return err
 	}
 	agent := &pullAgent{
-		origin: origin,
-		token:  token,
-		coordinator: newAgentClient(&tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    roots,
-		}, false),
 		local: newAgentClient(nil, true),
 		qb:    agentTarget{origin: agentQBOrigin, token: qbToken},
 		media: agentTarget{origin: agentMediaOrigin, token: mediaToken},
 	}
-	defer agent.coordinator.CloseIdleConnections()
 	defer agent.local.CloseIdleConnections()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if address := os.Getenv("PTMOVE_PULL_ADMIN_LISTEN"); address != "" {
+		password, err := secret("PTMOVE_PULL_ADMIN_PASSWORD")
+		if err != nil {
+			return err
+		}
+		links, err := newAgentLinkManager(os.Getenv("PTMOVE_PULL_STATE_FILE"), agent)
+		if err != nil {
+			return err
+		}
+		closeAdmin, err := startAgentAdmin(ctx, address, password, links)
+		if err != nil {
+			links.currentAgent().coordinator.CloseIdleConnections()
+			return err
+		}
+		defer func() {
+			closeAdmin()
+			links.currentAgent().coordinator.CloseIdleConnections()
+		}()
+		agent.runWithCoordinator(ctx, links.currentAgent)
+		return nil
+	}
+
+	agent.origin, err = agentCoordinatorOrigin(os.Getenv("PTMOVE_PULL_URL"))
+	if err != nil {
+		return err
+	}
+	roots, err := agentRootCAs(os.Getenv("PTMOVE_PULL_CA"))
+	if err != nil {
+		return err
+	}
+	agent.token, err = secret("PTMOVE_PULL_TOKEN")
+	if err != nil {
+		return err
+	}
+	agent.coordinator = newAgentClient(&tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}, false)
+	defer agent.coordinator.CloseIdleConnections()
 	agent.run(ctx)
 	return nil
 }
@@ -153,24 +171,43 @@ func newAgentClient(tlsConfig *tls.Config, local bool) *http.Client {
 }
 
 func (a *pullAgent) run(ctx context.Context) {
+	a.runWithCoordinator(ctx, func() *pullAgent { return a })
+}
+
+func (a *pullAgent) runWithCoordinator(ctx context.Context, currentAgent func() *pullAgent) {
 	var workers sync.WaitGroup
 	workers.Add(2)
 	go func() {
 		defer workers.Done()
-		a.runLane(ctx, "qb", a.qb)
+		runAgentLane(ctx, "qb", a.qb, currentAgent)
 	}()
 	go func() {
 		defer workers.Done()
-		a.runLane(ctx, "media", a.media)
+		runAgentLane(ctx, "media", a.media, currentAgent)
 	}()
 	workers.Wait()
 }
 
-func (a *pullAgent) runLane(ctx context.Context, lane string, target agentTarget) {
+func runAgentLane(ctx context.Context, lane string, target agentTarget, currentAgent func() *pullAgent) {
 	claimBody, _ := json.Marshal(Claim{Lane: lane})
 	backoff := agentMinBackoff
+	var previous *pullAgent
 	for ctx.Err() == nil {
+		// Use the same coordinator for the claim and any result associated with
+		// it, even when the administrator changes the address mid-request.
+		a := currentAgent()
+		if a != previous {
+			backoff = agentMinBackoff
+			previous = a
+		}
 		job, err := a.claim(ctx, lane, claimBody)
+		if err == nil && job != nil {
+			a.finishJob(ctx, target, *job)
+		}
+		if a != currentAgent() {
+			a.coordinator.CloseIdleConnections()
+			continue
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				return
@@ -183,13 +220,9 @@ func (a *pullAgent) runLane(ctx context.Context, lane string, target agentTarget
 			continue
 		}
 		backoff = agentMinBackoff
-		if job == nil {
-			if !agentPause(ctx, backoff) {
-				return
-			}
-			continue
+		if job == nil && !agentPause(ctx, backoff) {
+			return
 		}
-		a.finishJob(ctx, target, *job)
 	}
 }
 
@@ -266,7 +299,14 @@ func (a *pullAgent) execute(ctx context.Context, target agentTarget, job Job) Re
 		result.Body = []byte(message + "\n")
 		return result
 	}
-	if validateJob(job) != nil {
+	body := job.Body
+	if job.Lane == "qb" && job.Method == http.MethodPost && job.URI == qbAddURI {
+		var err error
+		body, err = qbAddBody(job.ContentType, body, true)
+		if err != nil {
+			return fail(http.StatusBadRequest, "local request denied")
+		}
+	} else if validateJob(job) != nil {
 		return fail(http.StatusBadRequest, "local request denied")
 	}
 	upstreamURI := job.URI
@@ -274,7 +314,7 @@ func (a *pullAgent) execute(ctx context.Context, target agentTarget, job Job) Re
 	if scanReferences {
 		upstreamURI = "/api/v2/torrents/info?filter=all"
 	}
-	request, err := http.NewRequestWithContext(ctx, job.Method, target.origin+upstreamURI, bytes.NewReader(job.Body))
+	request, err := http.NewRequestWithContext(ctx, job.Method, target.origin+upstreamURI, bytes.NewReader(body))
 	if err != nil {
 		return fail(http.StatusBadRequest, "invalid local request")
 	}

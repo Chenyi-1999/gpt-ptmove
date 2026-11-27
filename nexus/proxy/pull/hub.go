@@ -30,13 +30,13 @@ var (
 )
 
 type hubTask struct {
-	job     Job
-	caller  context.Context
-	due     time.Time
-	timer   *time.Timer
-	done    chan struct{}
-	result  Result
-	err     error
+	job    Job
+	caller context.Context
+	due    time.Time
+	timer  *time.Timer
+	done   chan struct{}
+	result Result
+	err    error
 }
 
 type hubReceipt struct {
@@ -225,7 +225,7 @@ func (h *pullHub) localHandler(name string) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, jobRequestLimit(name, r.Method, r.RequestURI)))
 		if err != nil {
 			writeHubBodyError(w, err)
 			return

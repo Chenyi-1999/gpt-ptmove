@@ -136,8 +136,17 @@ func extractMediaInfo(targetFile string) (string, error) {
 	if output, err := executeCommandWithTimeout(10*time.Minute, "mediainfo", "--Output=text", targetFile); err == nil && strings.TrimSpace(output) != "" {
 		return strings.TrimSpace(output), nil
 	}
-	if output, err := executeCommandWithTimeout(10*time.Minute, "ffprobe", "-hide_banner", "-i", targetFile); err == nil && strings.TrimSpace(output) != "" {
-		return strings.TrimSpace(output), nil
+	// ffprobe writes its human-readable stream summary to stderr, while MediaInfo
+	// writes its report to stdout. Capture both streams so fallback works.
+	stdout, stderr, err := executeCommandWithTimeoutAndStderr(10*time.Minute, "ffprobe", "-hide_banner", "-i", targetFile)
+	if err == nil {
+		output := strings.TrimSpace(stdout)
+		if output == "" {
+			output = strings.TrimSpace(stderr)
+		}
+		if output != "" {
+			return output, nil
+		}
 	}
 	return "", fmt.Errorf("failed to extract media info; install mediainfo or ffprobe, or configure PTNEXUS_MEDIAINFO_PATH / PTNEXUS_FFPROBE_PATH")
 }

@@ -154,7 +154,7 @@ func runScanPullJob(t *testing.T, job Job, targetToken string, handler http.Hand
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		a.runLane(ctx, job.Lane, agentTarget{origin: target.URL, token: targetToken})
+		runAgentLane(ctx, job.Lane, agentTarget{origin: target.URL, token: targetToken}, func() *pullAgent { return &a })
 	}()
 	defer func() {
 		cancel()

@@ -103,9 +103,9 @@ docker buildx build --platform linux/arm64 -f Dockerfile.nas --load -t ptmove-me
 - **152** 运行 `nexus/proxy/pull/compose.hub.yaml`，并加入 PTMove 的 Docker 网络。默认只向公网发布 TLS 端口 `28443`。PTMove 通过 Docker 内网的 `http://ptmove-pull-hub:28380` 查询 qB，媒体代理端口填 `29090`，选择「远程截图与 MediaInfo」。下载器的 API Key 与代理 Token 都填 Hub 的 `controller.token`，飞牛侧的真实 qB Token 放在飞牛。
 - **飞牛** 运行 `nexus/proxy/pull/compose.agent.yaml`。领单容器用宿主网络访问现有的 `127.0.0.1:8080` qB 和 `127.0.0.1:19090` 媒体代理。保留现有媒体容器的只读挂载。领单容器只需要 TLS 信任证书、领单 Token 和两项本机服务凭据。
 - **密钥与证书**。Hub 的目录由 `PTMOVE_PULL_HUB_SECRETS` 指定，文件为 `server.crt`、`server.key`、`agent.token`、`controller.token`。飞牛的目录由 `PTMOVE_PULL_AGENT_SECRETS` 指定，文件为 `controller.crt`（用于校验 152 的证书）、同一 `agent.token`、`qb.token` 和 `media.token`。两个容器默认使用 UID 65534，挂载文件应允许该用户读取。飞牛的 `PTMOVE_PULL_URL` 为例如 `https://152.136.236.238:28443`，TLS 证书需要包含该 IP 或实际域名。
-- **任务边界**。Hub 提供 `POST /v1/claim` 和 `POST /v1/result`，qB 查询和截图分别领取。结果以任务 ID 和租约标识确认，网络重试只回传同一结果。Hub 重启时，尚未完成的请求会失败，已领取的截图任务不会由 Hub 自动重放。该连接的 qB 接口用于查询。下载管理、种子导出和发种需要另外配置。媒体队列正在生成正式截图时，连接探针可能需要等当前任务结束，qB 查询使用独立队列。
+- **任务边界**。Hub 提供 `POST /v1/claim` 和 `POST /v1/result`，qB 查询和截图分别领取。结果以任务 ID 和租约标识确认，网络重试只回传同一结果。Hub 重启时，尚未完成的请求会失败，已领取的截图任务不会由 Hub 自动重放。扫描通过独立的只读入口查询 qB。既有发种后添加种子流程可提交受限的种子表单。该通道不提供通用下载管理、删除和种子导出接口。媒体队列正在生成正式截图时，连接探针可能需要等当前任务结束，qB 查询使用独立队列。
 
-镜像从 `nexus/proxy/pull` 构建，两个服务使用同一镜像。上线前先用该下载器完成连接测试和远程预览，确认截图草稿的写回后再停止旧连接。
+镜像从 `nexus/proxy/pull` 构建，两个服务使用同一镜像。 客户端可叠加 `compose.agent-admin.yaml` 保留管理页及其连接配置，现有部署继续使用原绑定地址和状态卷。上线前先用该下载器完成连接测试和远程预览，确认截图草稿的写回后再停止旧连接。
 
 ### 远程文件查询
 

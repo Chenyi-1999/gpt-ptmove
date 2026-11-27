@@ -3,11 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -290,6 +295,7 @@ func TestHubRoutesCredentialsAndLimits(t *testing.T) {
 	check("agent token cannot call private API", qb, hubRequest(http.MethodGet, "/api/v2/app/version", hubAgentFixture, ""), http.StatusUnauthorized)
 	check("local token cannot claim", h.agentHandler, hubRequest(http.MethodPost, "/v1/claim", hubLocalFixture, `{"lane":"qb"}`), http.StatusUnauthorized)
 	check("qB write denied", qb, hubRequest(http.MethodPost, "/api/v2/torrents/delete", hubLocalFixture, ""), http.StatusForbidden)
+	check("unknown qB write denied", qb, hubRequest(http.MethodPost, "/api/v2/torrents/setCategory", hubLocalFixture, ""), http.StatusForbidden)
 	check("qB alias denied", qb, hubRequest(http.MethodGet, "/api/v2/app/%76ersion", hubLocalFixture, ""), http.StatusForbidden)
 	check("cross lane denied", media, hubRequest(http.MethodGet, "/api/v2/app/version", hubLocalFixture, ""), http.StatusForbidden)
 	check("HTTPS denies private API", h.agentHandler, hubRequest(http.MethodGet, "/api/v2/app/version", hubAgentFixture, ""), http.StatusNotFound)
@@ -303,4 +309,120 @@ func TestHubRoutesCredentialsAndLimits(t *testing.T) {
 	oversizedResult := hubRequest(http.MethodPost, "/v1/result", hubAgentFixture, "")
 	oversizedResult.ContentLength = hubResultLimit + 1
 	check("oversized result", h.agentHandler, oversizedResult, http.StatusRequestEntityTooLarge)
+}
+
+func TestHubAndAgentUploadLargeQBTorrentOnlyOnce(t *testing.T) {
+	var localCalls atomic.Int32
+	var upload bytes.Buffer
+	form := multipart.NewWriter(&upload)
+	part, err := form.CreateFormFile("torrents", "fixture.torrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	comment := strings.Repeat("x", maxRequestBytes+1)
+	const info = "d6:lengthi1e4:name7:fixture12:piece lengthi16384e6:pieces20:abcdefghijklmnopqrst7:privatei1ee"
+	torrent := "d7:comment" + strconv.Itoa(len(comment)) + ":" + comment + "4:info" + info + "e"
+	if _, err := io.WriteString(part, torrent); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+	requestBody := upload.Bytes()
+	if int64(len(requestBody)) <= maxRequestBytes {
+		t.Fatalf("fixture body is only %d bytes", len(requestBody))
+	}
+	local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		localCalls.Add(1)
+		got, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read local upload: %v", err)
+		}
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/api/v2/torrents/add" ||
+			r.Header.Get("Authorization") != "Bearer qb-local-fixture-token" ||
+			r.Header.Get("Content-Type") != form.FormDataContentType() || !bytes.Equal(got, requestBody) {
+			t.Errorf("local upload changed in transit: method=%s uri=%s content-type=%q bytes=%d", r.Method, r.URL.RequestURI(), r.Header.Get("Content-Type"), len(got))
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = io.WriteString(w, "Ok.")
+	}))
+	defer local.Close()
+
+	h := newPullHub(hubAgentFixture, hubLocalFixture)
+	coordinator := httptest.NewTLSServer(http.HandlerFunc(h.agentHandler))
+	defer coordinator.Close()
+	localHub := httptest.NewServer(h.localHandler("qb"))
+	defer localHub.Close()
+
+	rootTransport := coordinator.Client().Transport.(*http.Transport)
+	coordinatorClient := newAgentClient(&tls.Config{RootCAs: rootTransport.TLSClientConfig.RootCAs, MinVersion: tls.VersionTLS12}, false)
+	defer coordinatorClient.CloseIdleConnections()
+	drop := &dropFirstResultResponse{inner: coordinatorClient.Transport}
+	coordinatorClient.Transport = drop
+	agent := &pullAgent{
+		origin: coordinator.URL, token: hubAgentFixture, coordinator: coordinatorClient,
+		local: newAgentClient(nil, true),
+	}
+	defer agent.local.CloseIdleConnections()
+
+	request, err := http.NewRequest(http.MethodPost, localHub.URL+"/api/v2/torrents/add", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+hubLocalFixture)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	callerResult := make(chan *http.Response, 1)
+	callerErr := make(chan error, 1)
+	go func() {
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			callerErr <- err
+			return
+		}
+		callerResult <- response
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	job, err := agent.claim(ctx, "qb", []byte(`{"lane":"qb"}`))
+	if err != nil || job == nil {
+		t.Fatalf("claim large upload: job=%#v err=%v", job, err)
+	}
+	if int64(len(job.Body)) != int64(len(requestBody)) {
+		t.Fatalf("claimed upload body length=%d, want %d", len(job.Body), len(requestBody))
+	}
+	agent.finishJob(context.Background(), agentTarget{origin: local.URL, token: "qb-local-fixture-token"}, *job)
+
+	select {
+	case err := <-callerErr:
+		t.Fatalf("local caller failed: %v", err)
+	case response := <-callerResult:
+		defer response.Body.Close()
+		result, _ := io.ReadAll(response.Body)
+		if response.StatusCode != http.StatusOK || string(result) != "Ok." {
+			t.Fatalf("caller got HTTP %d %q", response.StatusCode, result)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("local caller did not receive the upload result")
+	}
+	if got := drop.attempts.Load(); got != 2 {
+		t.Fatalf("result delivery attempted %d times, want 2", got)
+	}
+	if got := localCalls.Load(); got != 1 {
+		t.Fatalf("qB add executed %d times after ambiguous result delivery, want exactly once", got)
+	}
+}
+
+type dropFirstResultResponse struct {
+	inner    http.RoundTripper
+	attempts atomic.Int32
+}
+
+func (d *dropFirstResultResponse) RoundTrip(r *http.Request) (*http.Response, error) {
+	response, err := d.inner.RoundTrip(r)
+	if err == nil && r.URL.Path == "/v1/result" && d.attempts.Add(1) == 1 {
+		response.Body.Close()
+		return nil, errors.New("simulated ambiguous result delivery")
+	}
+	return response, err
 }

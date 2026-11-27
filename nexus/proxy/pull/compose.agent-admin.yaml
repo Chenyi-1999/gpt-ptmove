@@ -1,0 +1,13 @@
+services:
+  agent:
+    environment:
+      PTMOVE_PULL_ADMIN_LISTEN: "${PTMOVE_PULL_ADMIN_BIND:-127.0.0.1}:${PTMOVE_PULL_ADMIN_PORT:-19447}"
+      PTMOVE_PULL_ADMIN_LAN_CIDR: "${PTMOVE_PULL_ADMIN_LAN_CIDR:-}"
+      PTMOVE_PULL_ADMIN_PASSWORD_FILE: /run/ptmove/agent/admin.password
+      PTMOVE_PULL_STATE_FILE: /var/lib/ptmove-pull/link.json
+    volumes:
+      - type: bind
+        source: ${PTMOVE_PULL_AGENT_STATE:?Set the client configuration directory}
+        target: /var/lib/ptmove-pull
+        bind:
+          create_host_path: false

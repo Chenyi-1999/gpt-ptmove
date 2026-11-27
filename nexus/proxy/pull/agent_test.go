@@ -157,6 +157,11 @@ func TestAgentDoesNotFollowLocalRedirectOrForwardHeaders(t *testing.T) {
 			t.Errorf("local request accepted disallowed URI %q: %+v", uri, result)
 		}
 	}
+	job.Method = http.MethodPost
+	job.URI = "/api/v2/torrents/setCategory"
+	if result := agent.execute(ctx, target, job); result.Status != http.StatusBadRequest {
+		t.Fatalf("agent accepted an unknown qB write path: %+v", result)
+	}
 }
 
 func TestAgentClaimRejectsInvalidEnvelope(t *testing.T) {
