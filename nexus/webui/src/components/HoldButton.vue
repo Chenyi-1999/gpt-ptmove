@@ -3,7 +3,11 @@
   <button
     type="button"
     class="star-hold"
-    :class="{ 'star-hold--compact': compact }"
+    :class="{
+      'star-hold--compact': compact,
+      'star-hold--toolbar': appearance === 'toolbar',
+      'star-hold--text': appearance === 'text',
+    }"
     :data-phase="phase"
     :disabled="disabled"
     :aria-label="label + '（长按 2 秒）'"
@@ -22,8 +26,8 @@
   >
     <span class="star-hold__fill" aria-hidden="true"></span>
     <span class="star-hold__label" aria-hidden="true">
-      <Delete v-if="compact" />
-      <template v-else>{{ phase === 'done' ? '已确认' : '长按' + label }}</template>
+      <Delete v-if="compact || appearance === 'text'" />
+      <slot v-if="!compact">{{ phase === 'done' ? '已确认' : '长按' + label }}</slot>
     </span>
     <span :id="hintId" class="star-hold__hint">按住按钮、空格键或回车键 2 秒，提前松开会取消。</span>
   </button>
@@ -33,7 +37,12 @@
 import { Delete } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, useId, watch } from 'vue'
 
-const props = defineProps<{ label: string; disabled?: boolean; compact?: boolean }>()
+const props = defineProps<{
+  label: string
+  disabled?: boolean
+  compact?: boolean
+  appearance?: 'toolbar' | 'text'
+}>()
 const emit = defineEmits<{ hold: [] }>()
 const hintId = useId()
 const phase = ref<'idle' | 'holding' | 'done'>('idle')
@@ -109,18 +118,21 @@ onUnmounted(() => {
 
 <style scoped>
 .star-hold {
+  --star-hold-size: 40px;
+  --star-hold-progress: var(--star-action);
   position: relative;
   isolation: isolate;
+  box-sizing: border-box;
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  min-height: 40px;
+  min-height: var(--star-hold-size);
   max-width: 100%;
   padding: 0 12px;
-  border: 1px solid #694558;
-  border-radius: 14px;
-  background: #27272a;
-  color: #f5f5f5;
+  border: 1px solid var(--star-border-strong);
+  border-radius: 8px;
+  background: var(--star-surface-muted);
+  color: var(--star-danger);
   font: inherit;
   font-size: 13px;
   font-weight: 650;
@@ -132,20 +144,39 @@ onUnmounted(() => {
   transition: transform 200ms, border-color 200ms, box-shadow 200ms;
 }
 
-.star-hold--compact { width: 40px; padding: 0; }
-.star-hold__label { display: inline-flex; align-items: center; }
-.star-hold__label svg { width: 17px; height: 17px; }
+.star-hold--compact { width: var(--star-hold-size); padding: 0; flex: none; }
+.star-hold__label { display: inline-flex; align-items: center; gap: 6px; line-height: 1; }
+.star-hold__label svg { width: 1em; height: 1em; }
+.star-hold--compact .star-hold__label { font-size: 16px; }
 .star-hold:focus-visible { outline: 2px solid var(--star-accent); outline-offset: 2px; }
 .star-hold:disabled { opacity: 0.5; cursor: not-allowed; }
-.star-hold:not(:disabled):hover { border-color: var(--star-danger); }
+.star-hold:not(:disabled):hover {
+  border-color: var(--star-danger);
+  background: var(--star-danger-soft);
+}
+
+.star-hold--toolbar {
+  --star-hold-size: var(--settings-action-height, 36px);
+  border-radius: 6px;
+}
+
+.star-hold--text {
+  --star-hold-size: var(--settings-action-height, 32px);
+  --star-hold-progress: color-mix(in srgb, var(--star-danger) 22%, var(--star-surface));
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: var(--el-font-size-base);
+  font-weight: 500;
+}
 
 .star-hold__fill {
   position: absolute;
   z-index: -1;
   inset: 0 -6px 0 0;
-  background: #5227ff;
-  border-radius: 0 9px 9px 0;
-  box-shadow: 0 0 9px #ba97ff;
+  background: var(--star-hold-progress);
+  border-radius: 0 6px 6px 0;
   transform: translateX(calc(-100% - 12px));
   transition: transform 200ms ease-out;
 }
@@ -162,9 +193,10 @@ onUnmounted(() => {
 }
 
 .star-hold[data-phase='holding'] {
-  transform: scale(0.97);
-  box-shadow: 0 0 15px #8d64ff70;
+  transform: scale(0.98);
 }
+
+.star-hold:not(.star-hold--text):is([data-phase='holding'], [data-phase='done']) { color: var(--star-ink); }
 
 .star-hold[data-phase='holding'] .star-hold__fill {
   transform: translateX(0);
@@ -192,8 +224,7 @@ onUnmounted(() => {
 }
 
 @media (pointer: coarse) {
-  .star-hold { min-height: 44px; }
-  .star-hold--compact { width: 44px; }
+  .star-hold:not(.star-hold--toolbar, .star-hold--text) { --star-hold-size: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -781,7 +781,7 @@
                     placeholder="输入新标签"
                     @keyup.enter="addCustomTag"
                   />
-                  <el-button type="primary" size="small" @click="addCustomTag">
+                  <el-button type="primary" @click="addCustomTag">
                     添加标签
                   </el-button>
                 </div>
@@ -790,18 +790,16 @@
               <!-- 第四行：标签列表 -->
 
               <el-form-item label="" class="form-item">
-                <div
-                  v-if="tagsForm.tags.tags.length > 0"
-                  style="display: flex; flex-wrap: wrap; gap: 8px"
-                >
-                  <span
+                <div v-if="tagsForm.tags.tags.length > 0" class="settings-inline-actions">
+                  <el-tag
                     v-for="(tag, index) in tagsForm.tags.tags"
                     :key="tag + '-' + index"
-                    class="settings-inline-actions"
+                    size="small"
+                    closable
+                    @close="removeCustomTag(index)"
                   >
-                    <el-tag size="small">{{ tag }}</el-tag>
-                    <HoldButton compact :label="'删除标签 ' + tag" @hold="removeCustomTag(index)" />
-                  </span>
+                    {{ tag }}
+                  </el-tag>
                 </div>
               </el-form-item>
             </template>
@@ -816,10 +814,9 @@
                   <el-input
                     v-model="tagsForm.category.category"
                     placeholder="输入分类名称"
-                    size="small"
                     clearable
                   />
-                  <el-button type="primary" size="small" @click="autoSaveTagsSettings">
+                  <el-button type="primary" @click="autoSaveTagsSettings">
                     保存
                   </el-button>
                 </div>
@@ -2204,11 +2201,18 @@ onMounted(() => {
 }
 
 .settings-inline-actions--input {
+  --settings-field-height: 38px;
   width: 100%;
 }
 
 .settings-inline-actions--input .el-input {
   flex: 1 1 128px;
+}
+
+.settings-inline-actions--input :deep(.el-input__wrapper),
+.settings-inline-actions--input > .el-button {
+  box-sizing: border-box;
+  min-height: var(--settings-field-height);
 }
 
 .iyuu-log-list {

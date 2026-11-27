@@ -896,3 +896,15 @@
 - 更新 docs/DEPLOYMENT.json。152 与 OVH 的隔离候选和生产容器验证通过，均运行 v1.1.5，后端与前端内容哈希分别一致。公网入口分别核对 49 个页面或文件、健康及未认证 401。配置和数据挂载比对一致，保留回退镜像或容器以及 SQLite 一致性快照。OVH 已观测到切换后完成一次原有 RSS 周期且重启次数为 0。
 - 源码 b036d208154cc2d8dbe983994afea459e1ebce69 与 v1.1.5 标签已同步两仓。GitHub 公开发行 460196648 已核对完整 Docker 镜像、Compose、校验文件和示例插件。Gitee 私有发行 1374617 提供同版完整镜像入口及三个小附件，附件已授权回读并比对。
 - 152 验证的完整镜像 SHA-256 为 bfd6efeaab66ba6f1e6a0d231ffba5b1edfd656eebf1bad3dc4b8b16c18ff285，D 盘发布 ZIP 验证 105 个 OCI 对象和 ZIP CRC，已登记归档索引。未手动下载、发种或操作 81。原主工作区仍有未提交改动，本次使用独立工作树。记录时本回执的单独提交和推送待执行。
+
+## PTM-20261127-CONTEXTUAL-DELETE-ALIGNMENT — 2026-11-27T13:41:34+08:00 — Codex root / site_filters / compact_switch，精简删除入口并对齐设置控件
+
+- 从 v1.1.5 部署回执 42a07cd 建立独立工作树。nexus/webui/src/components/settings/GeneralSettings.vue 恢复标签内 Element Plus 原生 ×，沿用单个标签删除与自动保存。标签、分类两组输入框及按钮统一为 38px。
+- 修改 components/HoldButton.vue 与 components/settings/{SitesSettings,DownloaderSettings}.vue。长按按钮沿用原确认和进度逻辑，外观改用主题色。站点编辑和删除以同高 32px 的文字操作排列。下载器颜色、测试、路径映射、开关点击区与删除统一 36px，开关可见滑轨仍为 18px。修复窄屏路径映射中的删除按钮栅格位置。
+- Vite 构建、Vue 类型检查、定向 ESLint、10 项 Node 测试及 git diff --check 通过。Edge 离线夹具实测 1440/667/390/320px，验证按钮尺寸、中心线、窄屏无整体横向溢出。点小 × 只删除目标标签并发出一次模拟保存。站点单击删除无效，键盘长按进入原确认框并取消；下载器开关可用空格键，提前松开删除按钮不弹确认。无页面错误、无外部请求。首次截图测试发现默认输入框高 38px 但默认按钮高 32px，改用局部统一尺寸后复测通过。截图及报告在 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/starpt-alignment-20261127。
+- 本轮为本地界面调整和验收，保存在 codex/starpt-control-alignment。未提交、合并、推送、发行或部署。未访问任何项目服务器。未在物理手机和已登录生产界面验证。
+
+## PTM-20261127-ALIGNMENT-DEPLOY — 2026-11-27T16:03:45+08:00 — Codex root / rollout_review，准备双机推送设置对齐修订
+
+- 承接 PTM-20261127-CONTEXTUAL-DELETE-ALIGNMENT。生产构建与上一轮桌面和移动隔离测试使用的 45 个前端文件逐文件 SHA-256 比对一致。dist 与对应源码、记录一并提交。前端传输归档 SHA-256 203ed74c0a1a9b339cb1f51112421fe919e5ea88d6e50e4db38cb90ed266d486。
+- 已确认 152 与 OVH 的当前 v1.1.5 容器健康以及项目数据路径，分别基于各自现有镜像准备 1.1.5-ui.1，仅更新前端资源。先进行断网候选验证，再逐台切换，保留原镜像或原容器及数据快照。正式 v1.1.5 标签保留。记录时生产切换及远端推送待执行。

@@ -229,10 +229,19 @@
         </el-table-column>
         <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="scope">
-            <el-button type="primary" :icon="Edit" link @click="handleOpenDialog(scope.row)">
-              编辑
-            </el-button>
-            <HoldButton :key="scope.row.id" compact label="删除站点" @hold="handleDelete(scope.row)" />
+            <div class="site-row-actions">
+              <el-button type="primary" :icon="Edit" link @click="handleOpenDialog(scope.row)">
+                编辑
+              </el-button>
+              <HoldButton
+                :key="scope.row.id"
+                appearance="text"
+                label="删除站点"
+                @hold="handleDelete(scope.row)"
+              >
+                删除
+              </HoldButton>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -947,6 +956,20 @@ const handleDelete = (site: SiteConfig) => {
 .settings-table {
   width: 100%;
   border-radius: inherit;
+}
+
+.site-row-actions {
+  --settings-action-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.site-row-actions .el-button {
+  min-height: var(--settings-action-height);
+  padding: 0 4px;
+  border: 0;
 }
 
 .settings-footer {

@@ -87,6 +87,7 @@
 
               <HoldButton
                 compact
+                appearance="toolbar"
                 :label="downloader.name ? '删除 ' + downloader.name : '删除下载器'"
                 @hold="confirmDeleteDownloader(downloader.id)"
               />
@@ -303,7 +304,13 @@
           <el-input v-model="mapping.local" placeholder="例如：/app/data/qb1" class="mapping-input">
             <template #prepend>视频文件路径</template>
           </el-input>
-          <HoldButton compact label="删除此映射规则" @hold="deletePathMapping(mapping)" />
+          <HoldButton
+            class="mapping-item__remove"
+            compact
+            appearance="toolbar"
+            label="删除此映射规则"
+            @hold="deletePathMapping(mapping)"
+          />
         </div>
       </div>
 
@@ -802,13 +809,30 @@ const savePathMappings = async () => {
 }
 
 .header-controls {
+  --settings-action-height: 36px;
   max-width: 100%;
+}
+
+.downloader-color-controls {
+  display: flex;
+  align-items: center;
+}
+
+.header-controls > .el-button,
+.header-controls :deep(.el-switch) {
+  height: var(--settings-action-height);
+  min-height: var(--settings-action-height);
+}
+
+.header-controls > .el-button {
+  padding-inline: 11px;
 }
 
 .downloader-color-trigger {
   display: grid;
-  width: 36px;
-  height: 36px;
+  box-sizing: border-box;
+  width: var(--settings-action-height);
+  height: var(--settings-action-height);
   padding: 7px;
   place-items: center;
   border: 1px solid var(--star-border-strong);
@@ -918,6 +942,7 @@ const savePathMappings = async () => {
 }
 
 .mapping-item {
+  --settings-action-height: var(--el-component-size);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   align-items: center;
@@ -941,20 +966,10 @@ const savePathMappings = async () => {
     width: 100%;
   }
 
-  .top-actions > .el-button,
-  .header-controls > .el-button,
-  .downloader-color-trigger {
-    min-height: 44px;
-  }
-
-  .downloader-color-trigger {
-    width: 44px;
-  }
-
   .top-actions > .el-button {
+    min-height: 44px;
     flex: 1 1 auto;
   }
-
 
   .downloader-card :deep(.el-card__header),
   .downloader-card :deep(.el-card__body) {
@@ -969,7 +984,7 @@ const savePathMappings = async () => {
     grid-column: 1;
   }
 
-  .mapping-item > .el-button {
+  .mapping-item__remove {
     grid-column: 2;
     grid-row: 1 / span 2;
   }
