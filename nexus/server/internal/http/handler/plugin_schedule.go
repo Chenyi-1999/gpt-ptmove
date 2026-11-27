@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pt-nexus/server/internal/service/plugins"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -45,6 +46,10 @@ func (h *pluginHandler) wakeSchedules() {
 
 func (h *pluginHandler) getSchedule(c *gin.Context) {
 	id := c.Param("id")
+	if id == plugins.TjuptFeedPluginID {
+		pluginError(c, plugins.ErrPackageAction)
+		return
+	}
 	info, err := h.packages.Get(id)
 	if err != nil {
 		pluginError(c, err)
@@ -66,6 +71,10 @@ func (h *pluginHandler) getSchedule(c *gin.Context) {
 
 func (h *pluginHandler) putSchedule(c *gin.Context) {
 	id := c.Param("id")
+	if id == plugins.TjuptFeedPluginID {
+		pluginError(c, plugins.ErrPackageAction)
+		return
+	}
 	info, err := h.packages.Get(id)
 	if err != nil {
 		pluginError(c, err)
@@ -136,7 +145,7 @@ func (h *pluginHandler) scheduleLoop(ctx context.Context) {
 func (h *pluginHandler) runDueSchedule(ctx context.Context, now time.Time) time.Time {
 	var enabled []string
 	for _, info := range h.packages.List().Items {
-		if info.Enabled {
+		if info.Enabled && info.ID != plugins.TjuptFeedPluginID {
 			enabled = append(enabled, info.ID)
 		}
 	}

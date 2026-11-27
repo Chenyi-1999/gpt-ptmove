@@ -13,6 +13,15 @@ import (
 
 const DownloaderSummaryCapability = "downloader.summary"
 
+const (
+	// TjuptFeedPluginID 标识北洋园 RSS 的外装控制面板。
+	TjuptFeedPluginID = "tjupt-rss"
+	// TjuptFeedCapability 允许北洋园插件确认本次请求的宿主动作。
+	TjuptFeedCapability = "tjupt.feed"
+)
+
+var tjuptFeedActions = [...]string{"preview", "status", "trial", "start", "stop"}
+
 var (
 	ErrPackageNotFound  = errors.New("插件不存在")
 	ErrPackageDisabled  = errors.New("插件已停用")
@@ -58,8 +67,9 @@ type PackageSnapshot struct {
 }
 
 type ActionResult struct {
-	Message string        `json:"message,omitempty"`
-	Blocks  []ResultBlock `json:"blocks"`
+	Message    string        `json:"message,omitempty"`
+	Blocks     []ResultBlock `json:"blocks"`
+	HostAction string        `json:"host_action,omitempty"`
 }
 
 type ResultBlock struct {
@@ -94,13 +104,19 @@ func normalizeManifest(m *PackageManifest, id string) error {
 		len(m.Actions) == 0 || len(m.Actions) > 12 {
 		return errors.New("清单版本、ID（须等于 ZIP 文件名）、名称、字段或操作无效")
 	}
-	if len(m.Capabilities) > 1 || (len(m.Capabilities) == 1 && m.Capabilities[0] != DownloaderSummaryCapability) {
+	if id == TjuptFeedPluginID {
+		if len(m.Capabilities) != 1 || m.Capabilities[0] != TjuptFeedCapability ||
+			len(m.Fields) != 0 || len(m.Actions) != len(tjuptFeedActions) {
+			return errors.New("北洋园插件须声明专用宿主能力和全部固定操作，配置由宿主保存")
+		}
+	} else if len(m.Capabilities) > 1 || (len(m.Capabilities) == 1 && m.Capabilities[0] != DownloaderSummaryCapability) {
 		return errors.New("插件声明了不受支持的能力")
 	}
 	m.Capabilities = append([]string{}, m.Capabilities...)
 	seen := make(map[string]bool)
 	for _, action := range m.Actions {
-		if !pluginID.MatchString(action.ID) || !validText(action.Label, 64, true) || seen[action.ID] {
+		if !pluginID.MatchString(action.ID) || !validText(action.Label, 64, true) || seen[action.ID] ||
+			(id == TjuptFeedPluginID && !slices.Contains(tjuptFeedActions[:], action.ID)) {
 			return errors.New("插件操作 ID 或标签无效")
 		}
 		seen[action.ID] = true
@@ -195,7 +211,8 @@ func effectiveSettings(m PackageManifest, values map[string]any) map[string]any 
 }
 
 func validateResult(result *ActionResult) error {
-	if !validText(result.Message, 400, false) || len(result.Blocks) > maxBlocks {
+	if !validText(result.Message, 400, false) || len(result.Blocks) > maxBlocks ||
+		(result.HostAction != "" && !slices.Contains(tjuptFeedActions[:], result.HostAction)) {
 		return ErrPackageExecution
 	}
 	for _, block := range result.Blocks {
@@ -234,7 +251,7 @@ func validateResult(result *ActionResult) error {
 			return ErrPackageExecution
 		}
 	}
-	if result.Message == "" && len(result.Blocks) == 0 {
+	if result.Message == "" && len(result.Blocks) == 0 && result.HostAction == "" {
 		return fmt.Errorf("%w：没有返回内容", ErrPackageExecution)
 	}
 	if result.Blocks == nil {

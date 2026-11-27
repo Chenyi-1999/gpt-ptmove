@@ -969,3 +969,35 @@
 - 152 健康检查、45 个前端文件的隔离验证、生产扫描页面 HTTP 200、新资源及匿名 401 核对通过。Hub 在断网候选和生产中均通过 TLS 与匿名 401。飞牛 LAN 管理页 LAN 地址未变，匿名 401 和既有密码登录 HTTP 200。媒体容器 /keep、/temp 仍为只读挂载。
 - 2026-11-27 21:34:52（Asia/Shanghai），152 发起 /keep/TEST 的 HTTPS 远程只读扫描，耗时 339 ms，状态 complete。29 个显示任务中 26 个找到，目录 59 项、缺失 3、孤立 0。飞牛独立读取 384 项 qB 任务引用并据本地目录交叉核对，缺失路径及孤立结果一致。152 的页面缓存与本次扫描响应一致。
 - 未删除或修改飞牛文件、qB 任务，未手动触发下载或发种。管理连接只使用用户确认的独立飞牛 SSH 中转入口，未操作 81 本机或中转配置。未部署 OVH、推送远端或发布发行版。此回执将随本地 Git 记录保留。
+
+## PTM-20261127-TJUPT-WASM — 2026-11-27T19:53:08+08:00 — Codex root、tjupt_wasm_design、tjupt_package_contract、tjupt_package_ui，北洋园外装 WASM 插件
+
+- 新增 examples/plugins/tjupt-rss 和 nexus/server/internal/http/handler/plugin_tjupt.go，调整插件目录、调度入口、北洋园兼容路由、Go WASM 契约与 Vue 插件面板。外装包使用原 ID，只能返回与当前管理员请求一致的五个动作之一。RSS、H&R、qB、密文配置、在管台账和自动退种规则继续由原宿主管理。保留独立紧急停止入口。通用 WASM 调度排除北洋园，避免与 RSS 循环重复运行。
+- 从内置版升级时暂停原循环，直到用户安装并手动启动外装插件。停用或移除包后暂停新写操作，保留任务与配置。兼容动作入口也经外装包校验。同步版本、Compose、Dockerfile、前端 dist、API 契约、项目结构和安装说明。
+- 本地 Vue 类型检查、定向 ESLint、Vite 构建、45 个静态文件的产物比对、受影响的 Go 测试和差异检查通过。152 断网 Linux Go 1.23 全量测试、定向 go vet 和编译通过。初始共享模块缓存缺失，使用已核对依赖的隔离副本重跑。断网服务用旧版测试库验证升级、外装加载、认证、实际 WASI 动作、停用、移除、重装、缓存重启和台账与密文一致，校验 47 个前端 URL。验收时根目录使用应用对 index.html 的正常跳转。
+- tjupt-rss.zip 已打包并验证 CRC，SHA-256 为 a434d02c70e47db58fb886e6b92e4a1400cd0a8bfc2ebc773adb6589b2281911。候选镜像仅用于 152 隔离验收，生产实例仍运行 v1.1.6。更改保存在独立工作树，本次未提交、推送、公开发布或切换生产。外部站点和真实 qB 写入沿用模拟测试。
+
+
+## PTM-20261127-TJUPT-WASM-V117-OVH — 2026-11-27T20:15:41+08:00 — Codex root、tjupt_ovh_review，OVH 北洋园外装版切换
+
+- 在 152 复核 v1.1.7 隔离验收镜像，将同一后端、前端、北洋园包和下载器概览包按 SHA-256 核对后部署至 OVH。OVH 断网容器复测升级、WASI 安装、重启及 47 个前端路径。生产镜像为 sha256:4cfadbbb72aaa03eac50564a1b36519deb5d18b8effa6a3a238c64d9f71a1891。OVH 健康接口及插件页返回 200，插件 JS 哈希与 152 验收一致。152 生产健康接口仍为 v1.1.6。
+- 暂停并排空旧循环，保存一致性 SQLite 快照与插件缓存，复用 `/docker/starpt/data`。安装并启用北洋园 WASM，沿用原 RSS、H&R、qB、退种设置和台账。恢复前逐行比较 78 条原台账，其中 48 条在管。保留 1 分钟 RSS 周期，恢复后已完成真实周期，新增 0、跳过 10、失败 0，无 H&R 警告及 qB 待核对。低速观察窗口随进程重启重新累计，实际删除仍由原站点达标或免考及速度规则决定。未手动执行生产下载或退种来测试。
+- 将 OVH 原 v1.1.6 Docker 镜像与旧构建产物归档至 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-11\GPT-PTMOVE__2026-11-27_201321__历史发布__STARPT-v1.1.6-OVH.zip`，核对 Docker save 原始 SHA-256、102 层镜像清单、配置镜像 ID 和 ZIP CRC，已登记 D 盘索引。移除旧容器、镜像标签及已替换的构建产物，保留生产数据与切换前数据快照。
+- 更新 `docs/DEPLOYMENT.json` 和 `CHANGELOG.md`。运维脚本、产物和回执使用本机工具及归档目录和 OVH `/project/GPT-PTMOVE/releases/tjupt-wasm-v117-261127`。未提交、推送、发布 v1.1.7 附件或接触 81。本次 OVH 部署及 RSS 恢复完成。
+
+
+## PTM-20261127-OVH-STARPT-HISTORY-PRUNE — 2026-11-27T20:47:55+08:00 — Codex root、tjupt_ovh_review、scoped_archive、guarded_scope_cleanup，OVH STARPT 旧部署归档与清理
+
+- 依据容器状态、实际镜像 ID 及挂载引用，识别 17 个已停止的历史回滚容器、17 个镜像 ID（18 个旧标签）和 34 个旧发布包。历史容器 writable layer 无改动。逐项补齐 D 盘归档，旧镜像按标签、配置摘要和 Docker 层摘要验收。已有 5 个精确 OVH 镜像复用既有 ZIP。新归档 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-11\GPT-PTMOVE__2026-11-27_203648__历史发布__STARPT-OVH旧部署归档.zip`，ZIP CRC 与 SHA-256 已核验并登记索引，使用 MANIFEST.json 管理所有条目的恢复路径和校验。
+- 包归档核对 SHA-256 及解压后的 Docker tar 摘要。经 OVH 只读预检、生产健康与逐项哈希确认后，删除 17 个旧容器、18 个旧镜像标签和 34 个发布包（6393743867 字节），并去除指向当前镜像的 `tjupt-wasm-check-261127` 临时标签。复核 STARPT 在 OVH 只保留 `ptmove-nexus:1.1.7` 正式运行。没有执行 Docker 全局清理。
+- 标签清理后逐一核对 Docker 父子镜像关系。仅用于旧分支的 29 个无标签镜像（6 个旧发布镜像、23 个旧构建中间镜像）已先归档至 `D:\A_GPT\GPT-BackUp\GPT-PTMOVE\2026-11\GPT-PTMOVE__2026-11-27_204618__历史发布__STARPT-OVH旧构建镜像归档.zip`，校验镜像 ID、层哈希和 ZIP CRC 后从叶节点定向删除。旧发布镜像 ID 最终消失 15 个，另 2 个是 v1.1.7 的无标签父级依赖，保留。
+- 保护文件范围 69 项，核对清理前后哈希一致。生产容器 ID、启动时间、重启次数、数据挂载、运行配置与 RSS/H&R 设置指纹一致。RSS 循环继续开启，清理前 81 条现有任务身份均保留。复核公网健康为 v1.1.7。未访问 qB 的写接口，未暂停 RSS，未触及 81 或 152。
+- 更新 `CHANGELOG.md`，归档、工具和验证回执保存在 D 盘。未提交、推送、创建发行或重新部署。本次变更仅为 OVH STARPT 历史部署清理。
+
+
+## PTM-20261127-REMOTE-LOCAL-QUERY-V117-MERGE — 2026-11-27T23:39:51+08:00 — Codex root / ovh_review / ovh_deployment_info，合并 OVH 已上线的 v1.1.7 与远程扫描
+
+- 双仓 master 已快进到 9780eba。OVH 预检发现生产已运行 v1.1.7 北洋园 WASM，保留该版本并合入扫描，未用 1.1.6 镜像切换 OVH。
+- 合并 nexus/server 中 v1.1.7 的启动、插件注册与接口、RSS 调度、原有退种规则和回归测试。加入 examples/plugins/tjupt-rss 源码及插件清单、两个 Vue 插件组件和重新构建的 nexus/webui/dist。既有扫描代码与扫描界面继续使用。本体仍返回 v1.1.7，两份 Compose 使用部署标签 1.1.7-remote-scan.1。
+- 合并两份 API、部署、插件及项目结构文档，保留双方变更记录，并在版本说明中记录两项功能。152 断网测试通过 30 个 Go 包。Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和五个隔离 Edge 扫描场景通过。
+- 记录时合并候选的 152 Docker 验收、最新提交推送及 OVH 切换待完成。152 和 OVH 已通过直连核对，没有访问 81、修改 qB 任务或删除生产文件。

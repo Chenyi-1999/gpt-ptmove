@@ -255,6 +255,12 @@ func (m *PackageManager) Invoke(ctx context.Context, id, action string, resource
 	if !slices.ContainsFunc(info.Actions, func(candidate Action) bool { return candidate.ID == action }) {
 		return ActionResult{}, ErrPackageAction
 	}
+	expectedHostAction := ""
+	if id == TjuptFeedPluginID {
+		expectedHostAction = action
+		// 北洋园凭据和设置保留在宿主，访客只接收动作名。
+		resources = nil
+	}
 	input, err := guestInput(info, action, resources)
 	if err != nil {
 		return ActionResult{}, fmt.Errorf("%w：输入无法转换", ErrPackageExecution)
@@ -266,7 +272,14 @@ func (m *PackageManager) Invoke(ctx context.Context, id, action string, resource
 			return ActionResult{}, fmt.Errorf("%w：%s", ErrPackageExecution, err)
 		}
 	}
-	return m.runtime.execute(ctx, pkg.compiled, code, input)
+	result, err := m.runtime.execute(ctx, pkg.compiled, code, input)
+	if err != nil {
+		return ActionResult{}, err
+	}
+	if result.HostAction != expectedHostAction {
+		return ActionResult{}, fmt.Errorf("%w：返回的宿主动作与本次请求不一致", ErrPackageExecution)
+	}
+	return result, nil
 }
 
 func (m *PackageManager) snapshot() PackageSnapshot {

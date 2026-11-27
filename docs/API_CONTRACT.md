@@ -142,6 +142,10 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 - `POST /api/plugins/{id}/actions/{action}` 运行声明的 WASM 操作并返回 `{result:{message,blocks}}`。插件停用时返回 409。
 - `GET /api/plugins/{id}/schedule` 读取定时计划；`PUT` 接受 `{enabled,action,interval_minutes}`。时间戳使用 Unix 秒。定时操作只引用已加载的插件，目录刷新和运行计划相互独立。
 
+`tjupt-rss` 是北洋园外装包专用 ID。清单声明 `tjupt.feed` 和 `preview`、`status`、`trial`、`start`、`stop` 五个动作。WASM 接收所选动作并返回同名 `host_action`。宿主校验动作后调用原北洋园服务，返回对应 `/api/plugins/tjupt/feed/{action}` 的业务结构，包括配置视图、查询列表或试运行结果。凭据、设置、上传限速与循环时钟由原宿主管理。北洋园使用原 RSS 循环，独立 WASM 计划接口只适用于其他外装插件。
+
+原 `/api/plugins/tjupt/feed/{action}` 兼容入口使用同一动作校验。紧急 `POST /api/plugins/tjupt/feed/stop` 可直接停止循环。移除或停用包时保留配置、台账和下载文件，启用包后通过 `start` 恢复循环。首次从内置版升级时，先安装并刷新外装包，再启动原规则。
+
 现有 `/api/automation` 与 `/api/v1` 自动化接口保留。禁用内置自动转种插件后，手动及定时执行入口停止接受新的下载和发种操作；任务与预览读取继续可用。
 
 ## 本地文件查询

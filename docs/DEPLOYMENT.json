@@ -3211,6 +3211,68 @@
       "protected_81_accessed": false
     }
   },
+  "starpt_v1_1_7_ovh": {
+    "deploy_receipt": "PTM-20261127-TJUPT-WASM-V117-OVH",
+    "deployed_at": "2026-11-27T20:06:44+08:00",
+    "verified_at": "2026-11-27T20:15:41+08:00",
+    "validation_152": {
+      "mode": "isolated",
+      "image_id": "sha256:da55b764f19df4dbdb9e2c42b11f9e13db62b816ff3219edf64e996031e3c494",
+      "same_backend_frontend_and_plugin_archives": true,
+      "production_health_version": "1.1.6"
+    },
+    "production_ovh": {
+      "url": "https://ovh-starpt.star1999.de/plugins",
+      "container": "starpt",
+      "image": "ptmove-nexus:1.1.7",
+      "image_id": "sha256:4cfadbbb72aaa03eac50564a1b36519deb5d18b8effa6a3a238c64d9f71a1891",
+      "data_mount": "/docker/starpt/data:/app/data",
+      "public_health_version": "1.1.7",
+      "public_plugins_page_status": 200,
+      "public_plugin_js_sha256": "24e987ff4c69ce1797275fccc410d6adbdf0ee25d96678b643fab7d31ee0a120",
+      "release_artifacts_sha256": {
+        "server": "01aaf11a5c9bcf379355014a0c406ff66d098831b894b9fdaa75b2c0cbb721c4",
+        "frontend.tar.gz": "08abb6bf0148076bc439a7b8ba534fdfcc8964ead08d21e480ff09df9af9c965",
+        "tjupt-rss.zip": "a434d02c70e47db58fb886e6b92e4a1400cd0a8bfc2ebc773adb6589b2281911",
+        "downloader-summary.zip": "c9f6a5969034bbe659f70874c59be50ac1e14e269e8eb6bcaca9a688de6bea22"
+      },
+      "verified_assets": 47,
+      "plugin": "tjupt-rss",
+      "active_wasm_sha256": "6fbebbeca29676c1ee8a8f490d10c184607f70d7c807bdb4fd7880e3c3fc08e5",
+      "qb_version": "v5.3.1",
+      "rss_enabled": true,
+      "rss_interval_minutes": 1,
+      "rss_cycle_verified_at": "2026-11-27T20:09:49+08:00",
+      "rss_cycle": {
+        "added": 0,
+        "skipped": 10,
+        "failed": 0,
+        "pending_qb_confirmations": false,
+        "hnr_warning": false
+      },
+      "previous_ledger_rows_verified": 78,
+      "previous_ledger_active_at_cutover": 48,
+      "existing_feed_config_verified": true,
+      "existing_cleanup_enabled": true,
+      "cleanup_speed_window_restarted_with_process": true
+    },
+    "previous_ovh_release": {
+      "image_id": "sha256:3596499887f134c5adc93645301e0b27e3dfa834efa7c78a5a3085350fffd719",
+      "archive": "GPT-PTMOVE__2026-11-27_201321__历史发布__STARPT-v1.1.6-OVH.zip",
+      "archive_sha256": "31db41dafdd3754ac9235129021ceb8ad462f3adceb3c9119dc19de88bf9d6de",
+      "image_layers": 102,
+      "zip_crc_verified": true,
+      "stopped_container_removed": true,
+      "image_tag_removed": true,
+      "old_build_files_removed": [
+        "/project/GPT-PTMOVE/releases/delete-impact-v116-261127/runtime",
+        "/project/GPT-PTMOVE/releases/delete-impact-v116-261127/frontend.tar.gz"
+      ],
+      "previous_data_backups_preserved": true
+    },
+    "committed_pushed_or_published_this_operation": false,
+    "protected_81_access_performed": false
+  },
   "starpt_remote_local_scan_20261127": {
     "source_commits": {
       "starpt": "bdf2bd5fd3c7896597a04a1bdd6455a5f2732d0b",

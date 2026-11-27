@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pt-nexus/server/internal/service/migrationflow"
 	"github.com/pt-nexus/server/internal/service/plugins"
 	"gorm.io/gorm"
 )
@@ -27,6 +28,13 @@ type PluginDownloaderSummary struct {
 	Downloaded int64  `json:"downloaded_bytes"`
 }
 
+// TjuptPluginServices 保存北洋园外装包可以调用的宿主服务。
+type TjuptPluginServices struct {
+	RSS        *migrationflow.TjuptRSSService
+	Automation *migrationflow.TjuptAutomation
+	Feed       *migrationflow.TjuptFeed
+}
+
 type pluginHandler struct {
 	catalog          *plugins.Catalog
 	packages         *plugins.PackageManager
@@ -34,33 +42,38 @@ type pluginHandler struct {
 	automation       automationPluginControl
 	downloaders      func(context.Context) ([]PluginDownloaderSummary, error)
 	refreshMu        sync.Mutex
+	tjupt            *migrationflow.TjuptFeed
+	tjuptTransition  sync.Mutex
 	schedulesChanged chan struct{}
 }
 
-// RegisterPlugins exposes the restored catalog, administrator refresh and plugin operations.
-func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation automationPluginControl, downloaders func(context.Context) ([]PluginDownloaderSummary, error)) error {
+// RegisterPlugins 挂载插件目录、已安装插件动作和宿主操作。
+func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation automationPluginControl,
+	downloaders func(context.Context) ([]PluginDownloaderSummary, error), tjupt TjuptPluginServices) error {
 	catalog := plugins.New(dataDir,
-		plugins.Manifest{
-			SchemaVersion: 1, ID: "tjupt-rss", Name: "北洋园刷流", Version: "1.0",
-			Description: "订阅北洋园 RSS，在 qB 试运行或循环下载，并查看 H&R 剩余时间。",
-			Blocks:      []plugins.Block{},
-		},
 		plugins.Manifest{
 			SchemaVersion: 2, ID: automationPluginID, Name: "自动转种", Version: "2.0",
 			Description: "管理候选预览、转种规则、每月计划与任务记录。",
 			Blocks:      []plugins.Block{},
 		},
 	)
-	packages, err := plugins.NewPackageManager(context.Background(), dataDir, "tjupt-rss", automationPluginID)
+	ctx := context.Background()
+	packages, err := plugins.NewPackageManager(ctx, dataDir, automationPluginID)
 	if err != nil {
 		return err
 	}
 	h := &pluginHandler{
 		catalog: catalog, packages: packages, db: db, automation: automation, downloaders: downloaders,
+		tjupt:            tjupt.Feed,
 		schedulesChanged: make(chan struct{}, 1),
 	}
-	if err := h.startSchedules(context.Background()); err != nil {
-		_ = packages.Close(context.Background())
+	h.tjupt.BindPluginAvailability(h.tjuptReady)
+	if err := h.pauseUnavailableTjupt(ctx); err != nil {
+		_ = packages.Close(ctx)
+		return err
+	}
+	if err := h.startSchedules(ctx); err != nil {
+		_ = packages.Close(ctx)
 		return err
 	}
 	g.Use(func(c *gin.Context) {
@@ -74,6 +87,7 @@ func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation
 	g.GET("/:id/schedule", h.getSchedule)
 	g.PUT("/:id/schedule", h.putSchedule)
 	g.POST("/:id/actions/:action", h.invoke)
+	RegisterTjuptRSS(g.Group("/tjupt"), tjupt.RSS, tjupt.Automation, tjupt.Feed, &h.tjuptTransition, h.invokeTjupt)
 	return nil
 }
 
@@ -84,8 +98,17 @@ func (h *pluginHandler) list(c *gin.Context) {
 func (h *pluginHandler) refresh(c *gin.Context) {
 	h.refreshMu.Lock()
 	defer h.refreshMu.Unlock()
+	if !lockTjuptTransition(c, &h.tjuptTransition) {
+		return
+	}
+	defer h.tjuptTransition.Unlock()
+	ctx := c.Request.Context()
+	if err := h.pauseUnavailableTjupt(ctx); err != nil {
+		tjuptFeedError(c, err, http.StatusServiceUnavailable, "北洋园旧循环暂时无法暂停")
+		return
+	}
 	legacy, legacyErr := h.catalog.Reload()
-	installed, installErr := h.packages.Refresh(c.Request.Context())
+	installed, installErr := h.packages.Refresh(ctx)
 	h.wakeSchedules()
 	var issues []plugins.Issue
 	if legacyErr != nil {
@@ -93,6 +116,9 @@ func (h *pluginHandler) refresh(c *gin.Context) {
 	}
 	if installErr != nil {
 		issues = append(issues, plugins.Issue{File: "plugins/", Message: installErr.Error()})
+	}
+	if err := h.pauseUnavailableTjupt(ctx); err != nil {
+		issues = append(issues, plugins.Issue{File: "tjupt-rss.zip", Message: "北洋园已阻止后续下载器操作，循环状态暂时无法保存"})
 	}
 	h.respond(c, legacy, installed, issues)
 }
@@ -106,6 +132,10 @@ func (h *pluginHandler) respond(c *gin.Context, legacy plugins.Snapshot, install
 		packageIDs[item.ID] = true
 	}
 	for _, item := range legacy.Items {
+		if item.ID == plugins.TjuptFeedPluginID {
+			issues = append(issues, plugins.Issue{File: item.ID + ".json", Message: "北洋园使用 tjupt-rss.zip 安装"})
+			continue
+		}
 		if item.ID == automationPluginID {
 			enabled, err := h.automation.PluginEnabled(c.Request.Context())
 			if err != nil {
@@ -147,6 +177,10 @@ func (h *pluginHandler) setEnabled(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	if id == plugins.TjuptFeedPluginID {
+		h.setTjuptEnabled(c, *payload.Enabled)
+		return
+	}
 	if id == automationPluginID {
 		if err := h.automation.SetPluginEnabled(c.Request.Context(), *payload.Enabled); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"message": "保存自动转种开关失败"})
@@ -169,6 +203,10 @@ func (h *pluginHandler) setEnabled(c *gin.Context) {
 }
 
 func (h *pluginHandler) saveSettings(c *gin.Context) {
+	if c.Param("id") == plugins.TjuptFeedPluginID {
+		pluginError(c, plugins.ErrPackageAction)
+		return
+	}
 	var payload struct {
 		Settings map[string]any `json:"settings"`
 	}
@@ -188,6 +226,10 @@ func (h *pluginHandler) saveSettings(c *gin.Context) {
 }
 
 func (h *pluginHandler) invoke(c *gin.Context) {
+	if c.Param("id") == plugins.TjuptFeedPluginID {
+		h.invokeTjupt(c, c.Param("action"))
+		return
+	}
 	result, err := h.invokeAction(c.Request.Context(), c.Param("id"), c.Param("action"))
 	if err != nil {
 		pluginError(c, err)
@@ -197,6 +239,9 @@ func (h *pluginHandler) invoke(c *gin.Context) {
 }
 
 func (h *pluginHandler) invokeAction(ctx context.Context, id, action string) (plugins.ActionResult, error) {
+	if id == plugins.TjuptFeedPluginID {
+		return plugins.ActionResult{}, plugins.ErrPackageAction
+	}
 	info, err := h.packages.Get(id)
 	if err != nil {
 		return plugins.ActionResult{}, err

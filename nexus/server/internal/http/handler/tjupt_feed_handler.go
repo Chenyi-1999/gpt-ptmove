@@ -9,14 +9,10 @@ import (
 	"github.com/pt-nexus/server/internal/service/migrationflow"
 )
 
-func registerTjuptFeed(g *gin.RouterGroup, feed *migrationflow.TjuptFeed, transition *sync.Mutex) {
+func registerTjuptFeed(g *gin.RouterGroup, feed *migrationflow.TjuptFeed, transition *sync.Mutex,
+	invoke func(*gin.Context, string)) {
 	view := func(c *gin.Context) {
-		settings, err := feed.View(c.Request.Context())
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"message": "北洋园插件配置暂不可读取"})
-			return
-		}
-		c.JSON(http.StatusOK, settings)
+		tjuptFeedView(c, feed)
 	}
 	g.GET("", view)
 	g.PUT("", func(c *gin.Context) {
@@ -45,56 +41,67 @@ func registerTjuptFeed(g *gin.RouterGroup, feed *migrationflow.TjuptFeed, transi
 		}
 		view(c)
 	})
-	g.POST("/trial", func(c *gin.Context) {
-		if !lockTjuptTransition(c, transition) {
-			return
-		}
-		defer transition.Unlock()
-		result, err := feed.Trial(c.Request.Context())
-		if err != nil {
-			tjuptFeedError(c, err, http.StatusBadGateway, "北洋园试运行未能完成，请检查 RSS 与下载器连接")
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	})
-	g.POST("/start", func(c *gin.Context) {
-		if !lockTjuptTransition(c, transition) {
-			return
-		}
-		defer transition.Unlock()
-		if err := feed.SetEnabled(c.Request.Context(), true); err != nil {
-			tjuptFeedError(c, err, http.StatusServiceUnavailable, "北洋园循环暂无法启动")
-			return
-		}
-		view(c)
-	})
+	for _, action := range []string{"preview", "status", "trial", "start"} {
+		g.POST("/"+action, func(c *gin.Context) { invoke(c, action) })
+	}
+	// 紧急停止可直接调用宿主，外装包失效时仍可暂停循环。
 	g.POST("/stop", func(c *gin.Context) {
 		if !lockTjuptTransition(c, transition) {
 			return
 		}
 		defer transition.Unlock()
-		if err := feed.SetEnabled(c.Request.Context(), false); err != nil {
-			tjuptFeedError(c, err, http.StatusServiceUnavailable, "北洋园循环暂无法停止")
-			return
-		}
-		view(c)
+		runTjuptFeedAction(c, feed, "stop")
 	})
-	g.POST("/preview", func(c *gin.Context) {
-		items, err := feed.Preview(c.Request.Context())
+}
+
+// tjuptFeedView 返回现有台账的脱敏设置与运行状态。
+func tjuptFeedView(c *gin.Context, feed *migrationflow.TjuptFeed) {
+	settings, err := feed.View(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "北洋园插件配置暂不可读取"})
+		return
+	}
+	c.JSON(http.StatusOK, settings)
+}
+
+// runTjuptFeedAction 将固定动作分派到现有的北洋园服务。
+func runTjuptFeedAction(c *gin.Context, feed *migrationflow.TjuptFeed, action string) {
+	ctx := c.Request.Context()
+	switch action {
+	case "preview":
+		items, err := feed.Preview(ctx)
 		if err != nil {
 			tjuptFeedError(c, err, http.StatusBadGateway, "暂无法读取北洋园 RSS，请检查已保存的链接")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"items": items})
-	})
-	g.POST("/status", func(c *gin.Context) {
-		items, err := feed.Status(c.Request.Context())
+	case "status":
+		items, err := feed.Status(ctx)
 		if err != nil {
 			tjuptFeedError(c, err, http.StatusBadGateway, "暂无法查询 H&R，请检查北洋园 Token 与下载器连接")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"items": items})
-	})
+	case "trial":
+		result, err := feed.Trial(ctx)
+		if err != nil {
+			tjuptFeedError(c, err, http.StatusBadGateway, "北洋园试运行未能完成，请检查 RSS 与下载器连接")
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	case "start", "stop":
+		if err := feed.SetEnabled(ctx, action == "start"); err != nil {
+			message := "北洋园循环暂无法停止"
+			if action == "start" {
+				message = "北洋园循环暂无法启动"
+			}
+			tjuptFeedError(c, err, http.StatusServiceUnavailable, message)
+			return
+		}
+		tjuptFeedView(c, feed)
+	default:
+		c.JSON(http.StatusNotFound, gin.H{"message": "未找到北洋园操作"})
+	}
 }
 
 func lockTjuptTransition(c *gin.Context, transition *sync.Mutex) bool {

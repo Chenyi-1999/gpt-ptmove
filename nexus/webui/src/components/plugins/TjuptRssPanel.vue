@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import TjuptHrDurationHint from './TjuptHrDurationHint.vue'
 
 type Downloader = { id: string; name: string }
@@ -59,6 +59,8 @@ type FeedState = {
 }
 type Action = 'save' | 'refresh' | 'trial' | 'start' | 'stop' | 'preview' | 'status' | 'upload-limit'
 
+const props = defineProps<{ enabled: boolean }>()
+
 const downloaders = ref<Downloader[]>([])
 const feed = ref<FeedState | null>(null)
 const draft = ref<FeedSettings | null>(null)
@@ -117,7 +119,11 @@ const runLabel = computed(() => {
 })
 
 async function request<T>(path: string, method = 'GET', payload?: object): Promise<T> {
-  const response = await fetch('/api/plugins/tjupt' + path, {
+  const packageAction = path.match(/^\/feed\/(preview|status|trial|start|stop)$/)
+  const url = packageAction
+    ? `/api/plugins/tjupt-rss/actions/${packageAction[1]}`
+    : '/api/plugins/tjupt' + path
+  const response = await fetch(url, {
     method,
     headers: payload ? { 'Content-Type': 'application/json' } : undefined,
     body: payload ? JSON.stringify(payload) : undefined,
@@ -348,17 +354,30 @@ function formatTime(timestamp: string) {
 }
 
 onMounted(() => {
-  void load()
+  if (props.enabled) void load()
   pollTimer = window.setInterval(() => {
-    if (feed.value?.enabled || feed.value?.running) void refreshRun(true)
+    if (props.enabled && (feed.value?.enabled || feed.value?.running)) void refreshRun(true)
   }, 5000)
+})
+watch(() => props.enabled, (enabled) => {
+  if (enabled) {
+    void load()
+  } else {
+    feed.value = null
+    draft.value = null
+    candidates.value = null
+    torrents.value = null
+    trial.value = null
+    loading.value = false
+  }
 })
 onUnmounted(() => window.clearInterval(pollTimer))
 </script>
 
 <template>
   <section class="tjupt-panel" aria-label="北洋园 RSS 刷流">
-    <p v-if="loading" class="empty-state" role="status">正在读取配置…</p>
+    <p v-if="!enabled" class="empty-state" role="status">北洋园插件包已停用。启用后才能读取配置、查询状态或控制任务。</p>
+    <p v-else-if="loading" class="empty-state" role="status">正在读取配置…</p>
     <div v-else-if="loadError" class="panel-card">
       <p class="panel-message panel-error" role="alert">{{ loadError }}</p>
       <button class="action-button action-secondary" type="button" @click="load">重新读取配置</button>

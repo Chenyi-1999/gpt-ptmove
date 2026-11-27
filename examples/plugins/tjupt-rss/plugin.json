@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "id": "tjupt-rss",
+  "name": "北洋园 RSS 刷流",
+  "version": "1.0.0",
+  "description": "通过主程序管理北洋园 RSS、下载器任务和 H&R 状态。",
+  "capabilities": ["tjupt.feed"],
+  "fields": [],
+  "actions": [
+    {"id": "preview", "label": "RSS 选种预览"},
+    {"id": "status", "label": "查询 H&R 状态"},
+    {"id": "trial", "label": "试运行一次"},
+    {"id": "start", "label": "启动循环"},
+    {"id": "stop", "label": "停止循环"}
+  ]
+}

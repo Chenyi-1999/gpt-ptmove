@@ -95,6 +95,16 @@ type TjuptFeed struct {
 	startOnce    sync.Once
 	wake         chan struct{}
 	cleanupEpoch string
+	pluginReady  func() bool
+}
+
+// BindPluginAvailability 在启动服务前绑定外装包的可用状态。
+func (f *TjuptFeed) BindPluginAvailability(ready func() bool) {
+	f.pluginReady = ready
+}
+
+func (f *TjuptFeed) packageReady() bool {
+	return f.pluginReady == nil || f.pluginReady()
 }
 
 // NewTjuptFeed 初始化独立投种台账和加密设置，首次安装默认关闭循环。
@@ -259,6 +269,9 @@ func (f *TjuptFeed) Save(ctx context.Context, input TjuptFeedInput) error {
 
 // SetEnabled 仅保存启停状态；正式循环在后台领取任务。
 func (f *TjuptFeed) SetEnabled(ctx context.Context, enabled bool) error {
+	if enabled && !f.packageReady() {
+		return fmt.Errorf("%w，请先安装并启用北洋园插件", ErrTjuptFeedBusy)
+	}
 	row, err := f.repo.Control(ctx)
 	if err != nil || row.Enabled == enabled {
 		return err

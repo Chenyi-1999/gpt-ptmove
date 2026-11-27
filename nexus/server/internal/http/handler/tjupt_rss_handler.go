@@ -12,14 +12,14 @@ import (
 )
 
 // RegisterTjuptRSS 挂载插件的管理员接口。
-func RegisterTjuptRSS(g *gin.RouterGroup, service *migrationflow.TjuptRSSService, automation *migrationflow.TjuptAutomation, feed *migrationflow.TjuptFeed) {
+func RegisterTjuptRSS(g *gin.RouterGroup, service *migrationflow.TjuptRSSService, automation *migrationflow.TjuptAutomation,
+	feed *migrationflow.TjuptFeed, transition *sync.Mutex, invokeFeed func(*gin.Context, string)) {
 	g.Use(func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
 		c.Next()
 	})
-	var transition sync.Mutex
-	registerTjuptFeed(g.Group("/feed"), feed, &transition)
+	registerTjuptFeed(g.Group("/feed"), feed, transition, invokeFeed)
 	g.GET("/downloaders", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"items": service.Downloaders(), "retire_configured": service.RetireConfigured()})
 	})
@@ -86,7 +86,7 @@ func RegisterTjuptRSS(g *gin.RouterGroup, service *migrationflow.TjuptRSSService
 			c.JSON(http.StatusBadRequest, gin.H{"message": "北洋园规则格式无效"})
 			return
 		}
-		if !lockTjuptTransition(c, &transition) {
+		if !lockTjuptTransition(c, transition) {
 			return
 		}
 		defer transition.Unlock()

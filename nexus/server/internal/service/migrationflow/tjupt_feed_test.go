@@ -404,6 +404,39 @@ func TestTjuptFeedDoesNotRetryAmbiguousAddOrWriteAfterStop(t *testing.T) {
 	}
 }
 
+func TestTjuptFeedPackageAvailabilityFencesTrialWrites(t *testing.T) {
+	ctx := context.Background()
+	db, plugin, dir := newTjuptFeedTest(t)
+	feed, err := NewTjuptFeed(db, plugin, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configureTjuptFeedTest(t, feed)
+	ready := false
+	feed.BindPluginAvailability(func() bool { return ready })
+	site := &tjuptFeedFakeSite{items: []tjupt.Torrent{
+		{Hash: strings.Repeat("a", 40), SizeBytes: tjuptGiB, Data: []byte{1}},
+	}}
+	qb := &tjuptFeedFakeQB{rows: map[string]downloaderclient.TaggedQBTorrent{}}
+	attachTjuptFeedTest(feed, site, qb)
+	if _, err := feed.Trial(ctx); !errors.Is(err, ErrTjuptFeedBusy) || site.reads != 0 {
+		t.Fatalf("trial without the package must stop before RSS: reads=%d, err=%v", site.reads, err)
+	}
+	if err := feed.SetEnabled(ctx, true); !errors.Is(err, ErrTjuptFeedBusy) {
+		t.Fatalf("start without the package must fail: %v", err)
+	}
+	ready = true
+	qb.beforeWrite = func() { ready = false }
+	result, err := feed.Trial(ctx)
+	if err != nil || result.Added != 0 || len(qb.adds) != 0 || site.reads != 1 {
+		t.Fatalf("unavailable package must fence qB writes in trial: %+v, err=%v", result, err)
+	}
+	view, err := feed.View(ctx)
+	if err != nil || view.Enabled || !view.RSSConfigured || !view.HNRConfigured {
+		t.Fatalf("package availability must not clear configuration: %+v, err=%v", view, err)
+	}
+}
+
 func TestTjuptFeedRefusesAnEnabledLegacyLoop(t *testing.T) {
 	ctx := context.Background()
 	db, plugin, dir := newTjuptFeedTest(t)

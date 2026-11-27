@@ -54,6 +54,8 @@
 
 北洋园统一标签的转换由 RSS 循环持有租约时执行。已确认的任务先在投种台账登记公共标签归属，再由 `internal/service/downloaderclient/tjupt_feed_tags.go` 移除临时回执标签。旧版标签仍可用于只读 H&R 查询。
 
+外装北洋园包位于 `examples/plugins/tjupt-rss`。`internal/http/handler/plugin_tjupt.go` 将包声明的固定动作接到同一个 `TjuptFeed` 实例，并同步包启停与 RSS 循环状态。下载器操作前核对包的可用状态以及已有的运行租约。
+
 正式循环可按插件配置判断低速退种。H&R 同一记录的二次达标确认及低速窗口由 `internal/service/migrationflow/tjupt_feed*.go` 编排和持久化，`internal/service/downloaderclient` 在调用原生 qB 移除前复查任务归属、Tracker 和实时速度，保留下载文件。
 
 ### 3.2 `internal/config`

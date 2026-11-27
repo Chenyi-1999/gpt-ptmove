@@ -34,6 +34,12 @@ type tjuptFeedDownloader interface {
 
 func (f *TjuptFeed) run(parent context.Context, trial bool) (TjuptFeedResult, error) {
 	var result TjuptFeedResult
+	if !f.packageReady() {
+		if trial {
+			return result, fmt.Errorf("%w，请先安装并启用北洋园插件", ErrTjuptFeedBusy)
+		}
+		return result, nil
+	}
 	row, err := f.repo.Control(parent)
 	if err != nil {
 		return result, err
@@ -91,6 +97,9 @@ func (f *TjuptFeed) runCycle(ctx context.Context, row repository.TjuptFeedContro
 	}
 	scope := tjuptFeedDigest(d.ID, d.Host, d.Username)
 	guard := func(uploadLimitRevision *int64) error {
+		if !f.packageReady() {
+			return repository.ErrTjuptFeedLease
+		}
 		if err := f.repo.Verify(ctx, lease, trial, time.Now().Unix(), uploadLimitRevision); err != nil {
 			return err
 		}

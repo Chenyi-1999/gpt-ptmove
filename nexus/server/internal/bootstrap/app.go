@@ -188,6 +188,15 @@ func NewApp() (*App, error) {
 	engine.Use(middleware.JWTGuard(authService))
 	registerForkUpdateRoutes(engine)
 	handler.NewSiteProfilesHandler(profilesService).RegisterRoutes(engine.Group("/api"))
+	tjuptPlugin := migrationflow.NewTjuptRSSService(cfgManager)
+	tjuptAutomation, err := migrationflow.NewTjuptAutomation(store.DB, tjuptPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("初始化北洋园刷流状态失败: %w", err)
+	}
+	tjuptFeed, err := migrationflow.NewTjuptFeed(store.DB, tjuptPlugin, paths.DataDir)
+	if err != nil {
+		return nil, fmt.Errorf("初始化北洋园 RSS 插件失败: %w", err)
+	}
 	pluginsAPI := engine.Group("/api/plugins")
 	if err := handler.RegisterPlugins(pluginsAPI, paths.DataDir, store.DB, automationService,
 		func(ctx context.Context) ([]handler.PluginDownloaderSummary, error) {
@@ -207,19 +216,9 @@ func NewApp() (*App, error) {
 				})
 			}
 			return summaries, ctx.Err()
-		}); err != nil {
+		}, handler.TjuptPluginServices{RSS: tjuptPlugin, Automation: tjuptAutomation, Feed: tjuptFeed}); err != nil {
 		return nil, fmt.Errorf("初始化插件目录失败: %w", err)
 	}
-	tjuptPlugin := migrationflow.NewTjuptRSSService(cfgManager)
-	tjuptAutomation, err := migrationflow.NewTjuptAutomation(store.DB, tjuptPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("初始化北洋园刷流状态失败: %w", err)
-	}
-	tjuptFeed, err := migrationflow.NewTjuptFeed(store.DB, tjuptPlugin, paths.DataDir)
-	if err != nil {
-		return nil, fmt.Errorf("初始化北洋园 RSS 插件失败: %w", err)
-	}
-	handler.RegisterTjuptRSS(pluginsAPI.Group("/tjupt"), tjuptPlugin, tjuptAutomation, tjuptFeed)
 	engine.GET("/api/migrate/source-restriction", func(c *gin.Context) {
 		result, status := migrateService.CheckSourceRestriction(strings.TrimSpace(c.Query("task_id")))
 		c.JSON(status, result)

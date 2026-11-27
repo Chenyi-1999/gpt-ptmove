@@ -15,13 +15,15 @@ const catalog = ref<PluginCatalog>({ items: [], issues: [], metrics: {} })
 const loading = ref<'list' | 'refresh'>()
 const panelBusy = ref(false)
 const automationBusy = ref(false)
+const tjuptPackageBusy = ref(false)
 const automationError = ref('')
+const tjuptPackageError = ref('')
 const error = ref('')
 const notice = ref('')
 const current = computed(
   () => catalog.value.items.find((plugin) => plugin.id === route.query.plugin) ?? catalog.value.items[0],
 )
-const busy = computed(() => Boolean(loading.value) || panelBusy.value || automationBusy.value)
+const busy = computed(() => Boolean(loading.value) || panelBusy.value || automationBusy.value || tjuptPackageBusy.value)
 
 function selectPlugin(id: string) {
   void router.push({ name: 'plugins', query: { ...route.query, plugin: id } })
@@ -48,6 +50,25 @@ async function toggleAutomation(enabled: boolean) {
     automationError.value = err instanceof Error ? err.message : '更新自动转种状态失败'
   } finally {
     automationBusy.value = false
+  }
+}
+
+async function toggleTjuptPackage(enabled: boolean) {
+  if (busy.value) return
+  tjuptPackageBusy.value = true
+  tjuptPackageError.value = ''
+  try {
+    const { plugin } = await requestPlugin<{ plugin: PluginInfo }>(
+      '/tjupt-rss/enabled',
+      'PUT',
+      '更新北洋园插件状态失败',
+      { enabled },
+    )
+    updatePlugin(plugin)
+  } catch (err) {
+    tjuptPackageError.value = err instanceof Error ? err.message : '更新北洋园插件状态失败'
+  } finally {
+    tjuptPackageBusy.value = false
   }
 }
 
@@ -82,7 +103,7 @@ onMounted(() => void load())
     <header class="plugin-heading">
       <div>
         <h1 id="plugins-heading">插件</h1>
-        <p>安装或更新文件后，点击「刷新插件」读取目录。</p>
+        <p>未看到北洋园插件？将 <code>tjupt-rss.zip</code> 放入 <code>data/plugins/</code>，再点击「刷新插件」。</p>
       </div>
       <button class="plugin-refresh" type="button" :disabled="busy" @click="load(true)">
         <Refresh class="plugin-icon" aria-hidden="true" />
@@ -122,7 +143,24 @@ onMounted(() => void load())
           <span class="plugin-version">{{ current.version }}</span>
         </header>
         <p v-if="current.description" class="plugin-description">{{ current.description }}</p>
-        <TjuptRssPanel v-if="current.id === 'tjupt-rss'" />
+        <template v-if="current.id === 'tjupt-rss' && current.kind === 'wasm'">
+          <div class="automation-state">
+            <span :class="{ 'automation-state__active': current.enabled }">
+              {{ current.enabled ? '已启用' : '已停用' }}
+            </span>
+            <el-button
+              :disabled="busy"
+              :loading="tjuptPackageBusy"
+              @click="toggleTjuptPackage(!current.enabled)"
+            >
+              {{ current.enabled ? '停用插件' : '启用插件' }}
+            </el-button>
+          </div>
+          <p v-if="tjuptPackageError" class="plugin-message plugin-error" role="alert">
+            {{ tjuptPackageError }}
+          </p>
+          <TjuptRssPanel :enabled="current.enabled" />
+        </template>
         <template v-else-if="current.id === 'automation'">
           <div class="automation-state">
             <span :class="{ 'automation-state__active': current.enabled !== false }">

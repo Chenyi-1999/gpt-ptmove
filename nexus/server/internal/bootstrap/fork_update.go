@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.1.6"
+const forkVersion = "1.1.7"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-27",
+				"changes": []string{"北洋园刷流改为外装 WASM 插件，保留宿主设置、任务台账和退种规则", "本地文件查询支持通过 HTTPS 领单进行远程只读扫描"},
+			},
+			{
+				"version": "1.1.6",
 				"date":    "2026-11-27",
 				"changes": []string{"路径映射和 PTGen 来源可点击移除草稿行，未保存的下载器也可点击移除", "已保存的下载器和其他重要删除继续长按 2 秒"},
 			},
