@@ -17,12 +17,7 @@ type downloaderMeta struct {
 	Name     string
 	Mappings []pathMapping
 	Remote   bool
-}
-
-type localPathMeta struct {
-	RemotePath string
-	Mappings   []pathMapping
-	Expected   map[string]struct{}
+	ScanPeer string
 }
 
 type syncedItem struct {
@@ -34,15 +29,17 @@ type syncedItem struct {
 }
 
 type Service struct {
-	repo      *repository.LocalQueryRepository
-	cfg       *config.Manager
-	cacheFile string
+	repo           *repository.LocalQueryRepository
+	cfg            *config.Manager
+	cacheFile      string
+	openRemoteScan func(map[string]any, string) (remoteScanClient, error)
 }
 
 func New(repo *repository.LocalQueryRepository, cfg *config.Manager, dataDir string) *Service {
 	return &Service{
-		repo:      repo,
-		cfg:       cfg,
-		cacheFile: filepath.Join(dataDir, "local_scan_cache.json"),
+		repo:           repo,
+		cfg:            cfg,
+		cacheFile:      filepath.Join(dataDir, "local_scan_cache.json"),
+		openRemoteScan: newRemoteScanClient,
 	}
 }

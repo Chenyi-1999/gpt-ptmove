@@ -178,7 +178,7 @@
         <div class="scan-header">
           <div class="scan-header-left">
             <h2 class="quadrant-title">本地文件扫描</h2>
-            <p class="scan-description">扫描数据库中所有种子的保存路径，找出本地已删除的文件或未被任务引用的孤立文件。为防止误删除种子，所以不提供一键删除功能。</p>
+            <p class="scan-description">检查种子保存目录的顶层文件和内容目录。远程下载器由 HTTPS 领单客户端核验，只返回缺失和孤立文件的结果。</p>
           </div>
           <div class="scan-controls">
             <el-select v-model="selectedPath" clearable placeholder="选择路径(可选)" filterable size="default"
@@ -197,44 +197,86 @@
           </div>
         </div>
 
+        <el-alert
+          v-if="scanRequestError"
+          class="scan-status-alert"
+          type="error"
+          :title="scanRequestError"
+          :closable="false"
+          show-icon
+        />
+
+        <el-alert
+            v-if="scanResult"
+            class="scan-status-alert"
+            :type="scanStatus === 'complete' ? 'success' : scanStatus === 'partial' ? 'warning' : 'error'"
+            :title="scanStatusTitle"
+            :closable="false"
+            show-icon
+          >
+            <template v-if="scanStatus !== 'complete'">
+              <p class="scan-status-description">
+                {{ scanStatus === 'partial'
+                  ? '下方数量只统计已核验的路径；未核验或失败的路径不会按 0 缺失、0 孤立显示。'
+                  : '当前结果无法确认文件状态；请确认远程客户端在线并重新扫描。' }}
+              </p>
+              <p v-if="legacyScanNote" class="scan-status-description">{{ legacyScanNote }}</p>
+              <ul v-if="scanIssues.length" class="scan-issue-list">
+                <li v-for="(issue, index) in scanIssues" :key="`${issue.downloader_name}-${issue.path}-${index}`">
+                  <span class="scan-issue-heading">
+                    {{ issue.downloader_name || '未知下载器' }} · {{ issue.path || '路径未提供' }}
+                  </span>
+                  <el-tag :type="issue.status === 'failed' ? 'danger' : 'warning'" size="small">
+                    {{ issue.status === 'failed' ? '读取失败' : '未核验' }}
+                  </el-tag>
+                  <span v-if="issue.message" class="scan-issue-message">{{ issue.message }}</span>
+                </li>
+              </ul>
+            </template>
+          </el-alert>
+
         <!-- 扫描结果统计 -->
         <div v-if="scanResult" class="scan-summary glass-card glass-rounded">
           <el-row :gutter="16">
             <el-col :xs="12" :sm="8" :md="4">
               <div class="stat-item">
-                <div class="stat-value">{{ scanResult.scan_summary.total_torrents }}</div>
+                <div class="stat-value">{{ summaryValue('total_torrents') }}</div>
                 <div class="stat-label">总种子数</div>
               </div>
             </el-col>
             <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item">
-                <div class="stat-value">{{ scanResult.scan_summary.total_local_items }}</div>
-                <div class="stat-label">本地文件数</div>
+                <div class="stat-value">{{ summaryValue('total_local_items') }}</div>
+                <div class="stat-label">目录项目数</div>
+                <div v-if="isPartialCount('total_local_items')" class="stat-note">已核验部分</div>
               </div>
             </el-col>
             <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-danger">
-                <div class="stat-value">{{ scanResult.scan_summary.missing_count }}</div>
+                <div class="stat-value">{{ summaryValue('missing_count') }}</div>
                 <div class="stat-label">缺失文件</div>
+                <div v-if="isPartialCount('missing_count')" class="stat-note">已核验部分</div>
               </div>
             </el-col>
             <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-warning">
-                <div class="stat-value">{{ scanResult.scan_summary.orphaned_count }}</div>
+                <div class="stat-value">{{ summaryValue('orphaned_count') }}</div>
                 <div class="stat-label">孤立文件</div>
+                <div v-if="isPartialCount('orphaned_count')" class="stat-note">已核验部分</div>
               </div>
             </el-col>
             <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-success">
-                <div class="stat-value">{{ scanResult.scan_summary.synced_count }}</div>
-                <div class="stat-label">正常做种</div>
+                <div class="stat-value">{{ summaryValue('synced_count') }}</div>
+                <div class="stat-label">已找到文件</div>
+                <div v-if="isPartialCount('synced_count')" class="stat-note">已核验部分</div>
               </div>
             </el-col>
           </el-row>
         </div>
 
         <!-- 结果详情 -->
-        <div v-if="scanResult" class="scan-results glass-card glass-rounded">
+        <div v-if="scanResult && scanStatus !== 'unverified'" class="scan-results glass-card glass-rounded">
           <div style="display: flex; align-items: center; gap: 12px; ">
             <el-tabs v-model="activeTab" style="flex: 0 0 auto;">
               <el-tab-pane name="missing">
@@ -258,7 +300,7 @@
               <el-tab-pane name="synced">
                 <template #label>
                   <span class="tab-label">
-                    正常做种
+                    已找到文件
                     <el-badge v-if="scanResult.scan_summary.synced_count > 0"
                       :value="scanResult.scan_summary.synced_count" type="success" :max="999999" />
                   </span>
@@ -335,14 +377,18 @@
           </div>
         </div>
 
+        <div v-else-if="scanResult" class="empty-state-container">
+          <el-empty description="扫描未完成，因此没有可核验的文件清单" />
+        </div>
+
         <!-- 加载中状态 -->
-        <div v-if="scanning" v-loading="scanning" element-loading-text="正在扫描本地文件..."
+        <div v-if="scanning" v-loading="scanning" element-loading-text="正在核验保存目录…"
           element-loading-background="transparent" class="loading-container">
         </div>
 
         <!-- 空状态 -->
         <div v-if="!scanResult && !scanning" class="empty-state-container">
-          <el-empty description="点击扫描按钮进行本地文件检查" />
+          <el-empty :description="scanRequestError ? '扫描未取得结果，请修复连接后重新扫描' : '点击扫描按钮进行本地文件检查'" />
         </div>
       </div>
     </div>
@@ -386,6 +432,15 @@ interface ScanSummary {
   missing_count: number
   orphaned_count: number
   synced_count: number
+  remote_torrents_count?: number
+  skipped_remote?: boolean
+}
+
+interface ScanIssue {
+  path: string
+  downloader_name: string
+  status: 'unverified' | 'failed'
+  message: string
 }
 
 interface MissingFile {
@@ -415,6 +470,8 @@ interface ScanResult {
   missing_files: MissingFile[]
   orphaned_files: OrphanedFile[]
   synced_torrents: SyncedTorrent[]
+  scan_status?: 'complete' | 'partial' | 'unverified'
+  scan_issues?: ScanIssue[]
 }
 
 const emits = defineEmits<{
@@ -451,8 +508,47 @@ const groupCountRanking = computed(() =>
 const scanning = ref(false)
 const activeTab = ref('missing')
 const scanResult = ref<ScanResult | null>(null)
+const scanFromCache = ref(false)
+let scanRevision = 0
+const scanRequestError = ref('')
 const selectedPath = ref<string>('')
 const downloadersWithPaths = ref<Downloader[]>([])
+
+const scanStatus = computed<NonNullable<ScanResult['scan_status']>>(() => {
+  if (!scanResult.value) return 'unverified'
+  if (scanResult.value.scan_status) return scanResult.value.scan_status
+  // Old cached scans explicitly marked remote downloaders as skipped. Treat these
+  // legacy results as partial because their zero counts did not cover remote paths.
+  const summary = scanResult.value.scan_summary
+  return summary.skipped_remote || (summary.remote_torrents_count ?? 0) > 0 ? 'partial' : 'complete'
+})
+const scanIssues = computed(() => scanResult.value?.scan_issues ?? [])
+const legacyScanNote = computed(() => {
+  const summary = scanResult.value?.scan_summary
+  if (scanStatus.value !== 'partial' || scanIssues.value.length || !summary?.skipped_remote) return ''
+  const count = Number(summary.remote_torrents_count ?? 0)
+  return count > 0
+    ? `旧版缓存记录了 ${formatCount(count)} 个远程任务未核验，但没有保存对应路径明细。请重新扫描以获取逐路径状态。`
+    : '旧版缓存标记了远程路径未核验，但没有保存对应路径明细。请重新扫描以获取逐路径状态。'
+})
+const scanStatusTitle = computed(() => {
+  const prefix = scanFromCache.value ? '上次扫描 · ' : ''
+  if (scanStatus.value === 'complete' && scanResult.value?.scan_summary.total_torrents === 0)
+    return prefix + '当前范围没有可核验的任务'
+  if (scanStatus.value === 'complete') return prefix + '扫描完成，所选路径均已核验'
+  if (scanStatus.value === 'partial') return prefix + '扫描部分完成，结果仅覆盖已核验路径'
+  return prefix + '扫描未完成，当前结果无法核验'
+})
+
+type SummaryCountKey = 'total_torrents' | 'total_local_items' | 'missing_count' | 'orphaned_count' | 'synced_count'
+const summaryValue = (key: SummaryCountKey): string => {
+  const value = Number(scanResult.value?.scan_summary[key] ?? 0)
+  if (key === 'total_torrents') return formatCount(value)
+  if (scanStatus.value === 'unverified' || (scanStatus.value === 'partial' && value === 0)) return '未核验'
+  return formatCount(value)
+}
+const isPartialCount = (key: SummaryCountKey): boolean =>
+  scanStatus.value === 'partial' && Number(scanResult.value?.scan_summary[key] ?? 0) > 0
 
 // 路径筛选（共用一个）
 const pathFilter = ref<string>('')
@@ -584,10 +680,14 @@ const fetchDownloadersWithPaths = async () => {
 
 // 获取缓存的扫描结果
 const fetchCachedScanResult = async () => {
+  if (scanning.value) return
+  const revision = scanRevision
   try {
     const res = await axios.get<ScanResult>('/api/local_query/scan/cache')
-    scanResult.value = res.data
-    console.log('已加载缓存的扫描结果')
+    if (!scanning.value && revision === scanRevision) {
+      scanFromCache.value = true
+      scanResult.value = res.data
+    }
   } catch (error) {
     // 404表示没有缓存，这是正常的，不需要报错
     if (axios.isAxiosError(error) && error.response?.status !== 404) {
@@ -598,8 +698,12 @@ const fetchCachedScanResult = async () => {
 
 // 开始扫描
 const startScan = async () => {
+  if (scanning.value) return
+  scanRevision++
   scanning.value = true
   scanResult.value = null
+  scanFromCache.value = false
+  scanRequestError.value = ''
   try {
     await contentFiltersStore.load()
     const params = new URLSearchParams()
@@ -608,10 +712,13 @@ const startScan = async () => {
     const url = `/api/local_query/scan?${params.toString()}`
     const res = await axios.post<ScanResult>(url)
     scanResult.value = res.data
-    ElMessage.success('扫描完成！')
+    if (scanStatus.value === 'complete') ElMessage.success('扫描完成！')
+    else if (scanStatus.value === 'partial') ElMessage.warning('扫描部分完成，请查看未核验路径')
+    else ElMessage.error('扫描未完成，当前结果无法核验')
   } catch (error) {
     console.error('扫描失败:', error)
-    ElMessage.error('扫描失败，请查看控制台获取详情')
+    scanRequestError.value = '扫描请求失败，未获得可核验结果'
+    ElMessage.error('扫描失败，请检查连接后重试')
   } finally {
     scanning.value = false
   }
@@ -754,6 +861,42 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
+.scan-status-alert {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.scan-status-description {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.scan-issue-list {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 0 4px 0 18px;
+}
+
+.scan-issue-list li {
+  line-height: 1.5;
+}
+
+.scan-issue-heading {
+  margin-right: 8px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.scan-issue-message {
+  display: block;
+  margin-top: 3px;
+  color: var(--el-text-color-secondary);
+  overflow-wrap: anywhere;
+}
+
 .stat-item {
   text-align: center;
   padding: 12px;
@@ -777,6 +920,12 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   font-weight: 500;
+}
+
+.stat-note {
+  margin-top: 4px;
+  color: var(--el-color-warning);
+  font-size: 11px;
 }
 
 .stat-danger .stat-value {

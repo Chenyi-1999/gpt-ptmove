@@ -90,5 +90,18 @@ func (s *Service) saveScanCache(data map[string]any) error {
 	if err := os.MkdirAll(filepath.Dir(s.cacheFile), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(s.cacheFile, content, 0o644)
+	file, err := os.CreateTemp(filepath.Dir(s.cacheFile), ".local-scan-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	_, writeErr := file.Write(content)
+	closeErr := file.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return os.Rename(file.Name(), s.cacheFile)
 }

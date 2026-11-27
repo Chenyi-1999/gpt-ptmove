@@ -83,6 +83,17 @@ func (r *LocalQueryRepository) ListTorrents(path string, videoOnly bool) ([]Loca
 	return rows, nil
 }
 
+// ListScanReferences 读取全部目录引用，包含隐藏或被页面筛选掉的任务。
+func (r *LocalQueryRepository) ListScanReferences() ([]LocalTorrentRecord, error) {
+	rows := make([]LocalTorrentRecord, 0)
+	err := r.store.DB.Raw(`
+		SELECT name, save_path, downloader_id
+		FROM torrents
+		WHERE save_path IS NOT NULL AND TRIM(save_path) != ''
+	`).Scan(&rows).Error
+	return rows, err
+}
+
 func (r *LocalQueryRepository) ListDuplicateNames(videoOnly bool) ([]DuplicateNameRow, error) {
 	rows := make([]DuplicateNameRow, 0)
 	query := `

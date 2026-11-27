@@ -1,4 +1,4 @@
-import{d as X,an as me,i as $,g as o,r as m,b as E,e as s,k as r,f as a,u as ge,m as n,aY as c,_ as Z,o as we,T as ye,c as Q,j as P,p as d,U as ke,t as w,n as W}from"./index-DnCkIbo-.js";const xe=`请为 STARPT 生成一个站点配置 JSON，内容必须符合我提供的当前版本 Schema 和模板。根据我提供的脱敏 URL 和服务器实际返回的 HTML 选取路径和选择器。
+import{d as X,an as me,i as $,g as o,r as m,b as E,e as s,k as r,f as a,u as ge,m as n,aY as c,_ as Z,o as we,T as ye,c as Q,j as P,p as d,U as ke,t as w,n as W}from"./index-BzIEOdXO.js";const xe=`请为 STARPT 生成一个站点配置 JSON，内容必须符合我提供的当前版本 Schema 和模板。根据我提供的脱敏 URL 和服务器实际返回的 HTML 选取路径和选择器。
 
 站点名称：[名称]
 站点 ID：[希望使用的唯一小写代号]

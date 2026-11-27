@@ -60,6 +60,9 @@ func validateJob(j Job) error {
 		if j.Method != http.MethodGet || len(j.Body) != 0 {
 			return errors.New("qB endpoint is read-only")
 		}
+		if j.URI == localScanReferencesURI {
+			return nil
+		}
 		switch u.Path {
 		case "/api/v2/app/version", "/api/v2/app/webapiVersion", "/api/v2/sync/maindata",
 			"/api/v2/transfer/info", "/api/v2/torrents/info", "/api/v2/torrents/tags",
@@ -91,7 +94,7 @@ func validateJob(j Job) error {
 			}
 			return errors.New("unsupported screenshot mode")
 		case "/api/media/mediainfo", "/api/media/episode-count",
-			"/api/file/check", "/api/file/batch-check":
+			"/api/file/check", "/api/file/batch-check", "/api/file/scan":
 			return nil
 		}
 	}

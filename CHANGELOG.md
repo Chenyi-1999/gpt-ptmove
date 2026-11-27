@@ -936,3 +936,20 @@
 - 更新 docs/DEPLOYMENT.json。152 和 OVH 的断网候选及生产容器均验证通过，启用 v1.1.6。两机前端归档和后端二进制哈希一致，公网各核对 51 个页面或资产、健康和匿名 401。配置、挂载及回滚对象已核对，OVH 正常完成一轮切换后的原有 RSS 周期，重启次数为 0。
 - 源码 7e2cfc2bd7299ac2eb2c45bf585ce76e40140da4 及 v1.1.6 标签已同步两仓。GitHub 发行 460440886 完整镜像、Compose、校验文件和示例附件已核验。Gitee 发行 1376030 提供同版镜像入口及三个小附件，已授权回读比对。
 - 152 验证镜像 SHA-256 为 c681a21b30c50282f89a3173a8069b23a5ee0b7413361d2c4ff4f46a596ad4fc，D 盘发布 ZIP 完成 108 个 OCI 对象与 CRC 校验并登记索引。未手动执行删除生产数据、下载、发种或访问 81。记录时本回执的单独提交和推送待执行。
+
+
+## PTM-20261127-REMOTE-LOCAL-QUERY — 2026-11-27T21:09:42+08:00 — Codex root / pull_server / scan_agent / scan_ui，远程下载目录只读扫描
+
+- STARPT 后端修改 nexus/server/internal/{http/handler/local_query_handler.go,repository/local_query_repository.go,service/localquery/{scan,remote_scan,remote_scan_test,helpers,types,cache_paths}.go,service/downloaderclient/remote_local_scan{,_test}.go}。复用 HTTPS 领单通道读取客户端本地 qB 的未筛选任务引用，再扫描所选保存目录的顶层文件与内容目录。孤立候选会触发 qB 引用复核，扫描结果缓存原子更新。目录离线、不可访问、未能完整复核时标为未核验或失败。
+- 修改 nexus/proxy/{file_scan{,_test}.go,media_security.go,pull/{agent,protocol,file_scan_test,scan_references}.go}。媒体代理限定下载目录白名单，核对目录变化及链接，回传差异所需的文件元数据。领单端先在客户端裁剪 qB 返回字段。全链路仅查询，无文件内容传输、删除接口或下载器写操作。
+- 修改 nexus/webui/src/views/SitesView.vue，展示完整、部分和未核验状态、失败目录与历史标签，过期缓存响应不能覆盖当前扫描。更新 docs/{API_CONTRACT,REMOTE_SCREENSHOTS}.md、nexus/{proxy/README.nas,server/docs/PROJECT_STRUCTURE}.md。
+- 152 断网容器通过 Go 服务端全量、媒体代理扫描（含符号链接和路径拒绝）及 HTTPS 领单模块测试。模拟覆盖缺失、孤立、页面隐藏和共享目录引用、下载器引用变化、目录不可访问、客户端离线和结果回传。Windows 定向测试通过，Windows 全量的 SQLite 清理失败已在未改动基线复现，Linux 全量通过。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试和 Vite 构建通过，保留分包体积提示。Edge 夹具验证了桌面完整与离线、390px 部分完成、旧缓存和延迟缓存五组场景，无页面错误或外部请求。报告与截图位于 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/remote-local-scan-20261127。
+- 已在独立工作树实现。未提交、推送、发行或更新生产容器，152 仅用于断网测试，未部署 OVH 或连实际飞牛，未操作 81。正式启用需同步更新 STARPT、领单 Hub、客户端和媒体代理，在实际白名单目录完成验收。此功能按顶层路径核验，不递归校验每个文件。
+
+
+## PTM-20261127-REMOTE-LOCAL-QUERY-PACKAGE — 2026-11-27T21:18:00+08:00 — Codex root，生成扫描部署产物
+
+- 同步已通过浏览器验收的 nexus/webui/dist 45 个文件和 nexus/proxy/pt-nexus-box-proxy 的 Linux amd64 构建。飞牛领单端和媒体代理构建 Linux amd64 与 arm64 二进制。本次不创建发行标签。
+- 152 当前 STARPT 为 1.1.6，Hub 为 0.3.1-pull.3。经用户确认的专用中转登录独立飞牛 star-SSD，实际领单端为 0.3.1-pull.5、媒体代理为 0.3.1-mediainfo.1，现场确认 /keep、/temp 均只读挂载。没有操作 81 本机或中转配置。
+- 既有模拟测试结果见 PTM-20261127-REMOTE-LOCAL-QUERY。记录时构建产物已生成，候选容器、生产切换和实扫待验证，提交、推送和发布待执行。

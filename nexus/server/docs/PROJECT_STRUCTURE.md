@@ -480,7 +480,7 @@
 | 目录 | 说明 |
 |---|---|
 | `internal/service/crossseed` | Cross-seed 查询与删除等 |
-| `internal/service/localquery` | 本地路径扫描、缓存、重复分析 |
+| `internal/service/localquery` | 本地和远程下载目录核验、缓存、重复分析。远程目录经 `downloaderclient` 调用已有 HTTPS 领单通道。 |
 | `internal/service/settings` | 设置读写、UI 设置、本地背景图、迁移配置、下载器信息 |
 
 本地背景图落盘目录：`{DataDir}/backgrounds/`；内置默认图：`internal/service/settings/default_backgrounds/`（embed，空目录时种子写入）。

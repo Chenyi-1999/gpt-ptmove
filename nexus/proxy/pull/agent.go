@@ -269,7 +269,12 @@ func (a *pullAgent) execute(ctx context.Context, target agentTarget, job Job) Re
 	if validateJob(job) != nil {
 		return fail(http.StatusBadRequest, "local request denied")
 	}
-	request, err := http.NewRequestWithContext(ctx, job.Method, target.origin+job.URI, bytes.NewReader(job.Body))
+	upstreamURI := job.URI
+	scanReferences := job.URI == localScanReferencesURI
+	if scanReferences {
+		upstreamURI = "/api/v2/torrents/info?filter=all"
+	}
+	request, err := http.NewRequestWithContext(ctx, job.Method, target.origin+upstreamURI, bytes.NewReader(job.Body))
 	if err != nil {
 		return fail(http.StatusBadRequest, "invalid local request")
 	}
@@ -295,12 +300,22 @@ func (a *pullAgent) execute(ctx context.Context, target agentTarget, job Job) Re
 		(encoding != "" && !strings.EqualFold(encoding, "identity")) {
 		return fail(http.StatusBadGateway, "unsupported local response")
 	}
+	if scanReferences && response.StatusCode != http.StatusOK {
+		return fail(response.StatusCode, "local qB reference list unavailable")
+	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) && err != nil {
 		return fail(http.StatusGatewayTimeout, "local response timed out")
 	}
 	if err != nil || len(data) > maxResponseBytes {
 		return fail(http.StatusBadGateway, "local response unreadable or oversized")
+	}
+	if scanReferences {
+		data, err = projectLocalScanReferences(data)
+		if err != nil || len(data) > maxResponseBytes {
+			return fail(http.StatusBadGateway, "invalid local qB reference list")
+		}
+		contentType = "application/json"
 	}
 	result.Status = response.StatusCode
 	result.ContentType = contentType

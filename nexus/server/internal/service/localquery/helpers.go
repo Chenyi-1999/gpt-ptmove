@@ -2,6 +2,8 @@ package localquery
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -25,9 +27,32 @@ func (s *Service) downloaderMap() map[string]downloaderMeta {
 			Name:     toString(item["name"], "未知"),
 			Mappings: parsePathMappings(item["path_mappings"]),
 			Remote:   isRemoteDownloader(item),
+			ScanPeer: scanPeer(item),
 		}
 	}
 	return result
+}
+
+// scanPeer 标识同一个媒体端口，便于把共用该代理的下载器引用合并检查。
+func scanPeer(item map[string]any) string {
+	host := strings.TrimSpace(toString(item["host"], ""))
+	if !strings.Contains(host, "://") {
+		host = "http://" + host
+	}
+	parsed, err := url.Parse(host)
+	if err != nil || parsed.Hostname() == "" {
+		return ""
+	}
+	hostname := strings.ToLower(parsed.Hostname())
+	if hostname == "localhost" {
+		hostname = "127.0.0.1"
+	}
+	port := 9090
+	fmt.Sscan(toString(item["proxy_port"], ""), &port)
+	if port <= 0 {
+		port = 9090
+	}
+	return net.JoinHostPort(hostname, fmt.Sprint(port))
 }
 
 func (s *Service) downloadersInConfigOrder() []downloaderMeta {

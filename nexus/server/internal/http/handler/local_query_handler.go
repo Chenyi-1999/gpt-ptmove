@@ -49,7 +49,7 @@ func (h *LocalQueryHandler) DownloadersWithPaths(c *gin.Context) {
 
 func (h *LocalQueryHandler) Scan(c *gin.Context) {
 	path := c.Query("path")
-	result, err := h.service.Scan(path, localQueryBool(c.Query("video_only")))
+	result, err := h.service.Scan(c.Request.Context(), path, localQueryBool(c.Query("video_only")))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

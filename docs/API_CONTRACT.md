@@ -143,3 +143,11 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 - `GET /api/plugins/{id}/schedule` 读取定时计划；`PUT` 接受 `{enabled,action,interval_minutes}`。时间戳使用 Unix 秒。定时操作只引用已加载的插件，目录刷新和运行计划相互独立。
 
 现有 `/api/automation` 与 `/api/v1` 自动化接口保留。禁用内置自动转种插件后，手动及定时执行入口停止接受新的下载和发种操作；任务与预览读取继续可用。
+
+## 本地文件查询
+
+管理员使用 `POST /api/local_query/scan?path=...&video_only=1` 扫描选定范围。省略 `path` 时扫描所选任务的保存目录。结果包含 `scan_summary`、`missing_files`、`orphaned_files`、`synced_torrents` 和 `scanned_at`。缺失、孤立和已找到的计数只覆盖完成核验的目录。总种子数是数据库中本次选中的任务数。
+
+`scan_status` 为 `complete`、`partial` 或 `unverified`。详情 `scan_issues` 按目录返回 `path`、`downloader_name`、`status` 和 `message`。客户端离线、目录不可访问、引用不完整或达到扫描限制时，该范围没有可用于计数的结果。`GET /api/local_query/scan/cache` 返回上次的扫描结果。
+
+远程 qB 引用清单经已有 HTTPS 领单通道返回，只含哈希、保存路径和内容路径。媒体客户端只扫描白名单目录的顶层项目，返回缺失名称以及孤立文件的名称和体积。此流程不传输文件内容，也不提供删除操作。

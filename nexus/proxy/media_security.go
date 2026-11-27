@@ -18,7 +18,12 @@ const maxMediaBody = 64 << 10
 
 type mediaPolicy struct {
 	tokenHash [32]byte
-	roots     []string
+	roots     []mediaRoot
+}
+
+type mediaRoot struct {
+	path     string
+	identity os.FileInfo
 }
 
 // Roots are an explicit JSON array of absolute directories; no OS-dependent delimiter.
@@ -46,7 +51,13 @@ func loadMediaPolicy(token, rawRoots string) (*mediaPolicy, error) {
 		if err != nil || !info.IsDir() {
 			return nil, errors.New("media root must be a directory")
 		}
-		policy.roots = append(policy.roots, canonical)
+		root := mediaRoot{path: canonical}
+		// 目录句柄提供稳定身份。无法打开时保留既有媒体功能，但不允许目录扫描。
+		if directory, err := os.OpenRoot(canonical); err == nil {
+			root.identity, _ = directory.Stat(".")
+			_ = directory.Close()
+		}
+		policy.roots = append(policy.roots, root)
 	}
 	return policy, nil
 }
@@ -83,7 +94,7 @@ func (p *mediaPolicy) resolve(raw string) (string, error) {
 		canonical = filepath.Join(canonical, suffix[i])
 	}
 	for _, root := range p.roots {
-		relative, err := filepath.Rel(root, canonical)
+		relative, err := filepath.Rel(root.path, canonical)
 		if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative) {
 			return canonical, nil
 		}
@@ -100,6 +111,7 @@ func newMediaHandler(policy *mediaPolicy) http.Handler {
 	routes := map[string]http.HandlerFunc{
 		"/api/media/screenshot": screenshotHandler, "/api/media/mediainfo": mediainfoHandler,
 		"/api/file/check": fileCheckHandler, "/api/file/batch-check": batchFileCheckHandler,
+		"/api/file/scan":           policy.fileScanHandler,
 		"/api/media/episode-count": episodeCountHandler,
 	}
 	for path, handler := range routes {
@@ -159,6 +171,10 @@ func (p *mediaPolicy) protect(next http.Handler, gate chan struct{}) http.Handle
 				http.Error(w, "media path denied", 403)
 				return
 			}
+			if r.URL.Path == "/api/file/scan" && filepath.Clean(path) != resolved {
+				http.Error(w, "file scan directory alias cannot be verified", http.StatusUnprocessableEntity)
+				return
+			}
 			data["remote_path"], _ = json.Marshal(resolved)
 		}
 		if value, ok := data["remote_paths"]; ok {
@@ -210,6 +226,8 @@ func mediaRequestFields(path string) (map[string]bool, string) {
 	case "/api/file/batch-check":
 		names = []string{"remote_paths"}
 		required = "remote_paths"
+	case "/api/file/scan":
+		names = []string{"remote_path", "expected", "referenced"}
 	default:
 		return nil, ""
 	}
