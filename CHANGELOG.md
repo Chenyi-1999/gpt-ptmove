@@ -881,3 +881,11 @@
 - 152 和 OVH 分别以各自原有 v1.1.4 镜像叠加相同前端，当前标签 ptmove-nexus:1.1.4-ui.1。两台断网候选验证和容器健康检查通过。初次隔离探针假定镜像有 curl，改用镜像内置健康检查后复测通过。后端二进制 SHA、环境、配置和数据挂载逐一核对，本次只改前端层。保留 152 的原镜像与 Compose 副本、OVH 的原容器及两台一致性 SQLite 备用快照。OVH 保留北洋园轮询原状态并观察到切换后完成一轮，容器重启次数 0。
 - 两个公网入口各核对 47 个页面或资源路径和健康接口。OVH 去除边缘注入的 Cloudflare 分析脚本及额外换行后，HTML 与源站字节一致，静态资源直接比较通过。两边未认证设置请求均返回 401。部署入口为 http://152.136.236.238:18120/ 和 https://ovh-starpt.star1999.de/。生产验证覆盖公开页面与静态资源，登录后交互沿用前轮隔离浏览器验收。
 - 更新 docs/DEPLOYMENT.json 的本次 UI 叠加记录。未改正式发行标签或创建发行附件，未手工运行转种、发种或下载，未访问 81。记录时本回执的单独提交和同步待执行。
+
+
+## PTM-20261127-SITE-PROFILE-GUIDE-UI — 2026-11-27T13:15:39+08:00 — Codex root / ptgen_review，站点配置编写说明入口
+
+- 从 GitHub 与 Gitee 一致的 b55b0b2 建独立工作树。保留原 master 工作区的本地改动。修改 nexus/webui/src/components/settings/SiteProfilesSettings.vue，新增 SiteProfileGuide.vue、提示词和示例资源。站点档案说明可在网页内打开、复制和下载，剪贴板不可用时选择正文。新增文档内容同步测试并重建 45 个前端文件。
+- 更新 nexus/VERSION、nexus/server/internal/bootstrap/fork_update.go、nexus/Dockerfile.ptmove、两个 STARPT Compose 和 docs/RELEASE-v1.1.5.md。没有修改站点档案接口和导入规则。
+- Vue 类型检查、定向 ESLint、Vite 生产构建及 10 项 Node 测试通过。隔离 Edge 实测 1440、390 和 320px，下载内容与文档逐字节相同，复制与回退、焦点和原导入入口正常，无写 API、外网访问或页面错误。截图及报告位于 D:/A_GPT/GPT-BackUp/GPT-PTMOVE/2026-11/staging/site-profile-guide-20261127。未验证物理手机，Vite 保留已有大分包提示。
+- 152 的 Linux Go 全量测试、离线容器中的健康、版本、示例 JSON 和匿名 401 检查通过。152 已上线 v1.1.5，源站文件哈希、数据挂载和配置核对通过。保留原镜像与 SQLite 一致性快照。记录时本次源码提交、双仓发行、完整镜像归档和 OVH 切换待执行。未手动下载或发种，未操作 81。

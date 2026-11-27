@@ -15,6 +15,7 @@
         ><div class="head">
           <strong>已登记站点</strong>
           <div>
+            <el-button @click="guideOpen = true">编写说明</el-button>
             <el-button @click="download('/api/site-profiles/schema', 'site-profile.schema.json')"
               >下载 Schema</el-button
             ><el-button
@@ -43,6 +44,7 @@
         ></el-table
       ></el-card
     >
+    <SiteProfileGuide v-model="guideOpen" />
     <el-dialog
       v-model="editorOpen"
       :title="editing ? '检查配置' : '导入配置'"
@@ -124,6 +126,8 @@
 import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, type UploadFile } from 'element-plus'
+import SiteProfileGuide from './SiteProfileGuide.vue'
+
 type Profile = {
   id: string
   name: string
@@ -142,6 +146,7 @@ const loading = ref(false),
   previewing = ref(false),
   error = ref(''),
   profiles = ref<Profile[]>([]),
+  guideOpen = ref(false),
   editorOpen = ref(false),
   credentialsOpen = ref(false),
   editing = ref(false),

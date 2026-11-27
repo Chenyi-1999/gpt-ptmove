@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "example-tracker",
+  "name": "示例站点",
+  "base_url": "https://tracker.example.org",
+  "roles": ["source"],
+  "engine": "nexusphp",
+  "ptnexus_site": null,
+  "official_groups": ["ExampleWEB"],
+  "announce_hosts": ["announce.example.org"],
+  "paths": {
+    "listing": "/torrents.php",
+    "detail": "/details.php?id={id}",
+    "download": "/download.php?id={id}",
+    "search": "/torrents.php?search={query}"
+  },
+  "selectors": {
+    "table": "table#torrenttable",
+    "detail_link": "a[href*=\"details.php?id=\"]",
+    "title": "h1.torrent-title",
+    "description": "#kdescr",
+    "download_link": "a[href*=\"download.php?id=\"]",
+    "tags": "#torrent-info .tag",
+    "peers": "#torrent-info .seeders",
+    "seeders": "#torrent-info .seeders",
+    "leechers": "#torrent-info .leechers",
+    "official": "#torrent-info .official",
+    "restriction_allowed": "#torrent-info .repost-allowed",
+    "restriction_denied": "#torrent-info .repost-denied"
+  }
+}

@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.1.4"
+const forkVersion = "1.1.5"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,8 +17,13 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-27",
+				"changes": []string{"站点配置档案增加编写说明、AI 提示词复制和示例 JSON 下载"},
+			},
+			{
+				"version": "1.1.4",
 				"date":    "2026-11-26",
-				"changes": []string{"增加手动刷新的 ZIP/WASM 插件、可配置操作和定时运行", "自动转种进入插件页并支持独立启停"},
+				"changes": []string{"转种设置增加可排序的 PTGen 来源，可按顺序查询海报和简介"},
 			},
 			{
 				"version": "1.0.16",
