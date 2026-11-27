@@ -1,62 +1,60 @@
 <template>
   <div class="sites-view-container">
-    <section class="sites-overview" aria-labelledby="sites-overview-title">
-      <header class="sites-overview__heading">
-        <div>
+    <header class="sites-overview sites-overview__heading">
+      <h1>站点与存储</h1>
+      <el-button
+        class="sites-overview__refresh"
+        :loading="siteStatsLoading || groupStatsLoading"
+        :icon="Refresh"
+        @click="refreshStats"
+      >
+        刷新统计
+      </el-button>
+    </header>
 
-          <h1 id="sites-overview-title">站点与存储</h1>
+    <div class="layout-wrapper" :class="{ 'layout-wrapper--two-columns': sitesLayout.columns === 2 }">
+      <template v-for="panel in sitesLayout.order" :key="panel">
+        <section v-if="panel === 'summary'" class="sites-overview__chart-card"
+          data-panel="summary" aria-labelledby="seeding-summary-title">
+          <h2 id="seeding-summary-title" class="quadrant-title">做种汇总</h2>
+          <div class="sites-overview__metrics">
+            <article class="sites-overview__metric">
+              <span class="sites-overview__metric-icon sites-overview__metric-icon--violet"><Connection aria-hidden="true" /></span>
+              <div>
+                <p>已收录站点</p>
+                <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(siteStatsData.length) : '—' }}</strong>
+              </div>
+            </article>
+            <article class="sites-overview__metric">
+              <span class="sites-overview__metric-icon sites-overview__metric-icon--blue"><Files aria-hidden="true" /></span>
+              <div>
+                <p>各站种子数</p>
+                <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(totalTorrents) : '—' }}</strong>
+              </div>
+            </article>
+            <article class="sites-overview__metric">
+              <span class="sites-overview__metric-icon sites-overview__metric-icon--mint"><Coin aria-hidden="true" /></span>
+              <div>
+                <p>各站做种体积</p>
+                <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatBytes(totalSiteBytes) : '—' }}</strong>
+                <span class="sites-overview__metric-note">按站点分别计入</span>
+              </div>
+            </article>
+            <article class="sites-overview__metric">
+              <span class="sites-overview__metric-icon sites-overview__metric-icon--amber"><Medal aria-hidden="true" /></span>
+              <div>
+                <p>官组记录</p>
+                <strong>{{ groupStatsData.length || (!groupStatsLoading && !groupStatsError) ? formatCount(groupStatsData.length) : '—' }}</strong>
+                <span class="sites-overview__metric-note">{{ selectedSite || '全部站点' }}</span>
+              </div>
+            </article>
+          </div>
+        </section>
 
-        </div>
-        <el-button
-          class="sites-overview__refresh"
-          :loading="siteStatsLoading || groupStatsLoading"
-          :icon="Refresh"
-          @click="refreshStats"
-        >
-          刷新统计
-        </el-button>
-      </header>
-
-      <div class="sites-overview__metrics" aria-label="做种汇总">
-        <article class="sites-overview__metric">
-          <span class="sites-overview__metric-icon sites-overview__metric-icon--violet"><Connection aria-hidden="true" /></span>
-          <div>
-            <p>已收录站点</p>
-            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(siteStatsData.length) : '—' }}</strong>
-          </div>
-        </article>
-        <article class="sites-overview__metric">
-          <span class="sites-overview__metric-icon sites-overview__metric-icon--blue"><Files aria-hidden="true" /></span>
-          <div>
-            <p>各站种子数</p>
-            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatCount(totalTorrents) : '—' }}</strong>
-          </div>
-        </article>
-        <article class="sites-overview__metric">
-          <span class="sites-overview__metric-icon sites-overview__metric-icon--mint"><Coin aria-hidden="true" /></span>
-          <div>
-            <p>各站做种体积</p>
-            <strong>{{ siteStatsData.length || (!siteStatsLoading && !siteStatsError) ? formatBytes(totalSiteBytes) : '—' }}</strong>
-          </div>
-          <span class="sites-overview__metric-note">按站点分别计入</span>
-        </article>
-        <article class="sites-overview__metric">
-          <span class="sites-overview__metric-icon sites-overview__metric-icon--amber"><Medal aria-hidden="true" /></span>
-          <div>
-            <p>官组记录</p>
-            <strong>{{ groupStatsData.length || (!groupStatsLoading && !groupStatsError) ? formatCount(groupStatsData.length) : '—' }}</strong>
-          </div>
-          <span class="sites-overview__metric-note">{{ selectedSite || '全部站点' }}</span>
-        </article>
-      </div>
-
-      <div class="sites-overview__charts">
-        <article class="sites-overview__chart-card" aria-labelledby="site-storage-title">
+        <section v-else-if="panel === 'site-chart'" class="sites-overview__chart-card"
+          data-panel="site-chart" aria-labelledby="site-storage-title">
           <div class="sites-overview__chart-heading">
-            <div>
-
-              <h2 id="site-storage-title">站点空间分布</h2>
-            </div>
+            <h2 id="site-storage-title">站点空间分布</h2>
             <span class="sites-overview__chart-unit">总大小 · 前 5</span>
           </div>
           <div v-if="siteStatsError" class="sites-overview__chart-state" role="status">
@@ -84,14 +82,12 @@
               </div>
             </div>
           </div>
-        </article>
+        </section>
 
-        <article class="sites-overview__chart-card" aria-labelledby="group-count-title">
+        <section v-else-if="panel === 'group-chart'" class="sites-overview__chart-card"
+          data-panel="group-chart" aria-labelledby="group-count-title">
           <div class="sites-overview__chart-heading">
-            <div>
-
-              <h2 id="group-count-title">官组分布</h2>
-            </div>
+            <h2 id="group-count-title">官组分布</h2>
             <span class="sites-overview__chart-unit">种子数量 · 前 5</span>
           </div>
           <div v-if="groupStatsError" class="sites-overview__chart-state" role="status">
@@ -119,334 +115,321 @@
               </div>
             </div>
           </div>
-        </article>
-      </div>
-    </section>
+        </section>
 
-    <div class="layout-wrapper">
-      <!-- 第一个象限：做种站点统计 -->
-      <div class="quadrant glass-card glass-rounded">
-        <h2 class="quadrant-title">做种站点统计</h2>
-        <!-- [修改] 添加 table-wrapper 用于在极端情况下提供水平滚动 -->
-        <div class="table-wrapper">
-          <el-table v-loading="siteStatsLoading" :data="siteStatsData" class="stats-table glass-table"  border height="100%"
-            :default-sort="{ prop: 'total_size', order: 'descending' }">
-            <template #empty>
-              <el-empty description="无站点数据" />
-            </template>
-            <el-table-column prop="site_name" label="站点名称" align="center" sortable min-width="120" />
-            <el-table-column prop="torrent_count" label="做种数量" sortable align="center" />
-            <el-table-column prop="total_size" label="做种总体积" sortable align="center" min-width="100">
-              <template #default="scope">
-                <span>{{ formatBytes(scope.row.total_size) }}</span>
+        <section v-else-if="panel === 'site-stats'" class="quadrant glass-card glass-rounded"
+          data-panel="site-stats" aria-labelledby="site-seeding-stats-title">
+          <h2 id="site-seeding-stats-title" class="quadrant-title">做种站点统计</h2>
+          <div class="table-wrapper">
+            <el-table v-loading="siteStatsLoading" :data="siteStatsData" class="stats-table glass-table" border max-height="360"
+              :default-sort="{ prop: 'total_size', order: 'descending' }">
+              <template #empty>
+                <el-empty description="无站点数据" />
               </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
-
-      <!-- 第二个象限：做种官组统计 -->
-      <div class="quadrant glass-card glass-rounded">
-        <h2 class="quadrant-title group-title">
-          <span>做种官组统计</span>
-          <el-select v-model="selectedSite" placeholder="全部站点" clearable filterable size="small" class="group-site-select"
-            @change="handleSiteChange">
-            <el-option v-for="s in siteStatsData" :key="s.site_name" :label="s.site_name" :value="s.site_name" />
-          </el-select>
-        </h2>
-        <!-- [修改] 添加 table-wrapper 用于在极端情况下提供水平滚动 -->
-        <div class="table-wrapper">
-          <el-table v-loading="groupStatsLoading" :data="groupStatsData" class="stats-table glass-table" border height="100%"
-            :default-sort="{ prop: 'total_size', order: 'descending' }">
-            <template #empty>
-              <el-empty description="无官组数据" />
-            </template>
-            <el-table-column prop="site_name" label="所属站点" align="center" sortable width="110" />
-            <el-table-column :label="selectedSite ? '官组' : '官组'" prop="group_suffix" sortable align="center" />
-            <el-table-column prop="torrent_count" label="数量" sortable align="center" width="80" />
-            <el-table-column prop="total_size" label="体积" sortable align="center" width="90">
-              <template #default="scope">
-                <span>{{ formatBytes(scope.row.total_size) }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
-
-      <!-- 第三个象限：本地文件扫描 -->
-      <div class="quadrant local-scan-quadrant glass-card glass-rounded">
-        <div class="scan-header">
-          <div class="scan-header-left">
-            <h2 class="quadrant-title">本地文件扫描</h2>
-            <p class="scan-description">核验保存目录的顶层项目，检查缺失和孤立文件。远程目录由 HTTPS 领单客户端核验。</p>
+              <el-table-column prop="site_name" label="站点名称" align="center" sortable min-width="120" />
+              <el-table-column prop="torrent_count" label="做种数量" sortable align="center" />
+              <el-table-column prop="total_size" label="做种总体积" sortable align="center" min-width="100">
+                <template #default="scope">
+                  <span>{{ formatBytes(scope.row.total_size) }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
-          <div class="scan-controls">
-            <el-select v-model="selectedPath" clearable placeholder="选择路径(可选)" filterable size="default"
-              class="scan-path-select" :disabled="scanning || syncingDownloaders">
-              <el-option-group v-for="downloader in downloadersWithPaths" :key="downloader.id" :label="downloader.name">
-                <el-option v-for="pathItem in downloader.paths" :key="pathItem.path" :label="pathItem.path"
-                  :value="pathItem.path">
-                  <span>{{ pathItem.path }}</span>
-                  <span v-if="pathItem.access_status === 'unavailable'" class="path-option-status path-option-unavailable">目录不可访问</span>
-                  <span v-else-if="pathItem.access_status === 'remote'" class="path-option-status">远程核验</span>
-                  <span v-else class="path-option-count">({{ pathItem.count }})</span>
-                </el-option>
-              </el-option-group>
+        </section>
+
+        <section v-else-if="panel === 'group-stats'" class="quadrant glass-card glass-rounded"
+          data-panel="group-stats" aria-labelledby="group-seeding-stats-title">
+          <div class="group-title">
+            <h2 id="group-seeding-stats-title" class="quadrant-title">做种官组统计</h2>
+            <el-select v-model="selectedSite" placeholder="全部站点" clearable filterable size="small" class="group-site-select"
+              aria-label="筛选官组所属站点"
+              @change="handleSiteChange">
+              <el-option v-for="s in siteStatsData" :key="s.site_name" :label="s.site_name" :value="s.site_name" />
             </el-select>
-            <el-button @click="syncDownloaders" :loading="syncingDownloaders" :disabled="scanning" :icon="Refresh">
-              同步下载器
-            </el-button>
-            <el-button type="primary" @click="startScan" :loading="scanning" :disabled="syncingDownloaders" :icon="Search">
-              {{ selectedPath ? '扫描选定路径' : '扫描全部路径' }}
-            </el-button>
           </div>
-        </div>
+          <div class="table-wrapper">
+            <el-table v-loading="groupStatsLoading" :data="groupStatsData" class="stats-table glass-table" border max-height="360"
+              :default-sort="{ prop: 'total_size', order: 'descending' }">
+              <template #empty>
+                <el-empty description="无官组数据" />
+              </template>
+              <el-table-column prop="site_name" label="所属站点" align="center" sortable width="110" />
+              <el-table-column label="官组" prop="group_suffix" sortable align="center" />
+              <el-table-column prop="torrent_count" label="数量" sortable align="center" width="80" />
+              <el-table-column prop="total_size" label="体积" sortable align="center" width="90">
+                <template #default="scope">
+                  <span>{{ formatBytes(scope.row.total_size) }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </section>
 
-        <el-alert
-          v-if="downloadersLoadError"
-          class="scan-status-alert"
-          type="error"
-          :title="downloadersLoadError"
-          :closable="false"
-          show-icon
-        />
-        <el-alert
-          v-else-if="downloadersLoading"
-          class="scan-status-alert"
-          type="info"
-          title="正在读取下载器和保存目录…"
-          :closable="false"
-          :show-icon="false"
-        />
-        <el-alert
-          v-else-if="downloaderPathHint"
-          class="scan-status-alert"
-          :type="downloaderPathHint.type"
-          :title="downloaderPathHint.title"
-          :description="downloaderPathHint.description"
-          :closable="false"
-          show-icon
-        />
-        <el-alert
-          v-if="downloaderSyncError"
-          class="scan-status-alert"
-          type="error"
-          :title="downloaderSyncError"
-          :closable="false"
-          show-icon
-        />
-        <el-alert
-          v-else-if="downloaderSyncMessage"
-          class="scan-status-alert"
-          :type="downloaderSyncMessage.type"
-          :title="downloaderSyncMessage.title"
-          :closable="false"
-          show-icon
-        />
-        <el-alert
-          v-if="unavailablePathCount > 0 && !downloadersLoadError"
-          class="scan-status-alert"
-          type="warning"
-          :title="`${formatCount(unavailablePathCount)} 个保存目录在服务端不可访问`"
-          description="请检查 STARPT 容器的只读挂载。若容器路径与下载器保存路径不同，请配置路径映射。"
-          :closable="false"
-          show-icon
-        />
+        <section v-else-if="panel === 'local-scan'" class="quadrant local-scan-quadrant glass-card glass-rounded"
+          data-panel="local-scan" aria-labelledby="local-file-scan-title">
+          <div class="scan-header">
+            <div class="scan-header-left">
+              <h2 id="local-file-scan-title" class="quadrant-title">本地文件扫描</h2>
+              <p class="scan-description">核验保存目录的顶层项目，检查缺失和孤立文件。远程目录由 HTTPS 领单客户端核验。</p>
+            </div>
+            <div class="scan-controls">
+              <el-select v-model="selectedPath" clearable placeholder="选择路径(可选)" filterable size="default"
+                class="scan-path-select" aria-label="选择扫描路径" :disabled="scanning || syncingDownloaders">
+                <el-option-group v-for="downloader in downloadersWithPaths" :key="downloader.id" :label="downloader.name">
+                  <el-option v-for="pathItem in downloader.paths" :key="pathItem.path" :label="pathItem.path"
+                    :value="pathItem.path">
+                    <span>{{ pathItem.path }}</span>
+                    <span v-if="pathItem.access_status === 'unavailable'" class="path-option-status path-option-unavailable">目录不可访问</span>
+                    <span v-else-if="pathItem.access_status === 'remote'" class="path-option-status">远程核验</span>
+                    <span v-else class="path-option-count">({{ pathItem.count }})</span>
+                  </el-option>
+                </el-option-group>
+              </el-select>
+              <el-button @click="syncDownloaders" :loading="syncingDownloaders" :disabled="scanning" :icon="Refresh">
+                同步下载器
+              </el-button>
+              <el-button type="primary" @click="startScan" :loading="scanning" :disabled="syncingDownloaders" :icon="Search">
+                {{ selectedPath ? '扫描选定路径' : '扫描全部路径' }}
+              </el-button>
+            </div>
+          </div>
 
-        <el-alert
-          v-if="scanRequestError"
-          class="scan-status-alert"
-          type="error"
-          :title="scanRequestError"
-          :closable="false"
-          show-icon
-        />
-
-        <el-alert
-            v-if="scanResult"
+          <el-alert
+            v-if="downloadersLoadError"
             class="scan-status-alert"
-            :type="scanStatus === 'complete' ? 'success' : scanStatus === 'partial' ? 'warning' : 'error'"
-            :title="scanStatusTitle"
+            type="error"
+            :title="downloadersLoadError"
             :closable="false"
             show-icon
-          >
-            <template v-if="scanStatus !== 'complete'">
-              <p class="scan-status-description">
-                {{ scanStatus === 'partial'
-                  ? '下方数量只统计已核验的路径；未核验或失败的路径不会按 0 缺失、0 孤立显示。'
-                  : '请按下方原因处理后重新扫描。' }}
-              </p>
-              <p v-if="legacyScanNote" class="scan-status-description">{{ legacyScanNote }}</p>
-              <ul v-if="scanIssues.length" class="scan-issue-list">
-                <li v-for="(issue, index) in scanIssues" :key="`${issue.downloader_name}-${issue.path}-${index}`">
-                  <span class="scan-issue-heading">
-                    {{ issue.downloader_name || '未知下载器' }} · {{ issue.path || '路径未提供' }}
-                  </span>
-                  <el-tag :type="issue.status === 'failed' ? 'danger' : 'warning'" size="small">
-                    {{ issue.status === 'failed' ? '读取失败' : '未核验' }}
-                  </el-tag>
-                  <span v-if="issue.message" class="scan-issue-message">{{ issue.message }}</span>
-                </li>
-              </ul>
-            </template>
-          </el-alert>
+          />
+          <el-alert
+            v-else-if="downloadersLoading"
+            class="scan-status-alert"
+            type="info"
+            title="正在读取下载器和保存目录…"
+            :closable="false"
+            :show-icon="false"
+          />
+          <el-alert
+            v-else-if="downloaderPathHint"
+            class="scan-status-alert"
+            :type="downloaderPathHint.type"
+            :title="downloaderPathHint.title"
+            :description="downloaderPathHint.description"
+            :closable="false"
+            show-icon
+          />
+          <el-alert
+            v-if="downloaderSyncError"
+            class="scan-status-alert"
+            type="error"
+            :title="downloaderSyncError"
+            :closable="false"
+            show-icon
+          />
+          <el-alert
+            v-else-if="downloaderSyncMessage"
+            class="scan-status-alert"
+            :type="downloaderSyncMessage.type"
+            :title="downloaderSyncMessage.title"
+            :closable="false"
+            show-icon
+          />
+          <el-alert
+            v-if="unavailablePathCount > 0 && !downloadersLoadError"
+            class="scan-status-alert"
+            type="warning"
+            :title="`${formatCount(unavailablePathCount)} 个保存目录在服务端不可访问`"
+            description="请检查 STARPT 容器的只读挂载。若容器路径与下载器保存路径不同，请配置路径映射。"
+            :closable="false"
+            show-icon
+          />
 
-        <!-- 扫描结果统计 -->
-        <div v-if="scanResult" class="scan-summary glass-card glass-rounded">
-          <el-row :gutter="16">
-            <el-col :xs="12" :sm="8" :md="4">
+          <el-alert
+            v-if="scanRequestError"
+            class="scan-status-alert"
+            type="error"
+            :title="scanRequestError"
+            :closable="false"
+            show-icon
+          />
+
+          <el-alert
+              v-if="scanResult"
+              class="scan-status-alert"
+              :type="scanStatus === 'complete' ? 'success' : scanStatus === 'partial' ? 'warning' : 'error'"
+              :title="scanStatusTitle"
+              :closable="false"
+              show-icon
+            >
+              <template v-if="scanStatus !== 'complete'">
+                <p class="scan-status-description">
+                  {{ scanStatus === 'partial'
+                    ? '下方数量只统计已核验的路径；未核验或失败的路径不会按 0 缺失、0 孤立显示。'
+                    : '请按下方原因处理后重新扫描。' }}
+                </p>
+                <p v-if="legacyScanNote" class="scan-status-description">{{ legacyScanNote }}</p>
+                <ul v-if="scanIssues.length" class="scan-issue-list">
+                  <li v-for="(issue, index) in scanIssues" :key="`${issue.downloader_name}-${issue.path}-${index}`">
+                    <span class="scan-issue-heading">
+                      {{ issue.downloader_name || '未知下载器' }} · {{ issue.path || '路径未提供' }}
+                    </span>
+                    <el-tag :type="issue.status === 'failed' ? 'danger' : 'warning'" size="small">
+                      {{ issue.status === 'failed' ? '读取失败' : '未核验' }}
+                    </el-tag>
+                    <span v-if="issue.message" class="scan-issue-message">{{ issue.message }}</span>
+                  </li>
+                </ul>
+              </template>
+            </el-alert>
+
+          <!-- 扫描结果统计 -->
+          <div v-if="scanResult" class="scan-summary glass-card glass-rounded">
+            <div class="scan-summary__metrics">
               <div class="stat-item">
                 <div class="stat-value">{{ summaryValue('total_torrents') }}</div>
                 <div class="stat-label">总种子数</div>
               </div>
-            </el-col>
-            <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item">
                 <div class="stat-value">{{ summaryValue('total_local_items') }}</div>
                 <div class="stat-label">目录项目数</div>
                 <div v-if="isPartialCount('total_local_items')" class="stat-note">已核验部分</div>
               </div>
-            </el-col>
-            <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-danger">
                 <div class="stat-value">{{ summaryValue('missing_count') }}</div>
                 <div class="stat-label">缺失文件</div>
                 <div v-if="isPartialCount('missing_count')" class="stat-note">已核验部分</div>
               </div>
-            </el-col>
-            <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-warning">
                 <div class="stat-value">{{ summaryValue('orphaned_count') }}</div>
                 <div class="stat-label">孤立文件</div>
                 <div v-if="isPartialCount('orphaned_count')" class="stat-note">已核验部分</div>
               </div>
-            </el-col>
-            <el-col :xs="12" :sm="8" :md="5">
               <div class="stat-item stat-success">
                 <div class="stat-value">{{ summaryValue('synced_count') }}</div>
                 <div class="stat-label">已找到文件</div>
                 <div v-if="isPartialCount('synced_count')" class="stat-note">已核验部分</div>
               </div>
-            </el-col>
-          </el-row>
-        </div>
-
-        <!-- 结果详情 -->
-        <div v-if="scanResult && scanStatus !== 'unverified'" class="scan-results glass-card glass-rounded">
-          <div style="display: flex; align-items: center; gap: 12px; ">
-            <el-tabs v-model="activeTab" style="flex: 0 0 auto;">
-              <el-tab-pane name="missing">
-                <template #label>
-                  <span class="tab-label">
-                    缺失文件
-                    <el-badge v-if="scanResult.scan_summary.missing_count > 0"
-                      :value="scanResult.scan_summary.missing_count" type="danger" :max="999999" />
-                  </span>
-                </template>
-              </el-tab-pane>
-              <el-tab-pane name="orphaned">
-                <template #label>
-                  <span class="tab-label">
-                    孤立文件
-                    <el-badge v-if="scanResult.scan_summary.orphaned_count > 0"
-                      :value="scanResult.scan_summary.orphaned_count" type="warning" :max="999999" />
-                  </span>
-                </template>
-              </el-tab-pane>
-              <el-tab-pane name="synced">
-                <template #label>
-                  <span class="tab-label">
-                    已找到文件
-                    <el-badge v-if="scanResult.scan_summary.synced_count > 0"
-                      :value="scanResult.scan_summary.synced_count" type="success" :max="999999" />
-                  </span>
-                </template>
-              </el-tab-pane>
-            </el-tabs>
-            <el-select v-model="pathFilter" placeholder="筛选路径" clearable filterable class="path-filter-select">
-              <el-option v-for="path in allPaths" :key="path" :label="path" :value="path" />
-            </el-select>
-          </div>
-
-          <div class="tab-content-area">
-            <div v-if="activeTab === 'missing'" class="tab-content">
-              <el-table :data="filteredMissingFiles" class="glass-table glass-transition" height="100%"
-                :default-sort="{ prop: 'size', order: 'descending' }">
-                <el-table-column prop="name" label="种子名称" show-overflow-tooltip align="left" header-align="center" />
-                <el-table-column prop="save_path" label="保存路径"  align="center" width="250" show-overflow-tooltip
-                  header-align="center" />
-                <el-table-column prop="size" label="大小" width="110" sortable align="center">
-                  <template #default="{ row }">
-                    {{ formatBytes(row.size) }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="downloader_name" label="下载器" width="120" align="center" />
-              </el-table>
-            </div>
-
-            <div v-if="activeTab === 'orphaned'" class="tab-content">
-              <el-table :data="filteredOrphanedFiles" class="glass-table glass-transition" height="100%"
-                :default-sort="{ prop: 'size', order: 'descending' }">
-                <el-table-column prop="name" label="文件/文件夹名称" show-overflow-tooltip align="left"
-                  header-align="center" />
-                <el-table-column prop="path" label="所在路径" width="250" align="center" 
-                  :show-overflow-tooltip="{ placement: 'left' }"
-                  header-align="center" />
-                <el-table-column prop="size" label="大小" width="120" sortable align="center">
-                  <template #default="{ row }">
-                    {{ row.size ? formatBytes(row.size) : '未知' }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="is_file" label="类型" width="120" align="center" header-align="center">
-                  <template #default="{ row }">
-                    <el-tag :type="row.is_file ? 'success' : 'info'" size="small">
-                      {{ row.is_file ? '文件' : '文件夹' }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-
-            <div v-if="activeTab === 'synced'" class="tab-content">
-              <el-table :data="filteredSyncedTorrents" class="glass-table glass-transition" height="100%">
-                <el-table-column prop="name" label="名称" show-overflow-tooltip align="left" header-align="center" />
-                <el-table-column prop="path" label="路径" width="250" show-overflow-tooltip align="center"
-                  header-align="center" />
-                <el-table-column prop="torrents_count" label="任务数" width="120" align="center" header-align="center">
-                  <template #default="{ row }">
-                    <el-tag v-if="row.torrents_count > 0" type="warning" size="small">
-                      {{ row.torrents_count }}
-                    </el-tag>
-                    <span v-else>{{ row.torrents_count }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="下载器" width="120" align="center" header-align="center">
-                  <template #default="{ row }">
-                    <el-tag v-for="(name, index) in row.downloader_names" :key="index" size="small"
-                      style="margin-right: 4px">
-                      {{ name }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-              </el-table>
             </div>
           </div>
-        </div>
 
-        <div v-else-if="scanResult" class="empty-state-container">
-          <el-empty description="扫描未完成，因此没有可核验的文件清单" />
-        </div>
+          <!-- 结果详情 -->
+          <div v-if="scanResult && scanStatus !== 'unverified'" class="scan-results glass-card glass-rounded">
+            <div class="scan-results__controls">
+              <el-tabs v-model="activeTab" class="scan-results__tabs">
+                <el-tab-pane name="missing">
+                  <template #label>
+                    <span class="tab-label">
+                      缺失文件
+                      <el-badge v-if="scanResult.scan_summary.missing_count > 0"
+                        :value="scanResult.scan_summary.missing_count" type="danger" :max="999999" />
+                    </span>
+                  </template>
+                </el-tab-pane>
+                <el-tab-pane name="orphaned">
+                  <template #label>
+                    <span class="tab-label">
+                      孤立文件
+                      <el-badge v-if="scanResult.scan_summary.orphaned_count > 0"
+                        :value="scanResult.scan_summary.orphaned_count" type="warning" :max="999999" />
+                    </span>
+                  </template>
+                </el-tab-pane>
+                <el-tab-pane name="synced">
+                  <template #label>
+                    <span class="tab-label">
+                      已找到文件
+                      <el-badge v-if="scanResult.scan_summary.synced_count > 0"
+                        :value="scanResult.scan_summary.synced_count" type="success" :max="999999" />
+                    </span>
+                  </template>
+                </el-tab-pane>
+              </el-tabs>
+              <el-select v-model="pathFilter" placeholder="筛选路径" aria-label="筛选扫描结果路径" clearable filterable class="path-filter-select">
+                <el-option v-for="path in allPaths" :key="path" :label="path" :value="path" />
+              </el-select>
+            </div>
 
-        <!-- 加载中状态 -->
-        <div v-if="scanning" v-loading="scanning" element-loading-text="正在核验保存目录…"
-          element-loading-background="transparent" class="loading-container">
-        </div>
+            <div class="tab-content-area">
+              <div v-if="activeTab === 'missing'" class="tab-content">
+                <el-table :data="filteredMissingFiles" class="glass-table glass-transition" max-height="360"
+                  :default-sort="{ prop: 'size', order: 'descending' }">
+                  <el-table-column prop="name" label="种子名称" show-overflow-tooltip align="left" header-align="center" />
+                  <el-table-column prop="save_path" label="保存路径"  align="center" width="250" show-overflow-tooltip
+                    header-align="center" />
+                  <el-table-column prop="size" label="大小" width="110" sortable align="center">
+                    <template #default="{ row }">
+                      {{ formatBytes(row.size) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="downloader_name" label="下载器" width="120" align="center" />
+                </el-table>
+              </div>
 
-        <!-- 空状态 -->
-        <div v-if="!scanResult && !scanning" class="empty-state-container">
-          <el-empty :description="scanRequestError ? '扫描未取得结果，请修复连接后重新扫描' : '点击扫描按钮进行本地文件检查'" />
-        </div>
-      </div>
+              <div v-if="activeTab === 'orphaned'" class="tab-content">
+                <el-table :data="filteredOrphanedFiles" class="glass-table glass-transition" max-height="360"
+                  :default-sort="{ prop: 'size', order: 'descending' }">
+                  <el-table-column prop="name" label="文件/文件夹名称" show-overflow-tooltip align="left"
+                    header-align="center" />
+                  <el-table-column prop="path" label="所在路径" width="250" align="center"
+                    :show-overflow-tooltip="{ placement: 'left' }"
+                    header-align="center" />
+                  <el-table-column prop="size" label="大小" width="120" sortable align="center">
+                    <template #default="{ row }">
+                      {{ row.size ? formatBytes(row.size) : '未知' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="is_file" label="类型" width="120" align="center" header-align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="row.is_file ? 'success' : 'info'" size="small">
+                        {{ row.is_file ? '文件' : '文件夹' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+
+              <div v-if="activeTab === 'synced'" class="tab-content">
+                <el-table :data="filteredSyncedTorrents" class="glass-table glass-transition" max-height="360">
+                  <el-table-column prop="name" label="名称" show-overflow-tooltip align="left" header-align="center" />
+                  <el-table-column prop="path" label="路径" width="250" show-overflow-tooltip align="center"
+                    header-align="center" />
+                  <el-table-column prop="torrents_count" label="任务数" width="120" align="center" header-align="center">
+                    <template #default="{ row }">
+                      <el-tag v-if="row.torrents_count > 0" type="warning" size="small">
+                        {{ row.torrents_count }}
+                      </el-tag>
+                      <span v-else>{{ row.torrents_count }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="下载器" width="120" align="center" header-align="center">
+                    <template #default="{ row }">
+                      <el-tag v-for="(name, index) in row.downloader_names" :key="index" size="small"
+                        style="margin-right: 4px">
+                        {{ name }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="scanResult" class="empty-state-container">
+            <el-empty description="扫描未完成，因此没有可核验的文件清单" />
+          </div>
+
+          <!-- 加载中状态 -->
+          <div v-if="scanning" v-loading="scanning" element-loading-text="正在核验保存目录…"
+            element-loading-background="transparent" class="loading-container">
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="!scanResult && !scanning" class="empty-state-container">
+            <el-empty :description="scanRequestError ? '扫描未取得结果，请修复连接后重新扫描' : '点击扫描按钮进行本地文件检查'" />
+          </div>
+        </section>
+      </template>
     </div>
   </div>
 </template>
@@ -456,6 +439,7 @@ import { ref, onMounted, computed } from 'vue'
 import { Coin, Connection, Files, Medal, Refresh, Search } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { useContentFiltersStore } from '@/stores/contentFilters'
+import { useSitesLayoutStore } from '@/stores/sitesLayout'
 import { ElMessage } from '@/utils/uiNotify'
 
 interface SiteStat {
@@ -536,6 +520,7 @@ const emits = defineEmits<{
   ready: [refreshFn: () => Promise<void>]
 }>()
 const contentFiltersStore = useContentFiltersStore()
+const sitesLayout = useSitesLayoutStore()
 
 const siteStatsLoading = ref(true)
 const groupStatsLoading = ref(true)
@@ -879,108 +864,103 @@ const refreshAllData = async () => {
 }
 
 onMounted(() => {
+  void sitesLayout.load().catch(() => {
+    ElMessage.warning('未能读取做种检索布局，已显示默认布局')
+  })
   refreshAllData()
   emits('ready', refreshAllData)
 })
 </script>
 
 <style scoped lang="scss">
+/* Data dashboard surfaces follow STARPT's navy and violet visual system. */
 .sites-view-container {
   display: flex;
   flex-direction: column;
-  /* 在小屏幕上，高度需要自适应，而不是固定为 100vh */
-  min-height: 100vh;
-  padding: 10px 10px 50px 10px;
+  min-height: 100%;
+  padding: clamp(16px, 2.4vw, 30px);
   box-sizing: border-box;
+  gap: 24px;
+  color: var(--star-data-ink, #f4f3fb);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  /* 在大屏幕上隐藏滚动条，但在小屏幕上需要时会显示 */
   overflow: auto;
 }
 
 .layout-wrapper {
-  flex-grow: 1;
-  position: relative;
   display: grid;
-  /* 默认（大屏幕）状态：左侧宽度等于单行高度，使左侧区域看起来像正方形 */
-  grid-template-columns: minmax(300px, calc((100vh - 90px) / 2)) 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 20px;
-  min-height: 0;
+  width: min(100%, 1480px);
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 769px) {
+  .layout-wrapper--two-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .quadrant {
-  position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   padding: 15px;
   overflow: hidden;
-  min-height: 300px;
-}
-
-/* 第一、二个象限（做种站点、做种官组）在左侧上下排列 */
-.quadrant:nth-child(1),
-.quadrant:nth-child(2) {
-  grid-column: 1;
-}
-
-/* 第三个象限（待定内容）在右侧，跨越两行 */
-.quadrant:nth-child(3) {
-  grid-column: 2;
-  grid-row: 1 / 3;
+  border-color: var(--star-data-border, #293553) !important;
+  border-radius: var(--star-data-radius, 16px) !important;
+  background: var(--star-data-panel, #12182b) !important;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 12%) !important;
 }
 
 .quadrant-title {
   font-size: 1.1em;
   font-weight: 600;
-  color: #444;
+  color: var(--star-data-ink, #f4f3fb);
   margin: 0 0 10px 0;
   flex-shrink: 0;
 }
 
 .group-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  margin-bottom: 10px;
+}
+
+.group-title .quadrant-title {
+  margin-bottom: 0;
 }
 
 .group-site-select {
-  width: 240px;
+  width: min(240px, 100%);
 }
 
 .stats-table {
   width: 100%;
-  flex-grow: 1;
-  background-color: rgba(255, 255, 255, 0.3) !important;
 }
 
-:deep(.el-table) {
-  height: 100% !important;
-}
-
-/* [新增] 表格包装层，用于提供水平滚动 */
 .table-wrapper {
-  overflow-x: auto;
-  position: relative;
+  min-width: 0;
 }
 
-/* 本地扫描区块特殊样式 */
 .local-scan-quadrant {
-  display: flex;
-  flex-direction: column;
   gap: 16px;
+  min-height: 300px;
 }
 
 .scan-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   flex-shrink: 0;
-  gap: 20px;
+  gap: 12px;
 }
 
 .scan-header-left {
-  flex: 1;
+  flex: 1 1 240px;
   min-width: 0;
 }
 
@@ -991,14 +971,15 @@ onMounted(() => {
 .scan-description {
   margin: 0;
   font-size: 13px;
-  color: #909399;
+  color: var(--star-data-muted, #a8b3cf);
   line-height: 1.5;
 }
 
 .scan-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  flex-shrink: 0;
+  min-width: 0;
   gap: 10px;
 }
 
@@ -1007,7 +988,7 @@ onMounted(() => {
 }
 
 .scan-path-select {
-  width: 280px;
+  width: min(280px, 100%);
 }
 
 .path-option-status {
@@ -1029,6 +1010,12 @@ onMounted(() => {
 .scan-summary {
   padding: 10px;
   flex-shrink: 0;
+}
+
+.scan-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 94px), 1fr));
+  gap: 8px;
 }
 
 .scan-status-alert {
@@ -1080,8 +1067,9 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
   font-weight: 700;
+  overflow-wrap: anywhere;
   color: #303133;
   margin-bottom: 6px;
 }
@@ -1118,6 +1106,18 @@ onMounted(() => {
   padding: 12px;
 }
 
+.scan-results__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.scan-results__tabs {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .tab-content-area {
   flex: 1;
   min-height: 0;
@@ -1142,7 +1142,7 @@ onMounted(() => {
 }
 
 .path-filter-select {
-  width: 240px;
+  width: min(240px, 100%);
 }
 
 .empty-state-container {
@@ -1168,90 +1168,6 @@ onMounted(() => {
   padding: 0 15px!important;
 }
 
-/* --- 响应式布局 --- */
-
-/* 屏幕宽度小于等于 1200px 时 (例如：小尺寸笔记本电脑、大尺寸平板横屏) */
-@media (max-width: 1200px) {
-  .layout-wrapper {
-    /* 布局变为两列 */
-    grid-template-columns: repeat(2, 1fr);
-    /* 行高自动，允许网格向下扩展 */
-    grid-template-rows: auto;
-  }
-}
-
-/* 屏幕宽度小于等于 768px 时 (例如：平板竖屏、手机) */
-@media (max-width: 768px) {
-  .sites-view-container {
-    /* 允许整个页面垂直滚动 */
-    height: auto;
-    overflow-y: auto;
-    padding: 15px;
-    /* 在小屏幕上可以减小一些边距 */
-  }
-
-  .layout-wrapper {
-    /* 布局变为单列，所有象限垂直堆叠 */
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-
-  .quadrant {
-    min-height: 360px;
-    height: auto;
-    padding: 12px;
-  }
-
-  .group-title {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .group-site-select,
-  .scan-path-select,
-  .path-filter-select {
-    width: 100% !important;
-    margin-right: 0 !important;
-  }
-
-  .scan-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .scan-controls {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .scan-summary {
-    padding: 8px;
-  }
-
-  .stat-value {
-    font-size: 22px;
-  }
-
-  :deep(.el-tabs__nav-wrap) {
-    overflow-x: auto;
-  }
-
-  .loading-container,
-  .empty-state-container {
-    min-height: 180px;
-  }
-}
-
-/* Data dashboard surfaces follow STARPT's navy and violet visual system. */
-.sites-view-container {
-  min-height: 100%;
-  padding: clamp(16px, 2.4vw, 30px);
-  gap: 24px;
-  color: var(--star-data-ink, #f4f3fb);
-}
-
 .sites-overview {
   width: min(100%, 1480px);
   margin-inline: auto;
@@ -1264,11 +1180,6 @@ onMounted(() => {
   justify-content: space-between;
   gap: 18px;
 }
-
-.sites-overview__heading {
-  margin-bottom: 20px;
-}
-
 
 .sites-overview__heading h1 {
   margin: 0;
@@ -1296,9 +1207,8 @@ onMounted(() => {
 
 .sites-overview__metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 152px), 1fr));
+  gap: 10px;
 }
 
 .sites-overview__metric,
@@ -1313,10 +1223,10 @@ onMounted(() => {
   box-sizing: border-box;
   display: flex;
   min-width: 0;
-  min-height: 104px;
+  min-height: 88px;
   align-items: center;
-  gap: 13px;
-  padding: 17px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .sites-overview__metric-icon {
@@ -1374,16 +1284,11 @@ onMounted(() => {
 }
 
 .sites-overview__metric-note {
-  margin-inline-start: auto;
+  display: block;
+  margin-top: 3px;
   color: var(--star-data-muted, #a8b3cf);
   font-size: 0.7rem;
-  text-align: end;
-}
-
-.sites-overview__charts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  overflow-wrap: anywhere;
 }
 
 .sites-overview__chart-card {
@@ -1505,29 +1410,6 @@ onMounted(() => {
   outline: none;
 }
 
-.layout-wrapper {
-  width: min(100%, 1480px);
-  margin: 0 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-  grid-template-rows: minmax(300px, 0.8fr) minmax(380px, 1.2fr);
-  gap: 16px;
-}
-
-.quadrant {
-  border-color: var(--star-data-border, #293553) !important;
-  border-radius: var(--star-data-radius, 16px) !important;
-  background: var(--star-data-panel, #12182b) !important;
-  box-shadow: 0 14px 40px rgb(0 0 0 / 12%) !important;
-}
-
-.quadrant-title {
-  color: var(--star-data-ink, #f4f3fb);
-}
-
-.scan-description {
-  color: var(--star-data-muted, #a8b3cf);
-}
-
 .stat-item,
 .scan-summary,
 .scan-results {
@@ -1606,24 +1488,7 @@ onMounted(() => {
   background-color: rgb(10 13 24 / 66%);
 }
 
-@media (max-width: 1100px) {
-  .sites-overview__metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .layout-wrapper {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto;
-  }
-
-  .quadrant:nth-child(3) {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    min-height: 480px;
-  }
-}
-
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-width: 950px) and (hover: none) and (pointer: coarse) {
   .sites-view-container {
     gap: 16px;
     padding: 16px 12px 28px;
@@ -1637,15 +1502,12 @@ onMounted(() => {
     flex: none;
   }
 
-  .sites-overview__metrics {
-    gap: 9px;
-    margin-bottom: 9px;
+  .layout-wrapper {
+    gap: 10px;
   }
 
-  .sites-overview__metric {
-    min-height: 88px;
-    gap: 9px;
-    padding: 12px 10px;
+  .layout-wrapper--two-columns {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sites-overview__metric-icon {
@@ -1655,36 +1517,38 @@ onMounted(() => {
     font-size: 16px;
   }
 
-  .sites-overview__metric-note {
-    display: none;
-  }
-
-  .sites-overview__charts,
-  .layout-wrapper {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-  }
-
   .sites-overview__chart-card {
     padding: 16px;
   }
 
-  .quadrant:nth-child(1),
-  .quadrant:nth-child(2),
-  .quadrant:nth-child(3) {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .quadrant,
-  .quadrant:nth-child(3) {
-    min-height: 340px;
+  .quadrant {
     padding: 12px;
   }
 
-  .local-scan-quadrant,
-  .quadrant:nth-child(3) {
-    min-height: 460px;
+  .group-title,
+  .scan-header,
+  .scan-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .scan-header-left {
+    flex: auto;
+  }
+
+  .group-site-select,
+  .scan-path-select,
+  .path-filter-select {
+    width: 100%;
+  }
+
+  .scan-summary {
+    padding: 8px;
+  }
+
+  .empty-state-container,
+  .loading-container {
+    min-height: 180px;
   }
 }
 

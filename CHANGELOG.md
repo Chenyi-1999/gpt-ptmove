@@ -1026,3 +1026,11 @@
 - 最终镜像断网用真实 API 测试空索引、模拟 qB 同步、只读挂载、无挂载、缺失与孤立，模拟 qB 仅收到 GET。兼容 WASM 安装和重启测试通过。生产校验 47 个页面或资源、权限及启动健康，公网 /sites、新版页面资源和健康接口通过。两种视口浏览器测试通过。
 - 首轮上线发现北洋园 ZIP 需按既有机制执行「刷新插件」才会载入，已回滚。第二轮只在原插件目录没有其他 ZIP 的条件下装载经验证的北洋园包并调用刷新，原北洋园入口继续可用，RSS 仍关闭。未触发真实下载、发种或 qB 任务修改。
 - OVH 仅执行只读排查，未部署、修改挂载或写入种子索引，未操作 81。docs/DEPLOYMENT.json 补充本轮回执，工作分支提交，未推送或发布。
+
+
+## PTM-20261128-SITES-LAYOUT — 2026-11-28T01:04:21+08:00 — Codex root / sites_layout_view / sites_layout_settings / sites_layout_api，做种检索布局
+
+- 在「设置 → 通用设置」增加做种检索的电脑列数和六个模块的优先级。双列从左到右逐行展示，手机竖屏和横屏使用同一顺序的单列布局。原有统计与只读扫描入口继续可用。
+- 更新 nexus/webui/src/views/SitesView.vue、src/components/settings/{GeneralSettings,SitesLayoutSettings}.vue、src/stores/sitesLayout.ts 和 nexus/webui/dist。独立的认证布局 API 由 nexus/server/internal/bootstrap/app.go 与 internal/{http/handler,service}/settings/sites_layout.go 提供，持久化到 ui_settings.sites_layout。docs/API_CONTRACT.md 补充接口。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和 152 断网 Go 全量测试及构建通过。浏览器夹具验证 1440px 双列和单列、保存失败保留草稿及重试、刷新恢复排序，以及手机竖屏和横屏单列。Vite 保留原有大包提示。
+- 本条随隔离工作分支提交。完整镜像的 152 断网验收及上线待执行，结果另记。未推送或发布，未访问 OVH 或 81。
