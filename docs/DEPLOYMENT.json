@@ -4198,5 +4198,107 @@
         "starpt-v1.2.3-linux-amd64.tar.gz.sha256"
       ]
     }
+  },
+  "release_v1_2_4": {
+    "verified_at": "2026-11-28T23:49:11+08:00",
+    "source_commit": "dd51ba7bd91e8adbb80a989f60396562b5d79ef9",
+    "image": "ptmove-nexus:1.2.4",
+    "image_id": "sha256:6ac685338c49aa0426d8d1d8e1619f34df0f5def2f359f3368f93bfe98457df2",
+    "architecture": "linux/amd64",
+    "image_archive": {
+      "filename": "starpt-v1.2.4-linux-amd64.tar.gz",
+      "size": 371012848,
+      "sha256": "4eb4c8500b482fc1597a9328df8e08ec149ebfb1d1f24c77e298eaab38043661",
+      "docker_layers": 2,
+      "image_id": "sha256:6ac685338c49aa0426d8d1d8e1619f34df0f5def2f359f3368f93bfe98457df2",
+      "revision": "dd51ba7bd91e8adbb80a989f60396562b5d79ef9"
+    },
+    "docker_load_verified": true,
+    "production_152": {
+      "url": "http://152.136.236.238:18120/settings/downloader",
+      "image": "ptmove-nexus:1.2.4",
+      "id": "sha256:6ac685338c49aa0426d8d1d8e1619f34df0f5def2f359f3368f93bfe98457df2",
+      "source": "dd51ba7bd91e8adbb80a989f60396562b5d79ef9",
+      "previous_image": "ptmove-nexus:1.2.3",
+      "configuration_unchanged": true,
+      "hub_unchanged": true,
+      "plugins_unchanged": true,
+      "cached_torrents": 467,
+      "tracked_sites": 136,
+      "assets_and_routes_verified": 56,
+      "restart_count": 0
+    },
+    "hosted_frontend_with_mock_api": true,
+    "remote_download_source_zip_verified": true,
+    "browser_qa": {
+      "fixturesOnly": true,
+      "collapsedModeLabelOnly": true,
+      "connectionModeRadioLabels": [
+        "本地",
+        "远程"
+      ],
+      "hoverAndFocusExplanation": {
+        "local": "STARPT 读取可访问的视频文件，在本机生成截图并提取 MediaInfo。",
+        "remote": "远程服务器或 NAS 上的客户端读取视频，生成截图并提取 MediaInfo，再将结果回传给 STARPT。种子列表和流量仍通过下载器 API 获取。"
+      },
+      "mobileTapExplanation": true,
+      "remoteOnlyGitHubDownload": "https://github.com/Chenyi-1999/StarPT/archive/refs/tags/v1.2.3.zip",
+      "aiPromptCopiedByExecCommandFallback": true,
+      "aiPromptHasPinnedClientAndComposeDocs": true,
+      "aiPromptExcludesFixtureHostAndCredentials": true,
+      "modePersistsAfterSaveReload": true,
+      "actionsDisappearWhenModeLocal": true,
+      "viewports": [
+        1440,
+        390
+      ],
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "github": {
+      "release_id": 461658367,
+      "url": "https://github.com/Chenyi-1999/StarPT/releases/tag/v1.2.4",
+      "assets": {
+        "compose.starpt.yaml": {
+          "size": 498,
+          "sha256": "e4dd3b9b0348eabf93489efd23dd9307130bc23da20a8d5687f77092d2893df4"
+        },
+        "SHA256SUMS": {
+          "size": 185,
+          "sha256": "293c7954017fbd26cce3d2322fda906b5fb60d9669a0373bf7e2434dcaa69d3b"
+        },
+        "starpt-v1.2.4-linux-amd64.tar.gz": {
+          "size": 371012848,
+          "sha256": "4eb4c8500b482fc1597a9328df8e08ec149ebfb1d1f24c77e298eaab38043661"
+        },
+        "starpt-v1.2.4-linux-amd64.tar.gz.sha256": {
+          "size": 99,
+          "sha256": "a7e4209ade3a28e9ea8bee5a9ad9b3010da17c33eebc45c1d9c0654f45844d5a"
+        }
+      }
+    },
+    "gitee": {
+      "release_id": 1380900,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.2.4",
+      "archive_sha256": "4eb4c8500b482fc1597a9328df8e08ec149ebfb1d1f24c77e298eaab38043661",
+      "archive_size": 371012848,
+      "complete": false,
+      "assets": {
+        "starpt-v1.2.4-linux-amd64.tar.gz.part01.zip": {
+          "name": "starpt-v1.2.4-linux-amd64.tar.gz.part01.zip",
+          "size": 40894640,
+          "sha256": "2530a6a453b695206408708942016031cc248ac4dad745e80af5bf7d43c4df47",
+          "id": 3872406
+        }
+      },
+      "standard_assets": [
+        "SHA256SUMS",
+        "compose.starpt.yaml",
+        "starpt-v1.2.4-linux-amd64.tar.gz.sha256"
+      ],
+      "status": "attachment_quota_exceeded",
+      "downloadable_from_gitee": false,
+      "image_url": "https://github.com/Chenyi-1999/StarPT/releases/download/v1.2.4/starpt-v1.2.4-linux-amd64.tar.gz"
+    }
   }
 }

@@ -1206,3 +1206,10 @@
 - DownloaderSettings.vue 将折叠摘要精简到一处本地或远程标记，编辑表单使用「本地」「远程」单选切换和信息图标。远程状态提供 GitHub 客户端源码 ZIP 和 AI 部署提示词，HTTP 管理页支持兼容复制。提示词引用官方 Compose 和文档，仅含公开信息与待填参数。
 - 同步 docs/API_CONTRACT.md、docs/REMOTE_SCREENSHOTS.md、v1.2.4 发布说明、版本信息、Dockerfile、Compose 和重新构建的前端。维持现有连接与设置保存语义。
 - Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建、152 离线 Go 全量测试和编译通过。Vite 保留原有大分块提示。GitHub v1.2.3 源码 ZIP HTTP 200 并返回 ZIP 文件头，标签树确认包括客户端 Dockerfile、Compose、媒体代理和说明。浏览器全流程、152 部署及分发结果另记。未操作 OVH 或 81。
+
+## PTM-20261128-STARPT-V124-RELEASE — 2026-11-28T23:49:11+08:00 — Codex root / server_release_assets，发布下载器连接说明与客户端入口
+
+- 源码 dd51ba7bd91e8adbb80a989f60396562b5d79ef9 在 152 生成镜像 sha256:6ac685338c49aa0426d8d1d8e1619f34df0f5def2f359f3368f93bfe98457df2。隔离启动和 56 项路由资源、下载器统计与布局回归通过，切换后 152 健康和下载器设置路由正常。配置、站点/种子记录、插件、领单服务一致。
+- 浏览器通过 1440px／390px 模拟验收折叠摘要、悬停和聚焦说明、手机点击、远程下载入口、HTTP 复制兼容、保存刷新与本地状态隐藏入口。核对提示词包含客户端发布链接和正式 Compose、无下载器凭据。152 实际前端配合模拟 API 验收完成：True。
+- 152 对 371012848 字节完整镜像执行 SHA-256 校验和 Docker 重新载入，并直接上传至 GitHub。Gitee 起初拒收约 79 MiB 的分卷。改为约 39 MiB 后在 152 重组校验通过并成功上传第 1 卷；第 2 卷被 Gitee 以 1 GiB 仓库附件配额拒绝，独立镜像分发未完成。Gitee 保留本次 Compose 和校验文件，发行页已标记分卷未完成，并给出同一完整镜像的 GitHub 下载链接。未清理历史附件。
+- GitHub 和 Gitee 已推同一源码与 v1.2.4 标签并发行。未更新 OVH，未操作 81。
