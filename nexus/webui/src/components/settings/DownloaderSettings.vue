@@ -26,7 +26,7 @@
               <div class="downloader-meta">
                 <span v-if="downloader.type">{{ downloaderTypeLabel(downloader.type) }}</span>
                 <span class="downloader-location">{{
-                  downloaderSummaries.get(downloader.id)?.location
+                  downloader.use_proxy ? '远程' : '本地'
                 }}</span>
                 <span>{{ downloader.use_proxy ? '远程媒体' : '直连' }}</span>
                 <span
@@ -175,16 +175,6 @@
                     <el-option label="Transmission" value="transmission"></el-option>
                   </el-select>
                 </div>
-              </el-form-item>
-              <el-form-item label="下载器位置">
-                <el-radio-group v-model="downloader.display_location" aria-label="下载器位置">
-                  <el-radio-button value="auto">自动识别</el-radio-button>
-                  <el-radio-button value="local">本地</el-radio-button>
-                  <el-radio-button value="remote">远程</el-radio-button>
-                </el-radio-group>
-                <span class="credential-hint"
-                  >位置标记仅用于列表显示，自动识别适用于本机回环地址和已有位置标记。</span
-                >
               </el-form-item>
               <el-form-item label="连接方式">
                 <div class="proxy-settings-row">
@@ -422,7 +412,6 @@ import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import { ElMessage } from '@/utils/uiNotify'
 
 type ConnectionTestStatus = 'success' | 'error'
-type DownloaderLocation = 'auto' | 'local' | 'remote'
 
 type PathMapping = {
   remote: string
@@ -438,7 +427,6 @@ type DownloaderConfig = {
   username: string
   password: string
   password_configured: boolean
-  display_location: DownloaderLocation
   api_key: string
   api_key_configured: boolean
   clear_api_key: boolean
@@ -491,10 +479,6 @@ function downloaderTypeLabel(type: string) {
   return normalized
 }
 
-function normalizeLocation(value: unknown): DownloaderLocation {
-  return value === 'local' || value === 'remote' ? value : 'auto'
-}
-
 function downloaderHostname(host: string) {
   const address = host.trim()
   if (!address) return ''
@@ -504,22 +488,6 @@ function downloaderHostname(host: string) {
   } catch {
     return ''
   }
-}
-
-function downloaderLocation(downloader: DownloaderConfig, hostname: string) {
-  const selected = downloader.display_location
-  const stored = selected === 'auto' ? normalizeLocation(downloader.location) : selected
-  if (stored === 'local') return '本地'
-  if (stored === 'remote' || downloader.is_remote === true) return '远程'
-  if (
-    hostname === 'localhost' ||
-    hostname === 'localhost.' ||
-    hostname === '[::1]' ||
-    /^127\.\d+\.\d+\.\d+$/.test(hostname)
-  ) {
-    return '本地'
-  }
-  return '位置未标注'
 }
 
 function downloaderConfigIssue(downloader: DownloaderConfig, hostname: string) {
@@ -553,7 +521,6 @@ const downloaderSummaries = computed(() => {
       return [
         downloader.id,
         {
-          location: downloaderLocation(downloader, hostname),
           issue,
           state: issue ? 'missing' : unsaved ? 'draft' : 'ready',
           label: issue ? '待配置' : unsaved ? '待保存' : '已配置',
@@ -667,7 +634,6 @@ const fetchSettings = async () => {
         username: typeof record.username === 'string' ? record.username : '',
         password: typeof record.password === 'string' ? record.password : '',
         password_configured: record.password_configured === true,
-        display_location: normalizeLocation(record.display_location),
         api_key: '',
         api_key_configured: record.api_key_configured === true,
         clear_api_key: false,
@@ -758,7 +724,6 @@ const addDownloader = () => {
     username: '',
     password: '',
     password_configured: false,
-    display_location: 'auto',
     api_key: '',
     api_key_configured: false,
     clear_api_key: false,

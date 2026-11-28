@@ -1187,3 +1187,9 @@
 - 离线浏览器确认 1440px 桌面和 390px 手机的本地、远程、位置未标注、配置完整度和手动标注保存刷新。凭据保持脱敏、模式不变，无额外连接探测、横向溢出或页面错误。
 - 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 371007267 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
 - 同一 v1.2.2 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
+
+## PTM-20261128-STARPT-V123-DOWNLOADER-MODE-LABEL — 2026-11-28T22:54:17+08:00 — Codex root / mode_label_browser，下载器位置跟随截图连接方式
+
+- DownloaderSettings.vue 移除手动位置编辑。折叠卡片只根据现有远程截图与 MediaInfo 开关显示「远程」或「本地」，旧版手动标记和下载器地址不参与显示。配置完整度、启停、凭据和连接行为沿用已有逻辑。
+- 同步 docs/API_CONTRACT.md、v1.2.3 发布说明、版本信息、Dockerfile、Compose 和重新构建的前端。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建、152 离线 Go 全量测试和编译通过。Vite 保留既有大分块提示。模拟桌面卡片已核对连接方式优先于历史标记。切换保存、移动端、152 部署和双仓发行结果另记。本阶段未操作 OVH 或 81。

@@ -160,7 +160,7 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 `GET /api/settings` 返回的下载器对象提供只读布尔值 `password_configured`，用于在密码被隐去时判断是否已配置。保存设置时服务端忽略该字段。
 
-下载器对象可选的 `display_location` 支持 `auto`、`local` 和 `remote`。这个字段只影响设置页的位置标记。自动识别优先读取已有的位置标记，也能识别回环地址，其余地址显示「位置未标注」。
+下载器折叠卡片根据 `use_proxy` 显示位置。开启「远程截图与 MediaInfo」时显示「远程」，直连时显示「本地」。旧版 `display_location` 不参与显示判断。
 
 ## 首页和做种检索布局
 
