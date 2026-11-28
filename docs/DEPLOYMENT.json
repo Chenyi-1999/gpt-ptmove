@@ -3625,5 +3625,56 @@
     },
     "protected_81_operated": false,
     "push_or_release_performed": false
+  },
+  "starpt_downloader_filters_20261128": {
+    "source_commit": "6a4224c1ced10656cb9b02aae3bf74277b48a93d",
+    "verified_152": {
+      "url": "http://152.136.236.238:18120/plugins?plugin=downloader-summary",
+      "image": "ptmove-nexus:1.1.7-downloader-filters.1",
+      "id": "sha256:f97b22ed74165f0f89a8c1cbfddcf2af97df3458938a6987a4e878c43ce9b216",
+      "source": "6a4224c1ced10656cb9b02aae3bf74277b48a93d",
+      "previous_image": "ptmove-nexus:1.1.7-downloader-stats.1",
+      "configuration_unchanged": true,
+      "hub_unchanged": true,
+      "earlier_plugins_preserved": true,
+      "settings_and_schedule_preserved": true,
+      "downloader_count": 1,
+      "cached_torrents": 467,
+      "tracked_sites": 136,
+      "package_sha256": "eeb2de05d25b781ba599667aa7bcba3c691cbd89389fbbb471dd00cbb17fa667",
+      "plugin_version": "2.1.0",
+      "assets_and_routes_verified": 47,
+      "restart_count": 0,
+      "isolated_dimensions": [
+        "category",
+        "tag",
+        "site",
+        "path",
+        "tracker",
+        "state"
+      ],
+      "isolated_combined_filters": true,
+      "backend_sha256": "c9d0d875743686bc7b10972a13761a85abac917554c2890fdab63946b9b8c8a3",
+      "real_qb_read_only": {
+        "downloaders": 1,
+        "read_only": true,
+        "verified": [
+          {
+            "tasks": 384,
+            "combined_matches": 144,
+            "details_verified": 10,
+            "filters": [
+              "category",
+              "tag",
+              "tracker",
+              "status"
+            ]
+          }
+        ]
+      },
+      "public_http_page_and_assets_verified": true
+    },
+    "updated_ovh": false,
+    "protected_81_operated": false
   }
 }

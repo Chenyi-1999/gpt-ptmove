@@ -1078,3 +1078,9 @@
 - nexus/server/internal/http/handler/plugin_downloader_inventory.go、internal/service/torrentdata/downloader_inventory.go 和测试接入同一套筛选规则。返回匹配数量、下载器任务总数及完整选项，Tracker 仅用主机名。docs/{API_CONTRACT,STARPT_PLUGINS}.md 记录协议与使用方式。
 - 152 断网 Go 全量测试、WASI 包和二进制构建通过。Vue 类型检查、定向 ESLint、10 项 Node 测试及 Vite 构建通过。桌面、390px 测试四个条件组合、清空、切换下载器、刷新、分页和长内容。Vite 显示原有大分包提示。
 - 本条随隔离分支提交。152 最终候选和真实 qB 验证另记。远程主分支有独立的项目名称更新，本条未推送或发布，未操作 OVH 和 81。
+
+## PTM-20261128-DOWNLOADER-FILTERS-152 — 2026-11-28T17:33:13+08:00 — Codex root，下载器统计组合筛选部署回执
+
+- 152 镜像 ptmove-nexus:1.1.7-downloader-filters.1，源码 6a4224c，下载器统计 ZIP 2.1.0。保留原配置、插件设置和调度、467 条种子索引、站点、原插件和领单 Hub。保存了上一版镜像、ZIP、Compose、SQLite 与插件缓存。
+- 152 断网环境通过 qBittorrent 和 Transmission、六维分组、四条件组合、匹配分页、零匹配保留选项、非法筛选及鉴权验证。公网插件页、JS/CSS 和健康验证通过。
+- 实际 qB 只读核对：384 个任务中匹配 144 个，展开核对 10 条。未修改下载器任务。本轮仅部署 152，未操作 OVH 或 81。回执随隔离分支提交，独立的主分支项目名改动待整合后才能统一发布。
