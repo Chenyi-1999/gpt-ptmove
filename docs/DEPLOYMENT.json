@@ -3890,5 +3890,68 @@
         "starpt-v1.1.9-linux-amd64.tar.gz.sha256"
       ]
     }
+  },
+  "release_v1_2_0": {
+    "verified_at": "2026-11-28T21:33:34+08:00",
+    "source_commit": "b8a23a8cf59d5997f1e068b090a87a66cec42c4b",
+    "image": "ptmove-nexus:1.2.0",
+    "image_id": "sha256:937745f3b29c3b1c2f2a9c1220bbd3670ffa674e29d2ef92fbb5139426513c51",
+    "architecture": "linux/amd64",
+    "image_archive": {
+      "filename": "starpt-v1.2.0-linux-amd64.tar.gz",
+      "size": 371001500,
+      "sha256": "fe640ca5787464b93a684e5bbe5b12240669b590884c3d9d854c04798fa4e776",
+      "docker_layers": 2,
+      "image_id": "sha256:937745f3b29c3b1c2f2a9c1220bbd3670ffa674e29d2ef92fbb5139426513c51",
+      "revision": "b8a23a8cf59d5997f1e068b090a87a66cec42c4b"
+    },
+    "docker_load_verified": true,
+    "isolated_dashboard_visibility_save": true,
+    "production_152": {
+      "url": "http://152.136.236.238:18120/plugins",
+      "image": "ptmove-nexus:1.2.0",
+      "id": "sha256:937745f3b29c3b1c2f2a9c1220bbd3670ffa674e29d2ef92fbb5139426513c51",
+      "source": "b8a23a8cf59d5997f1e068b090a87a66cec42c4b",
+      "previous_image": "ptmove-nexus:1.1.9",
+      "configuration_unchanged": true,
+      "hub_unchanged": true,
+      "plugins_unchanged": true,
+      "cached_torrents": 467,
+      "tracked_sites": 136,
+      "assets_and_routes_verified": 55,
+      "restart_count": 0
+    },
+    "github": {
+      "release_id": 461575346,
+      "url": "https://github.com/Chenyi-1999/StarPT/releases/tag/v1.2.0",
+      "assets": {
+        "compose.starpt.yaml": {
+          "size": 498,
+          "sha256": "18c8b7cc275b1fbb9547bacf3fc9516c1cdff063626766cca76de17f9e6d05a2"
+        },
+        "SHA256SUMS": {
+          "size": 185,
+          "sha256": "45f380bec9e11a3391daf7057c683aef0c8654563bff572c626873056bc6ef93"
+        },
+        "starpt-v1.2.0-linux-amd64.tar.gz": {
+          "size": 371001500,
+          "sha256": "fe640ca5787464b93a684e5bbe5b12240669b590884c3d9d854c04798fa4e776"
+        },
+        "starpt-v1.2.0-linux-amd64.tar.gz.sha256": {
+          "size": 99,
+          "sha256": "bcec6bdec7bb578b985e70a72639d8f8289e7f46673c465f4369141fd0453cc6"
+        }
+      }
+    },
+    "gitee": {
+      "release_id": 1380406,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.2.0",
+      "image_url": "https://github.com/Chenyi-1999/StarPT/releases/download/v1.2.0/starpt-v1.2.0-linux-amd64.tar.gz",
+      "assets": [
+        "SHA256SUMS",
+        "compose.starpt.yaml",
+        "starpt-v1.2.0-linux-amd64.tar.gz.sha256"
+      ]
+    }
   }
 }
