@@ -41,8 +41,8 @@ Compose 会把该绝对目录以相同路径只读挂载进代理。若 qB 自�
 
 进入 **设置 → 下载器**，选择对应下载器。
 
-- **直连下载器**通过「下载器地址」连接 qBittorrent WebUI 或 Transmission RPC。例如，同机 qB 可填其 WebUI 地址（常用端口 `8080`）。媒体处理使用容器能访问的媒体目录。
-- **远程截图与 MediaInfo**继续通过「下载器地址」查列表、状态和流量，同时把截图、MediaInfo 和所需文件检查交给远程客户端。
+- **本地**通过「下载器地址」连接 qBittorrent WebUI 或 Transmission RPC。例如，同机 qB 可填其 WebUI 地址（常用端口 `8080`）。媒体处理使用容器能访问的媒体目录。
+- **远程**继续通过「下载器地址」查列表、状态和流量，同时把截图、MediaInfo 和所需文件检查交给远程客户端。编辑时可以从 GitHub 下载客户端源码并复制 AI 部署提示词。
 
 「媒体代理端口」和「下载器地址」使用相同主机名，各自连接自己的服务。直接连接独立媒体代理时填代理的实际映射端口，默认 `19090`。远程客户端主动领单时，STARPT 默认填 Hub 内部媒体端口 `29090`。远程客户端连接的 HTTPS 领单端口（默认 `28443`）填在远程客户端的服务端地址里。
 
@@ -100,7 +100,7 @@ docker buildx build --platform linux/arm64 -f Dockerfile.nas --load -t ptmove-me
 
 领单客户端可部署在保存媒体的 NAS 或远程 Linux 服务器。客户端向 STARPT 服务端发起 HTTPS 请求，在本机查询下载器、调用媒体代理并回传结果。正式图片由客户端上传 Pixhost。以下沿用现有 152 服务端和飞牛客户端的部署作为示例。
 
-- **152** 运行 `nexus/proxy/pull/compose.hub.yaml`，并加入 PTMove 的 Docker 网络。默认只向公网发布 TLS 端口 `28443`。PTMove 通过 Docker 内网的 `http://ptmove-pull-hub:28380` 查询 qB，媒体代理端口填 `29090`，选择「远程截图与 MediaInfo」。下载器的 API Key 与代理 Token 都填 Hub 的 `controller.token`，飞牛侧的真实 qB Token 放在飞牛。
+- **152** 运行 `nexus/proxy/pull/compose.hub.yaml`，并加入 PTMove 的 Docker 网络。默认只向公网发布 TLS 端口 `28443`。PTMove 通过 Docker 内网的 `http://ptmove-pull-hub:28380` 查询 qB，媒体代理端口填 `29090`，连接方式选择「远程」。下载器的 API Key 与代理 Token 都填 Hub 的 `controller.token`，飞牛侧的真实 qB Token 放在飞牛。
 - **飞牛** 运行 `nexus/proxy/pull/compose.agent.yaml`。领单容器用宿主网络访问现有的 `127.0.0.1:8080` qB 和 `127.0.0.1:19090` 媒体代理。保留现有媒体容器的只读挂载。领单容器只需要 TLS 信任证书、领单 Token 和两项本机服务凭据。
 - **密钥与证书**。Hub 的目录由 `PTMOVE_PULL_HUB_SECRETS` 指定，文件为 `server.crt`、`server.key`、`agent.token`、`controller.token`。飞牛的目录由 `PTMOVE_PULL_AGENT_SECRETS` 指定，文件为 `controller.crt`（用于校验 152 的证书）、同一 `agent.token`、`qb.token` 和 `media.token`。两个容器默认使用 UID 65534，挂载文件应允许该用户读取。飞牛的 `PTMOVE_PULL_URL` 为例如 `https://152.136.236.238:28443`，TLS 证书需要包含该 IP 或实际域名。
 - **任务边界**。Hub 提供 `POST /v1/claim` 和 `POST /v1/result`，qB 查询和截图分别领取。结果以任务 ID 和租约标识确认，网络重试只回传同一结果。Hub 重启时，尚未完成的请求会失败，已领取的截图任务不会由 Hub 自动重放。扫描通过独立的只读入口查询 qB。既有发种后添加种子流程可提交受限的种子表单。该通道不提供通用下载管理、删除和种子导出接口。媒体队列正在生成正式截图时，连接探针可能需要等当前任务结束，qB 查询使用独立队列。

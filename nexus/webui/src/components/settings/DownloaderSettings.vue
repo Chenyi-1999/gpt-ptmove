@@ -28,7 +28,6 @@
                 <span class="downloader-location">{{
                   downloader.use_proxy ? '远程' : '本地'
                 }}</span>
-                <span>{{ downloader.use_proxy ? '远程媒体' : '直连' }}</span>
                 <span
                   class="downloader-config-state"
                   :class="`downloader-config-state--${downloaderSummaries.get(downloader.id)?.state}`"
@@ -178,26 +177,52 @@
               </el-form-item>
               <el-form-item label="连接方式">
                 <div class="proxy-settings-row">
-                  <el-switch
+                  <el-radio-group
                     v-model="downloader.use_proxy"
-                    inline-prompt
-                    active-text="远程"
-                    inactive-text="直连"
-                    :aria-label="
-                      '连接方式：' + (downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器')
-                    "
+                    aria-label="连接方式"
                     @change="onConnectionModeChange(downloader)"
-                  />
-                  <strong class="connection-mode-title">
-                    {{ downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器' }}
-                  </strong>
-                  <span class="credential-hint connection-mode-hint">
-                    {{
-                      downloader.use_proxy
-                        ? '种子列表和流量继续走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
-                        : 'STARPT 直接连接下载器 API，有可读媒体目录时在本机处理视频。'
-                    }}
-                  </span>
+                  >
+                    <el-radio-button :value="false">本地</el-radio-button>
+                    <el-radio-button :value="true">远程</el-radio-button>
+                  </el-radio-group>
+                  <el-popover
+                    :trigger="['hover', 'focus', 'click']"
+                    placement="bottom-start"
+                    :width="360"
+                    :show-after="100"
+                    :popper-style="{ maxWidth: 'calc(100vw - 24px)', boxSizing: 'border-box' }"
+                  >
+                    <template #reference>
+                      <button
+                        type="button"
+                        class="connection-mode-info"
+                        aria-label="查看连接方式说明"
+                      >
+                        <InfoFilled aria-hidden="true" />
+                      </button>
+                    </template>
+                    <dl class="connection-mode-explanation">
+                      <dt>本地</dt>
+                      <dd>STARPT 读取可访问的视频文件，在本机生成截图并提取 MediaInfo。</dd>
+                      <dt>远程</dt>
+                      <dd>
+                        远程服务器或 NAS 上的客户端读取视频，生成截图并提取
+                        MediaInfo，再将结果回传给 STARPT。种子列表和流量仍通过下载器 API 获取。
+                      </dd>
+                    </dl>
+                  </el-popover>
+                  <template v-if="downloader.use_proxy">
+                    <a
+                      class="el-button is-link"
+                      :href="remoteClientDownloadUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >下载客户端源码（GitHub）</a
+                    >
+                    <el-button link :icon="CopyDocument" @click="copyRemoteClientPrompt">
+                      复制 AI 部署提示词
+                    </el-button>
+                  </template>
                 </div>
               </el-form-item>
               <el-form-item v-if="downloader.use_proxy" label="媒体代理端口">
@@ -394,14 +419,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, h, nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import {
   ArrowUp,
+  CopyDocument,
   Delete,
   EditPen,
   FolderOpened,
+  InfoFilled,
   Link,
   Plus,
   Refresh,
@@ -471,6 +498,59 @@ const testingConnectionId = ref<string | null>(null)
 const connectionTestResults = ref<Record<string, ConnectionTestStatus | undefined>>({})
 const API_BASE_URL = '/api'
 const torrentsViewState = useTorrentsViewState()
+
+const remoteClientRepo = 'https://github.com/Chenyi-1999/StarPT'
+const remoteClientVersion = 'v1.2.3'
+const remoteClientDownloadUrl = `${remoteClientRepo}/archive/refs/tags/${remoteClientVersion}.zip`
+const remoteClientPrompt = `请为我生成在 Linux NAS 或远程服务器上用 Docker 部署 STARPT 远程客户端的命令和 Compose 步骤，让客户端主动通过 HTTPS 领单，生成截图并提取 MediaInfo 后回传。
+
+使用已发布的客户端源码 ${remoteClientDownloadUrl}，并先阅读 ${remoteClientRepo}/blob/${remoteClientVersion}/docs/REMOTE_SCREENSHOTS.md。使用 nexus/proxy/pull 的 Dockerfile 和 compose.agent.yaml；需要客户端设置页时叠加 compose.agent-admin.yaml。用 nexus/proxy/compose.nas.yaml 部署媒体代理。
+
+请先向我确认 NAS 的 CPU 架构、下载器本机地址、宿主机媒体目录与下载器报告的路径、STARPT HTTPS 领单地址，以及是否需要设置页。按实际路径只读挂载媒体，并给出启动和只读验证步骤。证书和凭据用占位符，说明在设备上填写的位置。不要让我把真实密码或令牌发到聊天里。`
+
+async function copyRemoteClientPrompt() {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(remoteClientPrompt)
+      ElMessage.success('AI 部署提示词已复制')
+      return
+    }
+  } catch {
+    // HTTPS 剪贴板权限不可用时，继续尝试浏览器兼容复制。
+  }
+
+  const focused = document.activeElement
+  const field = document.createElement('textarea')
+  field.value = remoteClientPrompt
+  field.readOnly = true
+  field.style.cssText = 'position:fixed;left:0;top:0;opacity:0;pointer-events:none'
+  document.body.append(field)
+  field.select()
+  let copied = false
+  try {
+    copied = document.execCommand('copy')
+  } catch {
+    // 浏览器禁用程序复制时，提供可选择的文本。
+  } finally {
+    field.remove()
+    if (focused instanceof HTMLElement) focused.focus({ preventScroll: true })
+  }
+  if (copied) {
+    ElMessage.success('AI 部署提示词已复制')
+    return
+  }
+  void ElMessageBox.alert(
+    h('textarea', {
+      class: 'el-textarea__inner',
+      value: remoteClientPrompt,
+      readonly: true,
+      rows: 10,
+      'aria-label': 'AI 部署提示词',
+    }),
+    '请手动复制 AI 部署提示词',
+    { confirmButtonText: '关闭' },
+  ).catch(() => undefined)
+}
 
 function downloaderTypeLabel(type: string) {
   const normalized = type.trim().toLowerCase()
@@ -1144,10 +1224,50 @@ const savePathMappings = async () => {
   overflow-wrap: anywhere;
 }
 
-.connection-mode-title {
+.connection-mode-info {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--star-muted);
+  cursor: pointer;
+}
+
+.connection-mode-info:hover,
+.connection-mode-info:focus-visible {
+  color: var(--star-accent);
+  background: var(--star-accent-soft);
+}
+
+.connection-mode-info svg {
+  width: 16px;
+  height: 16px;
+}
+
+.connection-mode-explanation {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.connection-mode-explanation dt {
   color: var(--star-text);
-  font-size: 0.875rem;
   font-weight: 600;
+}
+
+.connection-mode-explanation dd {
+  margin: 2px 0 10px;
+}
+
+.connection-mode-explanation dd:last-child {
+  margin-bottom: 0;
+}
+
+.proxy-settings-row .el-button {
+  margin-left: 0;
 }
 
 .credential-hint {

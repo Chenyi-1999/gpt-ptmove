@@ -1200,3 +1200,9 @@
 - 离线浏览器确认 1440px 桌面和 390px 手机的本地和远程标记、切换方式后保存刷新、移除手动位置以及配置完整度。凭据保持脱敏，无额外连接探测、横向溢出或页面错误。
 - 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 370998046 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
 - 同一 v1.2.3 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
+
+## PTM-20261128-STARPT-V124-REMOTE-CLIENT-HELP — 2026-11-28T23:27:56+08:00 — Codex root / client_download_source / client_help_qa，下载器连接方式说明与远程客户端入口
+
+- DownloaderSettings.vue 将折叠摘要精简到一处本地或远程标记，编辑表单使用「本地」「远程」单选切换和信息图标。远程状态提供 GitHub 客户端源码 ZIP 和 AI 部署提示词，HTTP 管理页支持兼容复制。提示词引用官方 Compose 和文档，仅含公开信息与待填参数。
+- 同步 docs/API_CONTRACT.md、docs/REMOTE_SCREENSHOTS.md、v1.2.4 发布说明、版本信息、Dockerfile、Compose 和重新构建的前端。维持现有连接与设置保存语义。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建、152 离线 Go 全量测试和编译通过。Vite 保留原有大分块提示。GitHub v1.2.3 源码 ZIP HTTP 200 并返回 ZIP 文件头，标签树确认包括客户端 Dockerfile、Compose、媒体代理和说明。浏览器全流程、152 部署及分发结果另记。未操作 OVH 或 81。
