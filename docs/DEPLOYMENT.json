@@ -4300,5 +4300,31 @@
       "downloadable_from_gitee": false,
       "image_url": "https://github.com/Chenyi-1999/StarPT/releases/download/v1.2.4/starpt-v1.2.4-linux-amd64.tar.gz"
     }
+  },
+  "gitee_pre120_attachment_cleanup_20261129": {
+    "repository": "star1999/starpt",
+    "cutoff_exclusive": "v1.2.0",
+    "release_records_verified": 37,
+    "release_tags_unchanged": true,
+    "protected_release_attachments_verified": 5,
+    "removed_attachments": 77,
+    "affected_releases": 31,
+    "reclaimed_bytes": 1020664990,
+    "reclaimed_mib": 973.38,
+    "verification_time": "2026-11-29T00:04:15+08:00",
+    "backup": {
+      "project": "StarPT",
+      "timestamp": "2026-11-29T00:02:09+08:00",
+      "type": "历史发布",
+      "source": "Gitee star1999/starpt release attachments before v1.2.0",
+      "path": "D:\\A_GPT\\GPT-BackUp\\StarPT\\2026-11\\StarPT__2026-11-29_000209__历史发布__Gitee-v1.2.0前附件索引及小文件.zip",
+      "bytes": 7552195,
+      "sha256": "4afddf2fe87c2ab8c43846d5f5eec2feb9769366a0155672cd6936381170a591",
+      "embedded_assets": 63,
+      "existing_large_archives": 14,
+      "zip_crc_and_sha256_verified": true
+    },
+    "live_deployment_touched": false,
+    "github_release_assets_touched": false
   }
 }
