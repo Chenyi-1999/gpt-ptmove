@@ -4107,5 +4107,96 @@
         "starpt-v1.2.2-linux-amd64.tar.gz.sha256"
       ]
     }
+  },
+  "release_v1_2_3": {
+    "verified_at": "2026-11-28T23:08:41+08:00",
+    "source_commit": "ea54adc50991cea9374cd716f6117fe61b40c24b",
+    "image": "ptmove-nexus:1.2.3",
+    "image_id": "sha256:8c6db5672a7362a9a4fe07e009c5f7fb6177db26ee289b89fe12944217c830f3",
+    "architecture": "linux/amd64",
+    "image_archive": {
+      "filename": "starpt-v1.2.3-linux-amd64.tar.gz",
+      "size": 370998046,
+      "sha256": "66760662b515966294f01fb82f4b7bafd033440cbc01dfaa0f97ccd374506cc4",
+      "docker_layers": 2,
+      "image_id": "sha256:8c6db5672a7362a9a4fe07e009c5f7fb6177db26ee289b89fe12944217c830f3",
+      "revision": "ea54adc50991cea9374cd716f6117fe61b40c24b"
+    },
+    "docker_load_verified": true,
+    "isolated_dashboard_visibility_save": true,
+    "isolated_downloader_status_asset_verified": true,
+    "downloader_status_browser": {
+      "fixturesOnly": true,
+      "desktopCollapsedSummaries": true,
+      "location": {
+        "directModeAlwaysLocal": true,
+        "remoteMediaModeAlwaysRemote": true,
+        "ignoresLegacyFlagsAndHost": true,
+        "manualControlRemoved": true
+      },
+      "readiness": {
+        "qBTokenConfigured": "已配置",
+        "anonymousTransmission": "已配置",
+        "missingQbCredentials": "待配置",
+        "validDraft": "待保存",
+        "independentFromEnabled": true
+      },
+      "locationFollowsConnectionModeAcrossSaveAndReload": true,
+      "savedSecretsMaskedAndPreserved": true,
+      "proxyTokenConfigurationRetained": true,
+      "noDownloaderProbeDuringSummary": true,
+      "viewports": [
+        1440,
+        390
+      ],
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "production_152": {
+      "url": "http://152.136.236.238:18120/settings/downloader",
+      "image": "ptmove-nexus:1.2.3",
+      "id": "sha256:8c6db5672a7362a9a4fe07e009c5f7fb6177db26ee289b89fe12944217c830f3",
+      "source": "ea54adc50991cea9374cd716f6117fe61b40c24b",
+      "previous_image": "ptmove-nexus:1.2.2",
+      "configuration_unchanged": true,
+      "hub_unchanged": true,
+      "plugins_unchanged": true,
+      "cached_torrents": 467,
+      "tracked_sites": 136,
+      "assets_and_routes_verified": 56,
+      "restart_count": 0
+    },
+    "github": {
+      "release_id": 461634094,
+      "url": "https://github.com/Chenyi-1999/StarPT/releases/tag/v1.2.3",
+      "assets": {
+        "compose.starpt.yaml": {
+          "size": 498,
+          "sha256": "afb606d49776b2812b1405de0b20e32ef982a4449564ddd19efaad06ee5162e5"
+        },
+        "SHA256SUMS": {
+          "size": 185,
+          "sha256": "058cfb776021f069f5a0feada7333fd20bb36e2519574ef3bc2b7e03a9e108ad"
+        },
+        "starpt-v1.2.3-linux-amd64.tar.gz": {
+          "size": 370998046,
+          "sha256": "66760662b515966294f01fb82f4b7bafd033440cbc01dfaa0f97ccd374506cc4"
+        },
+        "starpt-v1.2.3-linux-amd64.tar.gz.sha256": {
+          "size": 99,
+          "sha256": "3b4ba3351834575994562be292d082f4c9244f8fc7e73582c774c94cad8c2301"
+        }
+      }
+    },
+    "gitee": {
+      "release_id": 1380812,
+      "url": "https://gitee.com/star1999/starpt/releases/tag/v1.2.3",
+      "image_url": "https://github.com/Chenyi-1999/StarPT/releases/download/v1.2.3/starpt-v1.2.3-linux-amd64.tar.gz",
+      "assets": [
+        "SHA256SUMS",
+        "compose.starpt.yaml",
+        "starpt-v1.2.3-linux-amd64.tar.gz.sha256"
+      ]
+    }
   }
 }
