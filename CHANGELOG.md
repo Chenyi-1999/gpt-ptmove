@@ -1062,3 +1062,11 @@
 - 152 容器更新为 ptmove-nexus:1.1.7-downloader-stats.1，源码 2f0bf41。安装校验过的 downloader-summary.zip 2.0.0，保留原容器挂载、配置、领单 Hub、467 条种子索引、站点和已有插件。保存了旧镜像、切换前 Compose、插件缓存和 SQLite 一致性快照。
 - 152 断网候选通过插件安装、qBittorrent 和 Transmission、四维计数、分页和多标签、实际空结果与下载器失联、权限及 47 项资源或路由。qB 夹具只接受认证与读接口，维度切换和明细复用同一份任务快照。公网插件页、资源和权限通过。
 - 真实 qB 只读读取 384 个任务，通过四维计数和路径展开。没有添加、改动或删除 qB 任务。docs/DEPLOYMENT.json 和本回执在隔离分支提交，未推送或发布；本轮仅部署 152，未操作 OVH 或 81。
+
+## PTM-20261128-DOWNLOADER-STATS-OVH — 2026-11-28T17:10:14+08:00 — Codex root / stats_ovh_review，152 下载器统计 2.0 部署至 OVH
+
+- 使用 152 验证的镜像与 ZIP，源码 2f0bf41。核对 Docker 归档原始 SHA-256、OVH 配置镜像 ID、114 个根文件系统层、后端二进制和 ZIP 摘要。OVH 断网复验 qBittorrent、Transmission、四维计数、分页、异常及 47 个路由或静态资源。公网 HTTPS 插件页、JS/CSS、健康及鉴权通过。
+- 复用 /docker/starpt/data 和原容器环境。短暂停北洋园 RSS，备份 SQLite 快照、旧 ZIP 和插件缓存，核对现有站点、种子索引、RSS 台账及其他插件。保留下载器统计的设置、调度和停用状态，并恢复北洋园原 1 分钟设置。
+- 在北洋园暂停期间用 OVH 直连 qB 只读核对 1 台下载器、共 221 个种子。四类计数和按状态展开的名单均通过。下载器统计原为停用，临时启用仅用于验证，随后恢复停用。没有手动新增、修改或删除 qB 任务。
+- 旧镜像和上一版插件 ZIP 已校验归档到 /mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_170950__历史发布__STARPT-OVH下载器统计升级回滚.zip。已清理旧容器、旧镜像标签及原存放位置的旧发布包。保留切换前的数据库和插件状态快照。
+- docs/DEPLOYMENT.json 与 CHANGELOG.md 记录验收结果，在隔离分支提交。未推送或发布，152 仅核对并导出已验证产物，未操作 81。
