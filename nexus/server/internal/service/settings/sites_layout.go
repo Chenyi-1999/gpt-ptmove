@@ -1,8 +1,16 @@
 package settings
 
 import (
-	"fmt"
+	"errors"
+	"slices"
 )
+
+const (
+	homeLayoutKey  = "home_layout"
+	sitesLayoutKey = "sites_layout"
+)
+
+var homeLayoutPanelOrder = []string{"tasks", "speed", "traffic", "downloaders"}
 
 var sitesLayoutPanelOrder = []string{
 	"summary",
@@ -13,92 +21,91 @@ var sitesLayoutPanelOrder = []string{
 	"local-scan",
 }
 
-// SitesLayoutSettings 保存做种检索页面的列数和模块顺序。
-type SitesLayoutSettings struct {
+// DashboardLayoutSettings 保存页面列数、模块顺序和隐藏的模块。
+type DashboardLayoutSettings struct {
 	Columns int      `json:"columns"`
 	Order   []string `json:"order"`
+	Hidden  []string `json:"hidden"`
 }
 
-// GetSitesLayoutSettings 读取做种检索布局，配置缺失或格式异常时返回默认布局。
-// 参数/返回：无参数；返回经过模块 ID 归一化的列数和顺序。
-// 失败场景：无，配置异常会使用默认值。
-// 副作用：无副作用，仅读取内存配置。
-func (s *SettingsService) GetSitesLayoutSettings() SitesLayoutSettings {
-	defaults := SitesLayoutSettings{Columns: 2, Order: append([]string(nil), sitesLayoutPanelOrder...)}
-	cfg := s.cfg.Get()
-	uiSettings, ok := cfg["ui_settings"].(map[string]any)
-	if !ok {
-		return defaults
-	}
-	layout, ok := uiSettings["sites_layout"].(map[string]any)
-	if !ok {
-		return defaults
-	}
-
-	switch columns := layout["columns"].(type) {
-	case float64:
-		if columns == 1 || columns == 2 {
-			defaults.Columns = int(columns)
-		}
-	case int:
-		if columns == 1 || columns == 2 {
-			defaults.Columns = columns
-		}
-	}
-
-	if rawOrder, exists := layout["order"]; exists {
-		order := make([]string, 0, len(sitesLayoutPanelOrder))
-		if values, ok := rawOrder.([]any); ok {
-			for _, value := range values {
-				if panelID, ok := value.(string); ok {
-					order = append(order, panelID)
-				}
-			}
-		} else if values, ok := rawOrder.([]string); ok {
-			order = append(order, values...)
-		}
-		defaults.Order = normalizeSitesLayoutOrder(order)
-	}
-	return defaults
+// GetHomeLayoutSettings 读取首页布局，缺失时使用默认的两列布局和模块顺序。
+func (s *SettingsService) GetHomeLayoutSettings() DashboardLayoutSettings {
+	return s.getDashboardLayout(homeLayoutKey, homeLayoutPanelOrder)
 }
 
-// SaveSitesLayoutSettings 保存做种检索页面布局，并保留其他 UI 配置。
-// 参数/返回：settings 为列数和模块顺序；返回配置写入错误。
-// 失败场景：列数不是 1 或 2 时返回校验错误，配置文件写入失败时返回底层错误。
-// 副作用：将布局写入持久化配置文件。
-func (s *SettingsService) SaveSitesLayoutSettings(settings SitesLayoutSettings) error {
+// SaveHomeLayoutSettings 保存首页布局，返回校验或写入错误。
+func (s *SettingsService) SaveHomeLayoutSettings(settings DashboardLayoutSettings) error {
+	return s.saveDashboardLayout(homeLayoutKey, homeLayoutPanelOrder, settings)
+}
+
+// GetSitesLayoutSettings 读取做种检索布局，缺失时使用默认的两列布局和模块顺序。
+func (s *SettingsService) GetSitesLayoutSettings() DashboardLayoutSettings {
+	return s.getDashboardLayout(sitesLayoutKey, sitesLayoutPanelOrder)
+}
+
+// SaveSitesLayoutSettings 保存做种检索布局，旧版请求未传隐藏模块时保留现有值。
+func (s *SettingsService) SaveSitesLayoutSettings(settings DashboardLayoutSettings) error {
+	return s.saveDashboardLayout(sitesLayoutKey, sitesLayoutPanelOrder, settings)
+}
+
+func (s *SettingsService) getDashboardLayout(key string, panels []string) DashboardLayoutSettings {
+	layout := nestedMap(s.cfg.Get(), "ui_settings", key)
+	settings := DashboardLayoutSettings{
+		Columns: 2,
+		Order:   dashboardPanelIDs(layout["order"]),
+		Hidden:  dashboardPanelIDs(layout["hidden"]),
+	}
+	if layout["columns"] == float64(1) {
+		settings.Columns = 1
+	}
+	return normalizeDashboardLayout(settings, panels)
+}
+
+func (s *SettingsService) saveDashboardLayout(key string, panels []string, settings DashboardLayoutSettings) error {
 	if settings.Columns != 1 && settings.Columns != 2 {
-		return fmt.Errorf("列数必须为 1 或 2")
+		return errors.New("列数必须为 1 或 2")
 	}
 
-	cfg := s.cfg.Get()
-	uiSettings := ensureMap(cfg, "ui_settings")
-	uiSettings["sites_layout"] = map[string]any{
-		"columns": settings.Columns,
-		"order":   normalizeSitesLayoutOrder(settings.Order),
-	}
-	cfg["ui_settings"] = uiSettings
-	return s.cfg.Save(cfg)
+	return s.cfg.UpdateUISettings(func(uiSettings map[string]any) {
+		layout := ensureMap(uiSettings, key)
+		if settings.Hidden == nil {
+			settings.Hidden = dashboardPanelIDs(layout["hidden"])
+		}
+		settings = normalizeDashboardLayout(settings, panels)
+		layout["columns"] = settings.Columns
+		layout["order"] = settings.Order
+		layout["hidden"] = settings.Hidden
+	})
 }
 
-func normalizeSitesLayoutOrder(order []string) []string {
-	known := make(map[string]bool, len(sitesLayoutPanelOrder))
-	for _, panelID := range sitesLayoutPanelOrder {
-		known[panelID] = true
-	}
-
-	result := make([]string, 0, len(sitesLayoutPanelOrder))
-	seen := make(map[string]bool, len(sitesLayoutPanelOrder))
-	for _, panelID := range order {
-		if known[panelID] && !seen[panelID] {
-			result = append(result, panelID)
-			seen[panelID] = true
+func normalizeDashboardLayout(settings DashboardLayoutSettings, panels []string) DashboardLayoutSettings {
+	settings.Order = normalizeDashboardPanelIDs(settings.Order, panels)
+	for _, panelID := range panels {
+		if !slices.Contains(settings.Order, panelID) {
+			settings.Order = append(settings.Order, panelID)
 		}
 	}
-	for _, panelID := range sitesLayoutPanelOrder {
-		if !seen[panelID] {
-			result = append(result, panelID)
+	settings.Hidden = normalizeDashboardPanelIDs(settings.Hidden, panels)
+	return settings
+}
+
+func normalizeDashboardPanelIDs(ids, panels []string) []string {
+	result := make([]string, 0, len(panels))
+	for _, id := range ids {
+		if slices.Contains(panels, id) && !slices.Contains(result, id) {
+			result = append(result, id)
 		}
 	}
 	return result
+}
+
+func dashboardPanelIDs(raw any) []string {
+	items := toSlice(raw)
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if id, ok := item.(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

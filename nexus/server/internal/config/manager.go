@@ -69,7 +69,26 @@ func (m *Manager) Get() map[string]any {
 func (m *Manager) Save(configData map[string]any) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.saveLocked(configData)
+}
 
+// UpdateUISettings 在配置锁内修改最新的界面设置，并将修改写入配置文件。
+// update 只接收界面配置副本，保存失败时内存配置保持原值。
+func (m *Manager) UpdateUISettings(update func(map[string]any)) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	configData := deepCopyMap(m.config)
+	uiSettings, ok := asMap(configData["ui_settings"])
+	if !ok {
+		uiSettings = map[string]any{}
+	}
+	update(uiSettings)
+	configData["ui_settings"] = uiSettings
+	return m.saveLocked(configData)
+}
+
+func (m *Manager) saveLocked(configData map[string]any) error {
 	configToSave := deepCopyMap(configData)
 	if cookieCloud, ok := asMap(configToSave["cookiecloud"]); ok {
 		if value, ok := cookieCloud["e2e_password"].(string); ok && value != "" {

@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.1.9"
+const forkVersion = "1.2.0"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-28",
+				"changes": []string{"首页支持调整卡片显示、顺序和电脑端列数", "做种检索可勾选显示的模块"},
+			},
+			{
+				"version": "1.1.9",
 				"date":    "2026-11-28",
 				"changes": []string{"设置增加独立的布局入口，可调整做种检索的列数和模块顺序", "移除通用设置中的功能扩展占位卡"},
 			},

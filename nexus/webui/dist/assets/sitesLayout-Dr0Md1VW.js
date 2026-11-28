@@ -1,0 +1,1 @@
+import{c as t}from"./dashboardLayout-Ca5CGuhO.js";const s={summary:"做种汇总","site-chart":"站点空间分布","group-chart":"官组分布","site-stats":"做种站点统计","group-stats":"做种官组统计","local-scan":"本地文件扫描"},o=t("sitesLayout","/api/ui_settings/sites_layout",s);export{s as S,o as u};

@@ -1,11 +1,19 @@
 <template>
-  <section class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body sites-layout" aria-labelledby="sites-layout-title">
+  <section
+    class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body layout-panel"
+    :aria-labelledby="`${layoutId}-title`"
+  >
     <header class="card-header">
       <div class="header-content">
         <el-icon class="header-icon"><Grid /></el-icon>
-        <h2 id="sites-layout-title">做种检索布局</h2>
+        <h2 :id="`${layoutId}-title`">{{ title }}</h2>
       </div>
-      <el-button type="primary" :loading="saving" :disabled="loading || Boolean(loadError) || !dirty" @click="saveLayout">
+      <el-button
+        type="primary"
+        :loading="saving"
+        :disabled="loading || Boolean(loadError) || !dirty"
+        @click="saveLayout"
+      >
         保存布局
       </el-button>
     </header>
@@ -19,35 +27,49 @@
       <template v-else>
         <div class="layout-columns">
           <div class="layout-field">
-            <span class="layout-label" id="sites-layout-columns-label">电脑端列数</span>
-            <el-radio-group v-model="draftColumns" aria-labelledby="sites-layout-columns-label" :disabled="saving">
+            <span class="layout-label" :id="`${layoutId}-columns-label`">电脑端列数</span>
+            <el-radio-group
+              v-model="draftColumns"
+              :aria-labelledby="`${layoutId}-columns-label`"
+              :disabled="saving"
+            >
               <el-radio-button :value="1">一列</el-radio-button>
               <el-radio-button :value="2">两列</el-radio-button>
             </el-radio-group>
           </div>
-          <p class="layout-help">
-            手机端固定单列。双列按从左到右、从上到下排列；列表中越靠前的模块优先级越高。
-          </p>
+          <p class="layout-help">{{ description }}</p>
         </div>
 
-        <p v-if="saveError" class="layout-feedback layout-feedback--error" role="alert">{{ saveError }}</p>
+        <p v-if="saveError" class="layout-feedback layout-feedback--error" role="alert">
+          {{ saveError }}
+        </p>
         <p v-else-if="savedMessage" class="layout-feedback" role="status">{{ savedMessage }}</p>
 
-        <ol class="panel-order" aria-label="做种检索模块优先级">
+        <ol class="panel-order" :aria-label="`${title}模块顺序`">
           <li v-for="(panel, index) in draftOrder" :key="panel" class="panel-order__row">
             <span class="panel-order__rank" aria-hidden="true">{{ index + 1 }}</span>
-            <span class="panel-order__name">{{ SITES_PANEL_LABELS[panel] }}</span>
-            <span class="panel-order__priority">{{ index === 0 ? '最高优先级' : `优先级 ${index + 1}` }}</span>
-            <div class="panel-order__actions" :aria-label="`${SITES_PANEL_LABELS[panel]}排序`">
+            <label class="panel-order__toggle">
+              <input
+                type="checkbox"
+                :checked="!draftHidden.includes(panel)"
+                :disabled="saving"
+                :aria-label="`显示${labels[panel]}`"
+                @change="setPanelVisibility(panel, ($event.target as HTMLInputElement).checked)"
+              />
+              <span class="panel-order__name">{{ labels[panel] }}</span>
+            </label>
+            <span v-if="draftHidden.includes(panel)" class="panel-order__priority">已隐藏</span>
+            <span v-else-if="panel === firstVisible" class="panel-order__priority">最高优先级</span>
+            <div class="panel-order__actions" :aria-label="`${labels[panel]}排序`">
               <el-button
                 :icon="ArrowUp"
-                :aria-label="`上移${SITES_PANEL_LABELS[panel]}`"
+                :aria-label="`上移${labels[panel]}`"
                 :disabled="saving || index === 0"
                 @click="movePanel(index, -1)"
               />
               <el-button
                 :icon="ArrowDown"
-                :aria-label="`下移${SITES_PANEL_LABELS[panel]}`"
+                :aria-label="`下移${labels[panel]}`"
                 :disabled="saving || index === draftOrder.length - 1"
                 @click="movePanel(index, 1)"
               />
@@ -60,16 +82,29 @@
   </section>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="PanelID extends string">
 import { ArrowDown, ArrowUp, Grid } from '@element-plus/icons-vue'
-import { computed, onMounted, ref } from 'vue'
-import { useSitesLayoutStore, SITES_PANEL_LABELS, type SitesPanelId } from '@/stores/sitesLayout'
+import { computed, onMounted, ref, shallowRef } from 'vue'
+import type { DashboardLayout } from '@/stores/dashboardLayout'
 
-const layoutStore = useSitesLayoutStore()
+const props = defineProps<{
+  layoutId: string
+  title: string
+  description: string
+  labels: Readonly<Record<PanelID, string>>
+  store: {
+    columns: 1 | 2
+    order: PanelID[]
+    hidden: PanelID[]
+    load(force?: boolean): Promise<void>
+    save(draft: DashboardLayout<PanelID>): Promise<void>
+  }
+}>()
+
 const draftColumns = ref<1 | 2>(2)
-const draftOrder = ref<SitesPanelId[]>([])
-const savedColumns = ref<1 | 2>(2)
-const savedOrder = ref<SitesPanelId[]>([])
+const draftOrder = shallowRef<PanelID[]>([])
+const draftHidden = shallowRef<PanelID[]>([])
+const saved = shallowRef<DashboardLayout<PanelID>>({ columns: 2, order: [], hidden: [] })
 const loading = ref(true)
 const saving = ref(false)
 const loadError = ref('')
@@ -77,26 +112,42 @@ const saveError = ref('')
 const savedMessage = ref('')
 
 const dirty = computed(
-  () => draftColumns.value !== savedColumns.value || draftOrder.value.some((panel, index) => panel !== savedOrder.value[index]),
+  () =>
+    draftColumns.value !== saved.value.columns ||
+    draftOrder.value.some((panel, index) => panel !== saved.value.order[index]) ||
+    draftHidden.value.length !== saved.value.hidden.length ||
+    draftHidden.value.some((panel) => !saved.value.hidden.includes(panel)),
+)
+const firstVisible = computed(() =>
+  draftOrder.value.find((panel) => !draftHidden.value.includes(panel)),
 )
 
 function syncFromStore() {
-  savedColumns.value = layoutStore.columns
-  draftColumns.value = layoutStore.columns
-  savedOrder.value = [...layoutStore.order]
-  draftOrder.value = [...layoutStore.order]
+  saved.value = {
+    columns: props.store.columns,
+    order: [...props.store.order],
+    hidden: [...props.store.hidden],
+  }
+  draftColumns.value = saved.value.columns
+  draftOrder.value = [...saved.value.order]
+  draftHidden.value = [...saved.value.hidden]
+}
+
+function clearSaveFeedback() {
+  saveError.value = ''
+  savedMessage.value = ''
 }
 
 async function loadLayout() {
   loading.value = true
   loadError.value = ''
-  saveError.value = ''
-  savedMessage.value = ''
+  clearSaveFeedback()
   try {
-    await layoutStore.load(true)
+    await props.store.load(true)
     syncFromStore()
   } catch (error) {
-    loadError.value = error instanceof Error ? `布局设置读取失败：${error.message}` : '布局设置读取失败，请重试。'
+    loadError.value =
+      error instanceof Error ? `布局设置读取失败：${error.message}` : '布局设置读取失败，请重试。'
   } finally {
     loading.value = false
   }
@@ -108,21 +159,31 @@ function movePanel(index: number, direction: -1 | 1) {
   const next = [...draftOrder.value]
   ;[next[index], next[target]] = [next[target], next[index]]
   draftOrder.value = next
-  saveError.value = ''
-  savedMessage.value = ''
+  clearSaveFeedback()
+}
+
+function setPanelVisibility(panel: PanelID, visible: boolean) {
+  draftHidden.value = visible
+    ? draftHidden.value.filter((id) => id !== panel)
+    : [...draftHidden.value, panel]
+  clearSaveFeedback()
 }
 
 async function saveLayout() {
   if (!dirty.value || saving.value) return
   saving.value = true
-  saveError.value = ''
-  savedMessage.value = ''
+  clearSaveFeedback()
   try {
-    await layoutStore.save({ columns: draftColumns.value, order: [...draftOrder.value] })
+    await props.store.save({
+      columns: draftColumns.value,
+      order: [...draftOrder.value],
+      hidden: [...draftHidden.value],
+    })
     syncFromStore()
-    savedMessage.value = '做种检索布局已保存。'
+    savedMessage.value = `${props.title}已保存。`
   } catch (error) {
-    saveError.value = error instanceof Error ? `保存失败：${error.message}` : '保存失败，请稍后重试。'
+    saveError.value =
+      error instanceof Error ? `保存失败：${error.message}` : '保存失败，请稍后重试。'
   } finally {
     saving.value = false
   }
@@ -132,7 +193,7 @@ onMounted(loadLayout)
 </script>
 
 <style scoped>
-.sites-layout {
+.layout-panel {
   min-width: 0;
 }
 
@@ -249,6 +310,28 @@ onMounted(loadLayout)
   font-weight: 700;
 }
 
+.panel-order__toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.panel-order__toggle input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--star-accent);
+}
+
+.panel-order__toggle input:focus-visible {
+  outline: 2px solid var(--star-accent);
+  outline-offset: 3px;
+}
+
 .panel-order__name {
   min-width: 0;
   color: var(--el-text-color-primary);
@@ -262,6 +345,8 @@ onMounted(loadLayout)
 }
 
 .panel-order__actions {
+  grid-column: -2;
+  grid-row: 1;
   display: flex;
   gap: 4px;
 }
@@ -294,6 +379,9 @@ onMounted(loadLayout)
 
   .panel-order__actions {
     grid-column: 3;
+  }
+
+  .panel-order__row:has(.panel-order__priority) .panel-order__actions {
     grid-row: 1 / span 2;
   }
 }

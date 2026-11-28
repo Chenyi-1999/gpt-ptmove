@@ -156,9 +156,14 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 展开明细时加 `details=1`、`group`（汇总返回的分组标识），并沿用相同筛选，可带 `page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条。Tracker 明细仅返回主机名。快照过期后须先刷新统计。
 
-## 做种检索布局
+## 首页和做种检索布局
 
-通过 `GET /api/ui_settings/sites_layout` 读取布局，使用同一路径的 `POST` 保存布局。布局对象包含 `columns`（1 或 2）和按优先级排列的 `order`。保存成功返回 `{"success":true}`，其他界面设置保留。可用模块依次为 `summary`、`site-chart`、`group-chart`、`site-stats`、`group-stats`、`local-scan`。缺省为两列和上述顺序。窄屏固定单列，沿用同一排序。
+通过 `GET /api/ui_settings/home_layout` 或 `GET /api/ui_settings/sites_layout` 读取对应页面布局，使用同一路径的 `POST` 保存。布局对象包含 `columns`（1 或 2）、按优先级排列的 `order` 和隐藏模块列表 `hidden`。保存成功返回 `{"success":true}`，另一页面的布局及其他界面设置保留。
+
+- 首页模块默认顺序为 `tasks`、`speed`、`traffic`、`downloaders`。
+- 做种检索模块默认顺序为 `summary`、`site-chart`、`group-chart`、`site-stats`、`group-stats`、`local-scan`。
+
+缺省为两列、默认顺序及显示所有模块。未知或重复的模块 ID 会被忽略，`order` 中未指定的模块按默认顺序补到末尾。保存时省略 `hidden` 会保留现有显示设置，传入空数组会重新显示全部模块。窄屏固定单列，沿用同一排序。
 
 ## 本地文件查询
 

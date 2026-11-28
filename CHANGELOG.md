@@ -1144,3 +1144,11 @@
 - 发行镜像对应源码 5f78b1ed76020a4978c70ba40d125dbb88850706，152 隔离实例验证布局接口 GET、POST 与重新读取，以及下载器统计回归。真实 152 数据、配置、插件 ZIP 和领单服务保持，新增布局路径与前端资源和健康通过。上一版本镜像和 Compose 可回退。
 - 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 370980152 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
 - 同一 v1.1.9 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
+
+## PTM-20261128-STARPT-V120-CARD-LAYOUTS — 2026-11-28T21:19:33+08:00 — Codex root / layout_persistence / dashboard_rendering，首页和做种检索卡片布局
+
+- 设置布局页增加「首页」与「做种检索」标签，由 LayoutSettings.vue 和 LayoutPanelEditor.vue 共用顺序、电脑端一列或两列、显示复选框和保存反馈。配置分别由 homeLayout.ts、sitesLayout.ts 和 dashboardLayout.ts 加载。
+- HomeView.vue 和 SitesView.vue 按已保存的可见顺序渲染。首页任务卡独占一行，保持快捷入口、概览、任务中心和后台任务。做种检索保留现有模块次序与手机单列。全部隐藏时提供布局恢复入口。
+- Go 设置服务、HTTP 路由及 docs/API_CONTRACT.md 添加首页配置及 sites_layout 隐藏选项。旧配置默认全部显示，旧客户端未传隐藏列表时沿用现值，空列表恢复显示全部。现有界面专用写入共用配置锁；其他整份配置写入保持原有行为。
+- Go 全量测试、配置并发保存与旧请求兼容测试、Vue 类型检查、定向 ESLint、10 项前端测试和 Vite 构建通过。Vite 保留既有大分块提示。离线桌面浏览器验证首页任务卡和本地扫描卡隐藏、设置保存及流量图表实际渲染。移动端验收、152 切换和双仓发行另记。
+- 更新 nexus/VERSION、版本信息、Dockerfile、Compose、生成的前端和 docs/RELEASE-v1.2.0.md。未操作 OVH 或 81。

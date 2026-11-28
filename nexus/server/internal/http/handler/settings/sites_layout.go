@@ -7,20 +7,29 @@ import (
 	settingsservice "github.com/pt-nexus/server/internal/service/settings"
 )
 
-// GetSitesLayoutSettings 返回做种检索页面布局。
-// 参数/返回：从 HTTP 请求读取用户身份上下文；成功时直接返回布局 JSON。
-// 失败场景：无，配置异常时服务层返回默认布局。
-// 副作用：无副作用，仅读取设置。
+// GetHomeLayoutSettings 返回首页布局。配置缺失时返回默认值，无副作用。
+func (h *Handler) GetHomeLayoutSettings(c *gin.Context) {
+	c.JSON(http.StatusOK, h.settings.GetHomeLayoutSettings())
+}
+
+// SaveHomeLayoutSettings 校验并持久化首页布局，返回保存结果。
+func (h *Handler) SaveHomeLayoutSettings(c *gin.Context) {
+	saveDashboardLayout(c, h.settings.SaveHomeLayoutSettings, "无法保存首页布局")
+}
+
+// GetSitesLayoutSettings 返回做种检索布局。配置缺失时返回默认值，无副作用。
 func (h *Handler) GetSitesLayoutSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, h.settings.GetSitesLayoutSettings())
 }
 
-// SaveSitesLayoutSettings 校验并保存做种检索页面布局。
-// 参数/返回：请求体包含 columns 和 order；成功返回 success=true。
-// 失败场景：请求体格式或列数不合法时返回 400；配置持久化失败时返回 500。
-// 副作用：写入 UI 布局配置文件。
+// SaveSitesLayoutSettings 校验并持久化做种检索布局，返回保存结果。
 func (h *Handler) SaveSitesLayoutSettings(c *gin.Context) {
-	var payload settingsservice.SitesLayoutSettings
+	saveDashboardLayout(c, h.settings.SaveSitesLayoutSettings, "无法保存做种检索布局")
+}
+
+// saveDashboardLayout 读取列数、模块顺序和可选的隐藏列表，保存失败时返回 400 或 500。
+func saveDashboardLayout(c *gin.Context, save func(settingsservice.DashboardLayoutSettings) error, failureMessage string) {
+	var payload settingsservice.DashboardLayoutSettings
 	if err := c.ShouldBindJSON(&payload); err != nil || payload.Order == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "布局配置格式错误"})
 		return
@@ -29,8 +38,8 @@ func (h *Handler) SaveSitesLayoutSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "列数必须为 1 或 2"})
 		return
 	}
-	if err := h.settings.SaveSitesLayoutSettings(payload); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "无法保存做种检索布局"})
+	if err := save(payload); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": failureMessage})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})

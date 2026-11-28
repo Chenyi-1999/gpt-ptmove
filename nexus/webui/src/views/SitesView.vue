@@ -12,8 +12,17 @@
       </el-button>
     </header>
 
-    <div class="layout-wrapper" :class="{ 'layout-wrapper--two-columns': sitesLayout.columns === 2 }">
-      <template v-for="panel in sitesLayout.order" :key="panel">
+    <div v-if="!layoutReady" class="layout-wrapper">
+      <p class="sites-overview__chart-card sites-layout-notice" role="status">正在读取做种检索布局…</p>
+    </div>
+    <div v-else-if="!sitesLayout.visibleOrder.length" class="layout-wrapper">
+      <div class="sites-overview__chart-card sites-layout-notice">
+        <p>做种检索模块已全部隐藏</p>
+        <RouterLink to="/settings/layout?view=sites">打开布局设置</RouterLink>
+      </div>
+    </div>
+    <div v-else class="layout-wrapper" :class="{ 'layout-wrapper--two-columns': sitesLayout.columns === 2 }">
+      <template v-for="panel in sitesLayout.visibleOrder" :key="panel">
         <section v-if="panel === 'summary'" class="sites-overview__chart-card"
           data-panel="summary" aria-labelledby="seeding-summary-title">
           <h2 id="seeding-summary-title" class="quadrant-title">做种汇总</h2>
@@ -521,6 +530,7 @@ const emits = defineEmits<{
 }>()
 const contentFiltersStore = useContentFiltersStore()
 const sitesLayout = useSitesLayoutStore()
+const layoutReady = ref(false)
 
 const siteStatsLoading = ref(true)
 const groupStatsLoading = ref(true)
@@ -864,9 +874,12 @@ const refreshAllData = async () => {
 }
 
 onMounted(() => {
-  void sitesLayout.load().catch(() => {
-    ElMessage.warning('未能读取做种检索布局，已显示默认布局')
-  })
+  void sitesLayout
+    .load()
+    .catch(() => ElMessage.warning('未能读取做种检索布局，已显示默认布局'))
+    .finally(() => {
+      layoutReady.value = true
+    })
   refreshAllData()
   emits('ready', refreshAllData)
 })
@@ -898,6 +911,21 @@ onMounted(() => {
 @media (min-width: 769px) {
   .layout-wrapper--two-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.sites-layout-notice {
+  margin: 0;
+  text-align: center;
+  color: var(--star-data-muted, #a8b3cf);
+
+  p {
+    margin: 0 0 8px;
+  }
+
+  a {
+    color: var(--star-data-accent, #b8a4ff);
+    text-decoration: underline;
   }
 }
 

@@ -310,6 +310,8 @@ func registerRoutes(
 		api.POST("/ui_settings/cross_seed", settingsHandler.SaveCrossSeedUISettings)
 		api.GET("/ui_settings/publish_logs", settingsHandler.GetPublishLogsUISettings)
 		api.POST("/ui_settings/publish_logs", settingsHandler.SavePublishLogsUISettings)
+		api.GET("/ui_settings/home_layout", settingsHandler.GetHomeLayoutSettings)
+		api.POST("/ui_settings/home_layout", settingsHandler.SaveHomeLayoutSettings)
 		api.GET("/ui_settings/sites_layout", settingsHandler.GetSitesLayoutSettings)
 		api.POST("/ui_settings/sites_layout", settingsHandler.SaveSitesLayoutSettings)
 		api.GET("/upload_settings", settingsHandler.GetUploadSettings)

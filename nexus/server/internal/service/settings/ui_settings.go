@@ -42,11 +42,9 @@ func (s *SettingsService) GetTorrentsUIViewSettings() map[string]any {
 }
 
 func (s *SettingsService) SaveTorrentsUIViewSettings(newSettings map[string]any) error {
-	cfg := s.cfg.Get()
-	ui := ensureMap(cfg, "ui_settings")
-	ui["torrents_view"] = newSettings
-	cfg["ui_settings"] = ui
-	return s.cfg.Save(cfg)
+	return s.cfg.UpdateUISettings(func(ui map[string]any) {
+		ui["torrents_view"] = newSettings
+	})
 }
 
 func (s *SettingsService) GetCrossSeedUIViewSettings() map[string]any {
@@ -69,11 +67,9 @@ func (s *SettingsService) GetCrossSeedUIViewSettings() map[string]any {
 }
 
 func (s *SettingsService) SaveCrossSeedUIViewSettings(newSettings map[string]any) error {
-	cfg := s.cfg.Get()
-	ui := ensureMap(cfg, "ui_settings")
-	ui["cross_seed_view"] = newSettings
-	cfg["ui_settings"] = ui
-	return s.cfg.Save(cfg)
+	return s.cfg.UpdateUISettings(func(ui map[string]any) {
+		ui["cross_seed_view"] = newSettings
+	})
 }
 
 // GetPublishLogsUIViewSettings 返回发布日志页面的 UI 设置。
@@ -107,11 +103,9 @@ func (s *SettingsService) GetPublishLogsUIViewSettings() map[string]any {
 // 失败场景：配置写入失败时返回错误。
 // 副作用：写入配置文件并持久化。
 func (s *SettingsService) SavePublishLogsUIViewSettings(newSettings map[string]any) error {
-	cfg := s.cfg.Get()
-	ui := ensureMap(cfg, "ui_settings")
-	ui["publish_logs_view"] = newSettings
-	cfg["ui_settings"] = ui
-	return s.cfg.Save(cfg)
+	return s.cfg.UpdateUISettings(func(ui map[string]any) {
+		ui["publish_logs_view"] = newSettings
+	})
 }
 
 func (s *SettingsService) GetUploadSettings() map[string]any {

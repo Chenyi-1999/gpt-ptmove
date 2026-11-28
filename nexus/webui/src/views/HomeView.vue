@@ -54,144 +54,170 @@
         </div>
       </dl>
 
-      <HomeTaskMonitor class="star-home__task" />
+      <p v-if="!layoutReady" class="home-card home-panel home-empty" role="status">
+        正在读取首页布局…
+      </p>
+      <div v-else-if="!homeLayout.visibleOrder.length" class="home-card home-panel home-empty">
+        <p>首页卡片已全部隐藏</p>
+        <RouterLink to="/settings/layout" class="home-link">打开布局设置</RouterLink>
+      </div>
+      <div
+        v-else
+        class="star-home__panels"
+        :class="{ 'star-home__panels--two-columns': homeLayout.columns === 2 }"
+      >
+        <template v-for="panel in homeLayout.visibleOrder" :key="panel">
+          <HomeTaskMonitor
+            v-if="panel === 'tasks'"
+            class="star-home__panel--wide"
+            data-panel="tasks"
+          />
+          <HomeSpeedPanel v-else-if="panel === 'speed'" data-panel="speed" />
 
-      <div class="star-home__panels">
-        <HomeSpeedPanel />
-
-        <section class="home-card home-panel" aria-labelledby="home-traffic-title">
-          <div class="home-panel__heading">
-            <div>
-              <h2 id="home-traffic-title">流量趋势</h2>
-              <p>按服务器时间统计已启用下载器的每小时流量</p>
-            </div>
-            <div class="home-range" role="group" aria-label="流量时段">
-              <button
-                v-for="option in ranges"
-                :key="option.value"
-                type="button"
-                :aria-pressed="range === option.value"
-                @click="range = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-
-          <p v-if="trafficError && traffic.length" class="home-status--warning" role="status">
-            刷新失败，当前为上次读取的数据。
-          </p>
-          <template v-if="traffic.length">
-            <div class="home-legend" aria-hidden="true">
-              <span><i class="home-key" /> 上传</span>
-              <span><i class="home-key home-key--blue" /> 下载</span>
-            </div>
-            <div
-              ref="chartHost"
-              class="home-chart"
-              role="img"
-              :aria-label="
-                currentRangeLabel +
-                '流量柱状图，上传 ' +
-                formatBytes(uploadTotal) +
-                '，下载 ' +
-                formatBytes(downloadTotal)
-              "
-            />
-          </template>
-          <div v-else class="home-chart home-empty" role="status">
-            <TrendCharts aria-hidden="true" />
-            <p v-if="trafficBusy">正在读取流量记录…</p>
-            <p v-else-if="trafficError">无法读取流量记录</p>
-            <p v-else>当前时段暂无流量记录</p>
-          </div>
-
-          <div class="home-panel__footer">
-            <details v-if="traffic.length" class="home-detail">
-              <summary>每小时数据</summary>
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">时间</th>
-                    <th scope="col">上传</th>
-                    <th scope="col">下载</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="point in traffic" :key="point.label">
-                    <th scope="row">{{ point.label }}</th>
-                    <td>{{ formatBytes(point.uploaded) }}</td>
-                    <td>{{ formatBytes(point.downloaded) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </details>
-          </div>
-        </section>
-
-        <section class="home-card home-panel" aria-labelledby="home-downloaders-title">
-          <div class="home-panel__heading">
-            <div>
-              <h2 id="home-downloaders-title">下载器</h2>
-              <p>每 30 秒刷新</p>
-            </div>
-            <RouterLink
-              to="/settings/downloader"
-              class="home-control home-control--icon"
-              aria-label="下载器设置"
-              title="下载器设置"
-            >
-              <Setting aria-hidden="true" />
-            </RouterLink>
-          </div>
-
-          <p
-            v-if="downloaderError && downloaderInfo !== null"
-            class="home-status--warning"
-            role="status"
+          <section
+            v-else-if="panel === 'traffic'"
+            class="home-card home-panel"
+            data-panel="traffic"
+            aria-labelledby="home-traffic-title"
           >
-            刷新失败，当前为上次读取的数据。
-          </p>
-          <ul v-if="downloaderInfo?.length" class="home-downloaders">
-            <li v-for="downloader in downloaderInfo" :key="downloader.id || downloader.name">
-              <div class="home-downloader__head">
-                <div class="home-downloader__name">
-                  <h3>{{ downloader.name }}</h3>
-                  <span>
-                    {{ downloaderTypeLabel(downloader.type)
-                    }}{{ downloader.details?.版本 ? ' · ' + downloader.details.版本 : '' }}
+            <div class="home-panel__heading">
+              <div>
+                <h2 id="home-traffic-title">流量趋势</h2>
+                <p>按服务器时间统计已启用下载器的每小时流量</p>
+              </div>
+              <div class="home-range" role="group" aria-label="流量时段">
+                <button
+                  v-for="option in ranges"
+                  :key="option.value"
+                  type="button"
+                  :aria-pressed="range === option.value"
+                  @click="range = option.value"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <p v-if="trafficError && traffic.length" class="home-status--warning" role="status">
+              刷新失败，当前为上次读取的数据。
+            </p>
+            <template v-if="traffic.length">
+              <div class="home-legend" aria-hidden="true">
+                <span><i class="home-key" /> 上传</span>
+                <span><i class="home-key home-key--blue" /> 下载</span>
+              </div>
+              <div
+                :ref="setChartHost"
+                class="home-chart"
+                role="img"
+                :aria-label="
+                  currentRangeLabel +
+                  '流量柱状图，上传 ' +
+                  formatBytes(uploadTotal) +
+                  '，下载 ' +
+                  formatBytes(downloadTotal)
+                "
+              />
+            </template>
+            <div v-else class="home-chart home-empty" role="status">
+              <TrendCharts aria-hidden="true" />
+              <p v-if="trafficBusy">正在读取流量记录…</p>
+              <p v-else-if="trafficError">无法读取流量记录</p>
+              <p v-else>当前时段暂无流量记录</p>
+            </div>
+
+            <div class="home-panel__footer">
+              <details v-if="traffic.length" class="home-detail">
+                <summary>每小时数据</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">时间</th>
+                      <th scope="col">上传</th>
+                      <th scope="col">下载</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="point in traffic" :key="point.label">
+                      <th scope="row">{{ point.label }}</th>
+                      <td>{{ formatBytes(point.uploaded) }}</td>
+                      <td>{{ formatBytes(point.downloaded) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </details>
+            </div>
+          </section>
+
+          <section
+            v-else-if="panel === 'downloaders'"
+            class="home-card home-panel"
+            data-panel="downloaders"
+            aria-labelledby="home-downloaders-title"
+          >
+            <div class="home-panel__heading">
+              <div>
+                <h2 id="home-downloaders-title">下载器</h2>
+                <p>每 30 秒刷新</p>
+              </div>
+              <RouterLink
+                to="/settings/downloader"
+                class="home-control home-control--icon"
+                aria-label="下载器设置"
+                title="下载器设置"
+              >
+                <Setting aria-hidden="true" />
+              </RouterLink>
+            </div>
+
+            <p
+              v-if="downloaderError && downloaderInfo !== null"
+              class="home-status--warning"
+              role="status"
+            >
+              刷新失败，当前为上次读取的数据。
+            </p>
+            <ul v-if="downloaderInfo?.length" class="home-downloaders">
+              <li v-for="downloader in downloaderInfo" :key="downloader.id || downloader.name">
+                <div class="home-downloader__head">
+                  <div class="home-downloader__name">
+                    <h3>{{ downloader.name }}</h3>
+                    <span>
+                      {{ downloaderTypeLabel(downloader.type)
+                      }}{{ downloader.details?.版本 ? ' · ' + downloader.details.版本 : '' }}
+                    </span>
+                  </div>
+                  <span
+                    class="home-downloader__status"
+                    :class="{
+                      'home-downloader__status--enabled':
+                        downloader.enabled && activeStatuses.includes(downloader.status),
+                    }"
+                  >
+                    {{ downloader.enabled ? downloader.status || '状态未知' : '已禁用' }}
                   </span>
                 </div>
-                <span
-                  class="home-downloader__status"
-                  :class="{
-                    'home-downloader__status--enabled':
-                      downloader.enabled && activeStatuses.includes(downloader.status),
-                  }"
-                >
-                  {{ downloader.enabled ? downloader.status || '状态未知' : '已禁用' }}
-                </span>
-              </div>
-              <dl v-if="downloader.enabled" class="home-downloader__metrics">
-                <div v-for="metric in metrics" :key="metric.key">
-                  <dt>{{ metric.label }}</dt>
-                  <dd>{{ downloader.details?.[metric.key] || '—' }}</dd>
-                </div>
-              </dl>
-            </li>
-          </ul>
-          <div v-else class="home-empty home-empty--downloaders" role="status">
-            <Monitor aria-hidden="true" />
-            <p v-if="downloaderBusy">正在读取下载器…</p>
-            <p v-else-if="downloaderError && downloaderInfo === null">无法读取下载器</p>
-            <template v-else>
-              <p>暂无下载器配置</p>
-              <RouterLink to="/settings/downloader" class="home-link">
-                添加下载器 <ArrowRight aria-hidden="true" />
-              </RouterLink>
-            </template>
-          </div>
-        </section>
+                <dl v-if="downloader.enabled" class="home-downloader__metrics">
+                  <div v-for="metric in metrics" :key="metric.key">
+                    <dt>{{ metric.label }}</dt>
+                    <dd>{{ downloader.details?.[metric.key] || '—' }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+            <div v-else class="home-empty home-empty--downloaders" role="status">
+              <Monitor aria-hidden="true" />
+              <p v-if="downloaderBusy">正在读取下载器…</p>
+              <p v-else-if="downloaderError && downloaderInfo === null">无法读取下载器</p>
+              <template v-else>
+                <p>暂无下载器配置</p>
+                <RouterLink to="/settings/downloader" class="home-link">
+                  添加下载器 <ArrowRight aria-hidden="true" />
+                </RouterLink>
+              </template>
+            </div>
+          </section>
+        </template>
       </div>
     </div>
   </div>
@@ -203,6 +229,8 @@ import axios from 'axios'
 import * as echarts from 'echarts'
 import HomeSpeedPanel from '@/components/HomeSpeedPanel.vue'
 import HomeTaskMonitor from '@/components/HomeTaskMonitor.vue'
+import { useHomeLayoutStore } from '@/stores/homeLayout'
+import { ElMessage } from '@/utils/uiNotify'
 import {
   ArrowRight,
   Bottom,
@@ -256,6 +284,9 @@ const ranges = [
   { value: 'yesterday', label: '昨日' },
 ] as const
 
+const homeLayout = useHomeLayoutStore()
+const layoutReady = ref(false)
+
 const activeStatuses = ['已连接', '已配置']
 const range = ref<(typeof ranges)[number]['value']>(ranges[0].value)
 const currentRangeLabel = computed(() =>
@@ -268,6 +299,10 @@ const trafficBusy = ref(true)
 const downloaderError = ref(false)
 const trafficError = ref(false)
 const chartHost = ref<HTMLElement | null>(null)
+
+function setChartHost(element: unknown) {
+  chartHost.value = element instanceof HTMLElement ? element : null
+}
 
 const enabledCount = computed(
   () => downloaderInfo.value?.filter((item) => item.enabled).length ?? 0,
@@ -464,6 +499,12 @@ watch(range, () => {
 })
 
 onMounted(() => {
+  void homeLayout
+    .load()
+    .catch(() => ElMessage.warning('未能读取首页布局，已显示默认布局'))
+    .finally(() => {
+      layoutReady.value = true
+    })
   refreshDashboard()
   refreshTimer = window.setInterval(refreshDashboard, 30000)
 })
@@ -618,13 +659,14 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
 }
 
-.star-home__task {
+.star-home__panel--wide,
+.star-home__panels > :only-child {
+  grid-column: 1 / -1;
   min-width: 0;
-  margin-bottom: 14px;
 }
 
 .star-home__panels {
-  grid-template-columns: minmax(0, 1.75fr) minmax(290px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -916,9 +958,9 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-@media (max-width: 900px) {
-  .star-home__panels {
-    grid-template-columns: minmax(0, 1fr);
+@media (min-width: 901px) {
+  .star-home__panels--two-columns {
+    grid-template-columns: minmax(0, 1.75fr) minmax(290px, 1fr);
   }
 }
 
