@@ -1138,3 +1138,9 @@
 - 从 nexus/webui/src/components/settings/GeneralSettings.vue 删除「功能扩展」卡片、占位文字和专用样式。保留同页实际设置项，重新生成 nexus/webui/dist。更新应用版本记录和 docs/RELEASE-v1.1.9.md。
 - Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和 152 离线 Go 测试通过。用最终构建复测桌面和手机，确认占位卡消失、相邻设置正常且独立布局保存刷新通过。
 - 与布局入口一并纳入 v1.1.9。152 切换和双仓发布结果另记。未操作 OVH 或 81。
+
+## PTM-20261128-STARPT-V119-RELEASE — 2026-11-28T21:06:17+08:00 — Codex root，发布布局设置与占位卡清理
+
+- 发行镜像对应源码 5f78b1ed76020a4978c70ba40d125dbb88850706，152 隔离实例验证布局接口 GET、POST 与重新读取，以及下载器统计回归。真实 152 数据、配置、插件 ZIP 和领单服务保持，新增布局路径与前端资源和健康通过。上一版本镜像和 Compose 可回退。
+- 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 370980152 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
+- 同一 v1.1.9 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
