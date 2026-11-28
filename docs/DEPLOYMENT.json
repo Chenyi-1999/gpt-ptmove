@@ -4326,5 +4326,97 @@
     },
     "live_deployment_touched": false,
     "github_release_assets_touched": false
+  },
+  "gitee_v1_2_4_complete_after_cleanup_20261129": {
+    "release_id": 1380900,
+    "url": "https://gitee.com/star1999/starpt/releases/tag/v1.2.4",
+    "archive_sha256": "4eb4c8500b482fc1597a9328df8e08ec149ebfb1d1f24c77e298eaab38043661",
+    "archive_size": 371012848,
+    "complete": true,
+    "assets": {
+      "starpt-v1.2.4-linux-amd64.tar.gz.part01.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part01.zip",
+        "size": 40894640,
+        "sha256": "2530a6a453b695206408708942016031cc248ac4dad745e80af5bf7d43c4df47",
+        "id": 3872406
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part02.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part02.zip",
+        "size": 40894640,
+        "sha256": "ca742a976bc62a199c8dddb5fee2b0503c2dbb712c236bd9c88cfaf980a6babc",
+        "id": 3872896
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part03.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part03.zip",
+        "size": 40894640,
+        "sha256": "1ca89d014b36b7bebde5f553ddf82c22c455a3aa3de8b554c3e9ee00bd59f106",
+        "id": 3872908
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part04.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part04.zip",
+        "size": 40894640,
+        "sha256": "3e9eaf53529836ce2b2c430cf08e67cae07bd9b802874e2880d60e0cae878fce",
+        "id": 3872928
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part05.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part05.zip",
+        "size": 40894640,
+        "sha256": "6dc46d948b0ee545b0d51162866d320e01f73434322930c81ad6030671e48b35",
+        "id": 3872969
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part06.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part06.zip",
+        "size": 40894640,
+        "sha256": "ab9e878ca420aee4c8fcbb341726da577c59891bb041ec9547fdbd86d6a69e92",
+        "id": 3872997
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part07.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part07.zip",
+        "size": 40894640,
+        "sha256": "9ecd373c8f7f4892faf90a7a746a31c039eebfdfa770c49c41dd4f78bebe4737",
+        "id": 3873029
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part08.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part08.zip",
+        "size": 40894640,
+        "sha256": "2aa4e0b7d084fa81e3a98a85adcd4f7cc36622047162da3500cbde26bc1b1d86",
+        "id": 3873048
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part09.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part09.zip",
+        "size": 40894640,
+        "sha256": "2fe51401a46fdaa991794946fa26009e542bacd79de3c857c9de4d9906afb964",
+        "id": 3873068
+      },
+      "starpt-v1.2.4-linux-amd64.tar.gz.part10.zip": {
+        "name": "starpt-v1.2.4-linux-amd64.tar.gz.part10.zip",
+        "size": 2962848,
+        "sha256": "0f0a9eda04569afe6658db292a0ce1b798495c7132b1312bd590391f72d0e2de",
+        "id": 3873071
+      },
+      "SHA256SUMS-gitee-parts-v1.2.4": {
+        "name": "SHA256SUMS-gitee-parts-v1.2.4",
+        "size": 1100,
+        "sha256": "b86241b283015de01a4187a6fe72ca440e51fb74ca60883a66222e1c68e9f5f5",
+        "id": 3873072
+      },
+      "GITEE-REASSEMBLY-v1.2.4.txt": {
+        "name": "GITEE-REASSEMBLY-v1.2.4.txt",
+        "size": 2391,
+        "sha256": "9c420f478ec16e9caed5e517f88df44e32202b6eadb7c42f1c95b58e4e2de943",
+        "id": 3873073
+      }
+    },
+    "all_partition_download_hashes_verified": true,
+    "release_fully_downloadable_from_gitee": true,
+    "compose_and_standard_checksums_verified": [
+      "SHA256SUMS",
+      "compose.starpt.yaml",
+      "starpt-v1.2.4-linux-amd64.tar.gz.sha256"
+    ],
+    "verification_time": "2026-11-29T00:15:32+08:00",
+    "source_commit": "dd51ba7bd91e8adbb80a989f60396562b5d79ef9",
+    "source_artifact_verified_at_152": true,
+    "cleanup_receipt_id": "PTM-20261129-GITEE-PRE120-ATTACHMENT-CLEANUP"
   }
 }
