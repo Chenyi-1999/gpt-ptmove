@@ -1118,3 +1118,10 @@
 - 更新 nexus/VERSION、nexus/Dockerfile.ptmove、nexus/compose.ptmove.yaml、compose.starpt.yaml、nexus/server/internal/bootstrap/fork_update.go 和 docs/RELEASE-v1.1.8.md。保留两边已有的历史记录。
 - Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和桌面及 390px 浏览器验收通过。Vite 保留大分块提示。152 隔离容器 Go 测试和构建通过。第一次 Go 检查使用了错误的插件测试输入，更换为下载器统计 ZIP 后通过。
 - 当前为发行源码及构建产物提交。152 最终镜像部署、双仓推送和发行验收另记。多页面并发刷新统计时，已打开的汇总和随后展开的明细可能读取不同快照。未操作 81 或 OVH。
+
+## PTM-20261128-STARPT-V118-RELEASE — 2026-11-28T19:47:49+08:00 — Codex root，验证并发布 StarPT v1.1.8
+
+- 源码和离线 Compose 合并提交为 944549439f067efea273bc948ea8f253eb8fe4e3，双仓 master 与 v1.1.8 标签已核对。发布日期、附件及产物信息记入 docs/DEPLOYMENT.json。
+- 152 使用同一 linux/amd64 镜像通过断网启动、四项组合筛选、分页和错误态验证，核对 47 项前端资源与路由。更新 152 后健康，保留数据、配置、插件、已有 467 条种子索引及领单服务。已有镜像和 Compose 可回退。
+- 完整 Docker 归档含 122 层，SHA-256 为 674e7488d0c146f42ba15ebad9126eb2e7774b904ac1e98327545e99a8a06753，gzip 与 docker load 复验通过。GitHub 发布完整镜像、Compose、两份插件 ZIP 与校验文件，按附件大小和 SHA-256 核验。Gitee 发布 Compose、插件 ZIP、校验文件和同一完整镜像下载地址，接口查阅确认。
+- 发行源码标签保留镜像对应提交。这条回执只更新变更记录与部署文档。未操作 81 或 OVH，未触发发种。
