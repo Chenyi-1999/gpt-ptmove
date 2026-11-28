@@ -18,7 +18,7 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 			{
 				"version": forkVersion,
 				"date":    "2026-11-28",
-				"changes": []string{"设置增加独立的布局入口，可调整做种检索的列数和模块顺序"},
+				"changes": []string{"设置增加独立的布局入口，可调整做种检索的列数和模块顺序", "移除通用设置中的功能扩展占位卡"},
 			},
 			{
 				"version": "1.1.8",

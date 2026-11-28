@@ -1132,3 +1132,9 @@
 - 同步构建 nexus/webui/dist，并更新 nexus/VERSION、Dockerfile、Compose、版本信息和 docs/RELEASE-v1.1.9.md。
 - Vue 类型检查、变更文件 ESLint、10 项 Node 测试、Vite 与 152 离线 Go 全量测试通过。Vite 保留已有大分块提示。1440px 桌面与 390px 手机浏览器检查通过，涵盖设置导航、保存和刷新、通用及转种页卡片缺席、无横向溢出。前端验收采用模拟接口。
 - 发行产物、152 切换及双仓发布待验收另记。本轮未部署 OVH 或访问 81。
+
+## PTM-20261128-STARPT-V119-SETTINGS-PLACEHOLDER — 2026-11-28T20:50:56+08:00 — Codex root / layout_browser_qa，移除功能扩展占位卡
+
+- 从 nexus/webui/src/components/settings/GeneralSettings.vue 删除「功能扩展」卡片、占位文字和专用样式。保留同页实际设置项，重新生成 nexus/webui/dist。更新应用版本记录和 docs/RELEASE-v1.1.9.md。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和 152 离线 Go 测试通过。用最终构建复测桌面和手机，确认占位卡消失、相邻设置正常且独立布局保存刷新通过。
+- 与布局入口一并纳入 v1.1.9。152 切换和双仓发布结果另记。未操作 OVH 或 81。

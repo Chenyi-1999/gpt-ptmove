@@ -836,28 +836,6 @@
           </el-form>
         </div>
       </div>
-
-      <!-- 功能扩展卡片 -->
-      <div
-        v-if="!transferOnly"
-        class="settings-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
-      >
-        <div class="card-header">
-          <div class="header-content">
-            <el-icon class="header-icon">
-              <Setting />
-            </el-icon>
-            <h3>功能扩展</h3>
-          </div>
-        </div>
-
-        <div class="card-content placeholder-content">
-          <el-icon class="placeholder-icon">
-            <Setting />
-          </el-icon>
-          <p class="placeholder-text">功能扩展中</p>
-        </div>
-      </div>
     </div>
   </div>
   <!-- 路径选择弹窗 -->
@@ -2141,27 +2119,6 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-.placeholder-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--el-text-color-secondary);
-  height: 100%;
-}
-
-.placeholder-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
-  opacity: 0.5;
-}
-
-.placeholder-text {
-  margin: 0;
-  font-size: 14px;
 }
 
 .slide-enter-active,
