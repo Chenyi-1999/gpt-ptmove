@@ -30,10 +30,20 @@ var (
 	ErrInventoryRead       = errors.New("读取下载器失败，请检查连接后重试")
 )
 
-var inventoryStates = []string{"seeding", "downloading", "paused", "checking", "queued", "error", "other"}
+var inventoryStateLabels = map[string]string{
+	"seeding":     "做种中",
+	"downloading": "下载中",
+	"paused":      "已暂停",
+	"checking":    "校验中",
+	"queued":      "排队中",
+	"error":       "异常",
+	"other":       "其他",
+}
 var inventoryDimensions = map[string]string{
 	"category": "未分类",
 	"tag":      "无标签",
+	"tracker":  "无 Tracker",
+	"state":    "其他",
 	"site":     "未识别站点",
 	"path":     "未知路径",
 }
@@ -44,10 +54,25 @@ type InventoryTorrent struct {
 	State    string   `json:"state"`
 	Category string   `json:"category"`
 	Tags     []string `json:"tags"`
+	Trackers []string `json:"trackers"`
 	Site     string   `json:"site"`
 	Path     string   `json:"path"`
 	Progress float64  `json:"progress"`
 	Size     int64    `json:"size"`
+}
+
+// InventoryFilters 表示同时匹配的分类、标签、Tracker 键及种子状态。空值不限制。
+type InventoryFilters struct {
+	Category string
+	Tag      string
+	Tracker  string
+	Status   string
+}
+
+// InventoryOption 是筛选项的显示名称和对应的不透明查询键。
+type InventoryOption struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
 }
 
 // InventoryGroup 包含该维度分组的总数和各状态数。
@@ -60,10 +85,12 @@ type InventoryGroup struct {
 
 // InventorySummary 是一次下载器统计的折叠结果。
 type InventorySummary struct {
-	RefreshedAt int64            `json:"refreshed_at"`
-	Total       int              `json:"total"`
-	Counts      map[string]int   `json:"counts"`
-	Groups      []InventoryGroup `json:"groups"`
+	RefreshedAt int64                        `json:"refreshed_at"`
+	SourceTotal int                          `json:"source_total"`
+	Total       int                          `json:"total"`
+	Counts      map[string]int               `json:"counts"`
+	Groups      []InventoryGroup             `json:"groups"`
+	Options     map[string][]InventoryOption `json:"options"`
 }
 
 // InventoryDetails 是同一快照上的种子明细页。
@@ -104,22 +131,21 @@ func NewDownloaderInventory(cfg *config.Manager, repo *repository.TorrentDataRep
 	}
 }
 
-// Summary 按维度读取计数。首次访问、快照过期或刷新时读取下载器，连接失败返回错误。
-func (s *DownloaderInventory) Summary(ctx context.Context, id, dimension string, refresh bool) (InventorySummary, error) {
-	if inventoryDimensions[dimension] == "" {
+// Summary 返回匹配筛选条件的分组计数和完整筛选选项。首次访问、快照过期或刷新时读取下载器。
+func (s *DownloaderInventory) Summary(ctx context.Context, id, dimension string, filters InventoryFilters, refresh bool) (InventorySummary, error) {
+	if inventoryDimensions[dimension] == "" || !filters.valid() {
 		return InventorySummary{}, ErrInventoryQuery
 	}
 	snapshot, err := s.getSnapshot(ctx, id, refresh, false)
 	if err != nil {
 		return InventorySummary{}, err
 	}
-	return snapshot.summary(dimension), nil
+	return snapshot.summary(dimension, filters), nil
 }
 
-// Details 从已展示的统计快照分页读取指定分组，支持按种子状态筛选。
-func (s *DownloaderInventory) Details(ctx context.Context, id, dimension, group, state string, page, pageSize int) (InventoryDetails, error) {
-	if inventoryDimensions[dimension] == "" || len(group) != 24 ||
-		(state != "" && !slices.Contains(inventoryStates, state)) ||
+// Details 从已有快照分页读取指定分组，同时应用汇总使用的筛选条件。快照失效时提示刷新。
+func (s *DownloaderInventory) Details(ctx context.Context, id, dimension, group string, filters InventoryFilters, page, pageSize int) (InventoryDetails, error) {
+	if inventoryDimensions[dimension] == "" || len(group) != 24 || !filters.valid() ||
 		page < 1 || page > inventoryTorrentLimit || pageSize < 1 || pageSize > 50 {
 		return InventoryDetails{}, ErrInventoryQuery
 	}
@@ -127,7 +153,16 @@ func (s *DownloaderInventory) Details(ctx context.Context, id, dimension, group,
 	if err != nil {
 		return InventoryDetails{}, err
 	}
-	return snapshot.details(dimension, group, state, page, pageSize), nil
+	return snapshot.details(dimension, group, filters, page, pageSize), nil
+}
+
+func (filters InventoryFilters) valid() bool {
+	for _, key := range [...]string{filters.Category, filters.Tag, filters.Tracker} {
+		if key != "" && (len(key) != 24 || strings.Trim(key, "0123456789abcdef") != "") {
+			return false
+		}
+	}
+	return filters.Status == "" || inventoryStateLabels[filters.Status] != ""
 }
 
 func (s *DownloaderInventory) getSnapshot(ctx context.Context, id string, refresh, details bool) (inventorySnapshot, error) {
@@ -207,21 +242,17 @@ func (s *DownloaderInventory) fetchSnapshot(downloader downloaderclient.Download
 	items := make([]InventoryTorrent, 0, len(torrents))
 	for _, torrent := range torrents {
 		site := matcher.Match(torrent.Trackers, "", torrent.Comment)
-		if site == "" {
-			for _, tracker := range torrent.Trackers {
-				if host := inventoryTrackerHost(tracker); host != "" {
-					site = host
-					break
-				}
-			}
+		trackers := inventoryTrackerHosts(torrent.Trackers)
+		if site == "" && len(trackers) > 0 {
+			site = trackers[0]
 		}
 		state := torrent.InventoryState
-		if !slices.Contains(inventoryStates, state) {
+		if inventoryStateLabels[state] == "" {
 			state = "other"
 		}
 		items = append(items, InventoryTorrent{
 			Name: torrent.Name, State: state, Category: torrent.Category, Tags: append([]string{}, torrent.Tags...),
-			Site: site, Path: torrent.SavePath, Progress: torrent.Progress / 100, Size: torrent.Size,
+			Trackers: trackers, Site: site, Path: torrent.SavePath, Progress: torrent.Progress / 100, Size: torrent.Size,
 		})
 	}
 	// 名称相同的任务维持下载器顺序，分页在同一快照中可重现。
@@ -229,8 +260,24 @@ func (s *DownloaderInventory) fetchSnapshot(downloader downloaderclient.Download
 	return inventorySnapshot{refreshedAt: time.Now(), torrents: items}, nil
 }
 
+// inventoryTrackerHosts 将同一任务的 Tracker 按主机去重，保留下载器给出的顺序。
+func inventoryTrackerHosts(trackers []string) []string {
+	hosts := make([]string, 0, len(trackers))
+	for _, tracker := range trackers {
+		host := inventoryTrackerHost(tracker)
+		if host != "" && !slices.Contains(hosts, host) {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
+}
+
+// inventoryTrackerHost 从 Tracker 地址中提取主机，丢弃端口、凭据、路径与查询参数。
 func inventoryTrackerHost(tracker string) string {
 	value := strings.TrimSpace(tracker)
+	if ip := net.ParseIP(value); ip != nil {
+		return ip.String()
+	}
 	if !strings.Contains(value, "://") {
 		value = "//" + value
 	}
@@ -239,10 +286,19 @@ func inventoryTrackerHost(tracker string) string {
 		return ""
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	if strings.Contains(host, ".") || net.ParseIP(host) != nil {
-		return host
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.String()
 	}
-	return ""
+	if !strings.Contains(host, ".") {
+		return ""
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' ||
+			strings.Trim(label, "abcdefghijklmnopqrstuvwxyz0123456789-") != "" {
+			return ""
+		}
+	}
+	return host
 }
 
 func inventoryGroupKey(value string) string {
@@ -258,6 +314,12 @@ func (torrent InventoryTorrent) groupValues(dimension string) []string {
 		if len(torrent.Tags) > 0 {
 			return torrent.Tags
 		}
+	case "tracker":
+		if len(torrent.Trackers) > 0 {
+			return torrent.Trackers
+		}
+	case "state":
+		return []string{torrent.State}
 	case "site":
 		return []string{torrent.Site}
 	case "path":
@@ -266,19 +328,56 @@ func (torrent InventoryTorrent) groupValues(dimension string) []string {
 	return []string{""}
 }
 
-func (snapshot inventorySnapshot) summary(dimension string) InventorySummary {
+func (torrent InventoryTorrent) matchesGroup(dimension, key string) bool {
+	for _, value := range torrent.groupValues(dimension) {
+		if inventoryGroupKey(value) == key {
+			return true
+		}
+	}
+	return false
+}
+
+func (filters InventoryFilters) matches(torrent InventoryTorrent) bool {
+	return (filters.Status == "" || torrent.State == filters.Status) &&
+		(filters.Category == "" || torrent.matchesGroup("category", filters.Category)) &&
+		(filters.Tag == "" || torrent.matchesGroup("tag", filters.Tag)) &&
+		(filters.Tracker == "" || torrent.matchesGroup("tracker", filters.Tracker))
+}
+
+func inventoryGroupLabel(dimension, value string) string {
+	if dimension == "state" && inventoryStateLabels[value] != "" {
+		return inventoryStateLabels[value]
+	}
+	if value == "" {
+		return inventoryDimensions[dimension]
+	}
+	return value
+}
+
+func (snapshot inventorySnapshot) summary(dimension string, filters InventoryFilters) InventorySummary {
 	byValue := make(map[string]*InventoryGroup)
 	counts := make(map[string]int)
+	optionValues := map[string]map[string]struct{}{
+		"category": {},
+		"tag":      {},
+		"tracker":  {},
+	}
+	total := 0
 	for _, torrent := range snapshot.torrents {
+		for optionDimension, values := range optionValues {
+			for _, value := range torrent.groupValues(optionDimension) {
+				values[value] = struct{}{}
+			}
+		}
+		if !filters.matches(torrent) {
+			continue
+		}
+		total++
 		counts[torrent.State]++
 		for _, value := range torrent.groupValues(dimension) {
 			group := byValue[value]
 			if group == nil {
-				label := value
-				if label == "" {
-					label = inventoryDimensions[dimension]
-				}
-				group = &InventoryGroup{Key: inventoryGroupKey(value), Label: label, Counts: make(map[string]int)}
+				group = &InventoryGroup{Key: inventoryGroupKey(value), Label: inventoryGroupLabel(dimension, value), Counts: make(map[string]int)}
 				byValue[value] = group
 			}
 			group.Total++
@@ -298,27 +397,38 @@ func (snapshot inventorySnapshot) summary(dimension string) InventorySummary {
 		}
 		return strings.Compare(a.Key, b.Key)
 	})
-	return InventorySummary{RefreshedAt: snapshot.refreshedAt.Unix(), Total: len(snapshot.torrents), Counts: counts, Groups: groups}
+	options := make(map[string][]InventoryOption, len(optionValues))
+	for optionDimension, values := range optionValues {
+		choices := make([]InventoryOption, 0, len(values))
+		for value := range values {
+			choices = append(choices, InventoryOption{Key: inventoryGroupKey(value), Label: inventoryGroupLabel(optionDimension, value)})
+		}
+		slices.SortFunc(choices, func(a, b InventoryOption) int {
+			if order := strings.Compare(a.Label, b.Label); order != 0 {
+				return order
+			}
+			return strings.Compare(a.Key, b.Key)
+		})
+		options[optionDimension] = choices
+	}
+	return InventorySummary{
+		RefreshedAt: snapshot.refreshedAt.Unix(), SourceTotal: len(snapshot.torrents),
+		Total: total, Counts: counts, Groups: groups, Options: options,
+	}
 }
 
-func (snapshot inventorySnapshot) details(dimension, group, state string, page, pageSize int) InventoryDetails {
+func (snapshot inventorySnapshot) details(dimension, group string, filters InventoryFilters, page, pageSize int) InventoryDetails {
 	rows := make([]InventoryTorrent, 0, pageSize)
 	offset := (page - 1) * pageSize
 	total := 0
 	for _, torrent := range snapshot.torrents {
-		if state != "" && torrent.State != state {
+		if !filters.matches(torrent) || !torrent.matchesGroup(dimension, group) {
 			continue
 		}
-		for _, value := range torrent.groupValues(dimension) {
-			if inventoryGroupKey(value) != group {
-				continue
-			}
-			if total >= offset && len(rows) < pageSize {
-				rows = append(rows, torrent)
-			}
-			total++
-			break
+		if total >= offset && len(rows) < pageSize {
+			rows = append(rows, torrent)
 		}
+		total++
 	}
 	return InventoryDetails{RefreshedAt: snapshot.refreshedAt.Unix(), Total: total, Page: page, PageSize: pageSize, Rows: rows}
 }

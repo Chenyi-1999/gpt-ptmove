@@ -1070,3 +1070,11 @@
 - 在北洋园暂停期间用 OVH 直连 qB 只读核对 1 台下载器、共 221 个种子。四类计数和按状态展开的名单均通过。下载器统计原为停用，临时启用仅用于验证，随后恢复停用。没有手动新增、修改或删除 qB 任务。
 - 旧镜像和上一版插件 ZIP 已校验归档到 /mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_170950__历史发布__STARPT-OVH下载器统计升级回滚.zip。已清理旧容器、旧镜像标签及原存放位置的旧发布包。保留切换前的数据库和插件状态快照。
 - docs/DEPLOYMENT.json 与 CHANGELOG.md 记录验收结果，在隔离分支提交。未推送或发布，152 仅核对并导出已验证产物，未操作 81。
+
+
+## PTM-20261128-DOWNLOADER-FILTERS — 2026-11-28T17:31:41+08:00 — Codex root / filters_ui / filters_backend，下载器统计组合筛选
+
+- 下载器统计 ZIP 升级为 2.1.0。nexus/webui/src/components/plugins/DownloaderInventoryPanel.vue 和 webui/dist 加入分类、标签、Tracker 和状态的组合筛选与清空操作，支持按 Tracker 和种子状态分组，展开和分页沿用当前筛选。
+- nexus/server/internal/http/handler/plugin_downloader_inventory.go、internal/service/torrentdata/downloader_inventory.go 和测试接入同一套筛选规则。返回匹配数量、下载器任务总数及完整选项，Tracker 仅用主机名。docs/{API_CONTRACT,STARPT_PLUGINS}.md 记录协议与使用方式。
+- 152 断网 Go 全量测试、WASI 包和二进制构建通过。Vue 类型检查、定向 ESLint、10 项 Node 测试及 Vite 构建通过。桌面、390px 测试四个条件组合、清空、切换下载器、刷新、分页和长内容。Vite 显示原有大分包提示。
+- 本条随隔离分支提交。152 最终候选和真实 qB 验证另记。远程主分支有独立的项目名称更新，本条未推送或发布，未操作 OVH 和 81。

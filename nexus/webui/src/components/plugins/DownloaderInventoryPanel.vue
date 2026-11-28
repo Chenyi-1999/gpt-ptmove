@@ -15,7 +15,14 @@ const dimensions = {
   tag: '标签',
   site: '站点',
   path: '路径',
+  tracker: 'Tracker',
+  state: '种子状态',
 } as const
+const facetFields = [
+  { key: 'category', label: '分类', placeholder: '全部分类' },
+  { key: 'tag', label: '标签', placeholder: '全部标签' },
+  { key: 'tracker', label: 'Tracker', placeholder: '全部 Tracker' },
+] as const
 const stateLabels = {
   seeding: '做种中',
   downloading: '下载中',
@@ -27,14 +34,25 @@ const stateLabels = {
 } as const
 type Dimension = keyof typeof dimensions
 type State = keyof typeof stateLabels
+type Facet = (typeof facetFields)[number]['key']
+type Filters = Record<Facet, string> & { status: State | '' }
+type Option = { key: string; label: string }
+type Options = Record<Facet, Option[]>
 type Downloader = { id: string; name: string; enabled: boolean }
 type Group = { key: string; label: string; total: number; counts: Record<string, number> }
-type Inventory = { refreshed_at: number; total: number; counts: Record<string, number>; groups: Group[] }
+type Inventory = {
+  refreshed_at: number
+  total: number
+  source_total: number
+  groups: Group[]
+  options: Options
+}
 type Torrent = {
   name: string
   state: string
   category: string
   tags: string[]
+  trackers?: string[]
   site: string
   path: string
   progress: number
@@ -53,7 +71,8 @@ const dateFormat = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeSt
 const downloaders = ref<Downloader[]>([])
 const downloaderId = ref('')
 const dimension = ref<Dimension>('category')
-const status = ref<State | ''>('')
+const filters = ref<Filters>(emptyFilters())
+const filterOptions = ref<Options>(emptyOptions())
 const inventory = ref<Inventory>()
 const expandedGroup = ref<string | null>(null)
 const detail = ref<DetailPage>()
@@ -72,7 +91,7 @@ let detailRequest = 0
 
 const hasEnabledDownloader = computed(() => downloaders.value.some((row) => row.enabled))
 const blocked = computed(() => props.refreshing || toggling.value)
-const groups = computed(() => inventory.value?.groups.filter((group) => groupCount(group) > 0) ?? [])
+const hasFilters = computed(() => Object.values(filters.value).some(Boolean))
 const detailPages = computed(() =>
   detail.value ? Math.max(1, Math.ceil(detail.value.total / detail.value.page_size)) : 1,
 )
@@ -81,8 +100,29 @@ function message(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-function groupCount(group: Group) {
-  return status.value ? (group.counts[status.value] ?? 0) : group.total
+function emptyFilters(): Filters {
+  return { category: '', tag: '', tracker: '', status: '' }
+}
+
+function emptyOptions(): Options {
+  return { category: [], tag: [], tracker: [] }
+}
+
+function clearFilters() {
+  filters.value = emptyFilters()
+}
+
+function inventoryQuery() {
+  const query = new URLSearchParams({ downloader_id: downloaderId.value, dimension: dimension.value })
+  for (const [key, value] of Object.entries(filters.value)) {
+    if (value) query.set(key, value)
+  }
+  return query
+}
+
+function unavailableFilter(key: Facet) {
+  const current = filters.value[key]
+  return current && !filterOptions.value[key].some((option) => option.key === current)
 }
 
 function stateLabel(state: string) {
@@ -142,12 +182,18 @@ async function loadInventory(refresh = false) {
   inventoryLoading.value = Boolean(downloaderId.value && props.plugin.enabled)
   if (!inventoryLoading.value) return
 
-  const query = new URLSearchParams({ downloader_id: downloaderId.value, dimension: dimension.value })
+  const query = inventoryQuery()
   if (refresh) query.set('refresh', '1')
   try {
     const data = await requestPlugin<Inventory>(inventoryPath + '?' + query, 'GET', '无法读取种子统计')
-    if (!Array.isArray(data.groups)) throw new Error('种子统计格式无效')
-    if (request === inventoryRequest) inventory.value = data
+    if (!Array.isArray(data.groups) || !Number.isSafeInteger(data.source_total) ||
+        !facetFields.every(({ key }) => Array.isArray(data.options?.[key]))) {
+      throw new Error('种子统计格式无效')
+    }
+    if (request === inventoryRequest) {
+      filterOptions.value = data.options
+      inventory.value = data
+    }
   } catch (error) {
     if (request === inventoryRequest) inventoryError.value = message(error, '无法读取种子统计')
   } finally {
@@ -160,15 +206,11 @@ async function loadDetail(group: string, page: number) {
   requestedPage.value = page
   detailLoading.value = true
   detailError.value = ''
-  const query = new URLSearchParams({
-    downloader_id: downloaderId.value,
-    dimension: dimension.value,
-    details: '1',
-    group,
-    page: String(page),
-    page_size: '25',
-  })
-  if (status.value) query.set('status', status.value)
+  const query = inventoryQuery()
+  query.set('details', '1')
+  query.set('group', group)
+  query.set('page', String(page))
+  query.set('page_size', '25')
   try {
     const data = await requestPlugin<DetailPage>(inventoryPath + '?' + query, 'GET', '无法读取种子名单')
     if (!Array.isArray(data.rows)) throw new Error('种子名单格式无效')
@@ -225,8 +267,11 @@ watch(
   },
   { immediate: true },
 )
-watch([downloaderId, dimension], () => void loadInventory())
-watch(status, clearDetail)
+watch(downloaderId, () => {
+  clearFilters()
+  filterOptions.value = emptyOptions()
+}, { flush: 'sync' })
+watch([downloaderId, dimension, filters], () => void loadInventory(), { deep: true })
 onBeforeUnmount(() => {
   listRequest++
   inventoryRequest++
@@ -270,16 +315,33 @@ onBeforeUnmount(() => {
               <option v-for="(label, key) in dimensions" :key="key" :value="key">{{ label }}</option>
             </select>
           </label>
+          <label v-for="field in facetFields" :key="field.key" class="inventory-field">
+            <span :id="'inventory-' + field.key + '-label'">{{ field.label }}</span>
+            <select
+              v-model="filters[field.key]"
+              :aria-labelledby="'inventory-' + field.key + '-label'"
+              :disabled="blocked || (!filterOptions[field.key].length && !filters[field.key])"
+            >
+              <option value="">{{ field.placeholder }}</option>
+              <option v-if="unavailableFilter(field.key)" :value="filters[field.key]">所选项已不在统计中</option>
+              <option v-for="option in filterOptions[field.key]" :key="option.key" :value="option.key">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
           <label class="inventory-field">
             <span id="inventory-status-label">种子状态</span>
-            <select v-model="status" aria-labelledby="inventory-status-label" :disabled="blocked">
+            <select v-model="filters.status" aria-labelledby="inventory-status-label" :disabled="blocked">
               <option value="">全部状态</option>
               <option v-for="(label, key) in stateLabels" :key="key" :value="key">{{ label }}</option>
             </select>
           </label>
-          <el-button :icon="Refresh" :disabled="blocked || !downloaderId" :loading="inventoryLoading" @click="loadInventory(true)">
-            刷新统计
-          </el-button>
+          <div class="inventory-actions">
+            <el-button :disabled="blocked || !hasFilters" @click="clearFilters">清空筛选</el-button>
+            <el-button :icon="Refresh" :disabled="blocked || !downloaderId" :loading="inventoryLoading" @click="loadInventory(true)">
+              刷新统计
+            </el-button>
+          </div>
         </div>
 
         <div class="inventory-results" :aria-busy="inventoryLoading">
@@ -290,16 +352,16 @@ onBeforeUnmount(() => {
           <p v-if="inventoryLoading && !inventory" class="inventory-message" role="status">正在读取种子统计…</p>
           <template v-if="inventory">
             <div class="result-meta">
-              <strong v-if="status">匹配 {{ numberFormat.format(inventory.counts[status] ?? 0) }} 个 · 共 {{ numberFormat.format(inventory.total) }} 个种子</strong>
+              <strong v-if="hasFilters">匹配 {{ numberFormat.format(inventory.total) }} 个 · 共 {{ numberFormat.format(inventory.source_total) }} 个种子</strong>
               <strong v-else>共 {{ numberFormat.format(inventory.total) }} 个种子</strong>
               <span>{{ inventoryError ? '上次成功读取' : '统计时间' }} {{ formatTime(inventory.refreshed_at) }}</span>
             </div>
-            <p v-if="dimension === 'tag' && groups.length" class="tag-note">带有多个标签的种子会计入各自标签。</p>
-            <p v-if="!groups.length" class="inventory-message" role="status">
-              {{ inventory.total ? '没有符合所选状态的种子。' : '该下载器没有种子。' }}
+            <p v-if="dimension === 'tag' && inventory.groups.length" class="tag-note">带有多个标签的种子会计入各自标签。</p>
+            <p v-if="!inventory.groups.length" class="inventory-message" role="status">
+              {{ inventory.source_total ? '没有符合筛选条件的种子。' : '该下载器没有种子。' }}
             </p>
             <ul v-else class="inventory-groups">
-              <li v-for="(group, index) in groups" :key="group.key" class="inventory-group">
+              <li v-for="(group, index) in inventory.groups" :key="group.key" class="inventory-group">
                 <button
                   type="button"
                   class="group-toggle"
@@ -309,10 +371,10 @@ onBeforeUnmount(() => {
                   @click="toggleGroup(group.key)"
                 >
                   <span class="group-label">{{ group.label }}</span>
-                  <span class="group-count">{{ numberFormat.format(groupCount(group)) }} 个</span>
+                  <span class="group-count">{{ numberFormat.format(group.total) }} 个</span>
                   <ArrowDown :class="{ 'group-open': expandedGroup === group.key }" aria-hidden="true" />
                 </button>
-                <ul v-if="!status" class="group-counts" aria-label="状态分布">
+                <ul v-if="!filters.status && dimension !== 'state'" class="group-counts" aria-label="状态分布">
                   <template v-for="(label, key) in stateLabels" :key="key">
                     <li v-if="group.counts[key]" :data-state="key">{{ label }} {{ numberFormat.format(group.counts[key]) }}</li>
                   </template>
@@ -339,6 +401,7 @@ onBeforeUnmount(() => {
                             <div><dt>分类</dt><dd>{{ torrent.category || '未分类' }}</dd></div>
                             <div><dt>站点</dt><dd>{{ torrent.site || '未识别' }}</dd></div>
                             <div class="torrent-meta-wide"><dt>标签</dt><dd>{{ torrent.tags?.join('、') || '无' }}</dd></div>
+                            <div v-if="torrent.trackers?.length" class="torrent-meta-wide"><dt>Tracker</dt><dd>{{ torrent.trackers.join('、') }}</dd></div>
                             <div class="torrent-meta-wide"><dt>路径</dt><dd>{{ torrent.path || '未提供' }}</dd></div>
                           </dl>
                         </li>
@@ -398,7 +461,7 @@ onBeforeUnmount(() => {
 
 .inventory-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: end;
   gap: 10px;
   padding: 12px;
@@ -408,6 +471,18 @@ onBeforeUnmount(() => {
 }
 .inventory-filters :deep(.el-button) {
   min-height: 38px;
+}
+
+.inventory-actions {
+  display: flex;
+  grid-column: span 2;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inventory-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .inventory-field {
@@ -619,9 +694,4 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 420px) {
-  .inventory-field:first-child {
-    grid-column: 1 / -1;
-  }
-}
 </style>

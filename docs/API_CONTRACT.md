@@ -150,9 +150,11 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 ## 下载器统计插件
 
-`GET /api/plugins/downloader-summary/inventory` 需要管理员登录及已启用的下载器统计 2.0。省略 `downloader_id` 时只列出下载器的 ID、名称和启用状态。指定 ID 后，用 `dimension=category|tag|site|path` 读取分组及各状态的计数，`refresh=1` 可主动刷新。成功响应的 `refreshed_at` 是快照的 Unix 秒。连接失败返回错误，汇总不会修改下载器任务或 STARPT 种子索引。
+`GET /api/plugins/downloader-summary/inventory` 需要管理员登录及已启用的下载器统计插件。省略 `downloader_id` 时只列出下载器的 ID、名称和启用状态。指定 ID 后，用 `dimension=category|tag|site|path|tracker|state` 读取分组，`refresh=1` 可主动刷新。成功响应的 `refreshed_at` 是快照的 Unix 秒。连接失败返回错误，汇总不会修改下载器任务或 STARPT 种子索引。
 
-展开明细时加 `details=1`、`group`（汇总返回的分组标识），可带 `status`、`page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条，只返回展示所需字段。快照过期后须先刷新统计。
+汇总和明细都支持组合筛选。`category`、`tag` 和 `tracker` 用汇总 `options` 返回的选项标识，`status` 用状态值，省略为全部。各筛选条件必须同时满足。`total` 是匹配任务的数量，`source_total` 是下载器快照中的任务总数。筛选为零时仍返回该下载器的完整选项。
+
+展开明细时加 `details=1`、`group`（汇总返回的分组标识），并沿用相同筛选，可带 `page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条。Tracker 明细仅返回主机名。快照过期后须先刷新统计。
 
 ## 做种检索布局
 

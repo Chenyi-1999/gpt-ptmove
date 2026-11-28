@@ -11,6 +11,7 @@ import (
 	"github.com/pt-nexus/server/internal/service/torrentdata"
 )
 
+// downloaderInventory 供已启用的插件读取下载器、筛选汇总及分页详情。
 func (h *pluginHandler) downloaderInventory(c *gin.Context) {
 	info, err := h.packages.Get(plugins.DownloaderInventoryPluginID)
 	switch {
@@ -40,6 +41,12 @@ func (h *pluginHandler) downloaderInventory(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	dimension := c.DefaultQuery("dimension", "category")
+	filters := torrentdata.InventoryFilters{
+		Category: c.Query("category"),
+		Tag:      c.Query("tag"),
+		Tracker:  c.Query("tracker"),
+		Status:   c.Query("status"),
+	}
 	if c.Query("details") == "1" {
 		page, pageErr := strconv.Atoi(c.DefaultQuery("page", "1"))
 		pageSize, sizeErr := strconv.Atoi(c.DefaultQuery("page_size", "25"))
@@ -47,7 +54,7 @@ func (h *pluginHandler) downloaderInventory(c *gin.Context) {
 			respondInventoryError(c, torrentdata.ErrInventoryQuery)
 			return
 		}
-		result, err := h.inventory.Details(ctx, id, dimension, c.Query("group"), c.Query("status"), page, pageSize)
+		result, err := h.inventory.Details(ctx, id, dimension, c.Query("group"), filters, page, pageSize)
 		if err != nil {
 			respondInventoryError(c, err)
 			return
@@ -56,7 +63,7 @@ func (h *pluginHandler) downloaderInventory(c *gin.Context) {
 		return
 	}
 
-	result, err := h.inventory.Summary(ctx, id, dimension, c.Query("refresh") == "1")
+	result, err := h.inventory.Summary(ctx, id, dimension, filters, c.Query("refresh") == "1")
 	if err != nil {
 		respondInventoryError(c, err)
 		return
