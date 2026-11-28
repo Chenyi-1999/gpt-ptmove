@@ -587,7 +587,10 @@ const handleGlobalRefresh = async () => {
     if (shouldDelegateRefreshToComponent(refreshPath) && refreshComponent) {
       await refreshComponent()
     } else {
-      await axios.post('/api/refresh_data')
+      const response = await axios.post<{ success?: boolean; message?: string }>('/api/refresh_data')
+      if (response.data?.success === false) {
+        throw new Error(response.data.message || '数据刷新失败')
+      }
       if (refreshComponent && route.path === refreshPath) {
         await refreshComponent()
       }

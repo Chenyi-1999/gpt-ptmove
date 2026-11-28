@@ -148,10 +148,26 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 现有 `/api/automation` 与 `/api/v1` 自动化接口保留。禁用内置自动转种插件后，手动及定时执行入口停止接受新的下载和发种操作；任务与预览读取继续可用。
 
+## 下载器统计插件
+
+`GET /api/plugins/downloader-summary/inventory` 需要管理员登录及已启用的下载器统计插件。省略 `downloader_id` 时只列出下载器的 ID、名称和启用状态。指定 ID 后，用 `dimension=category|tag|site|path|tracker|state` 读取分组，`refresh=1` 可主动刷新。成功响应的 `refreshed_at` 是快照的 Unix 秒。连接失败返回错误，汇总不会修改下载器任务或 STARPT 种子索引。
+
+汇总和明细都支持组合筛选。`category`、`tag` 和 `tracker` 用汇总 `options` 返回的选项标识，`status` 用状态值，省略为全部。各筛选条件必须同时满足。`total` 是匹配任务的数量，`source_total` 是下载器快照中的任务总数。筛选为零时仍返回该下载器的完整选项。
+
+展开明细时加 `details=1`、`group`（汇总返回的分组标识），并沿用相同筛选，可带 `page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条。Tracker 明细仅返回主机名。快照过期后须先刷新统计。
+
+## 做种检索布局
+
+通过 `GET /api/ui_settings/sites_layout` 读取布局，使用同一路径的 `POST` 保存布局。布局对象包含 `columns`（1 或 2）和按优先级排列的 `order`。保存成功返回 `{"success":true}`，其他界面设置保留。可用模块依次为 `summary`、`site-chart`、`group-chart`、`site-stats`、`group-stats`、`local-scan`。缺省为两列和上述顺序。窄屏固定单列，沿用同一排序。
+
 ## 本地文件查询
+
+`GET /api/local_query/downloaders_with_paths?video_only=1` 按下载器返回种子索引中的保存路径。每台下载器的 `indexed_count` 是显隐规则下有保存路径的任务数，在视频筛选前计数。保存路径的 `access_status` 为 `available`、`unavailable` 或 `remote`。本地目录不存在或容器无法访问时保留路径，标为 `unavailable`。远程目录要在扫描时核验。
+
+同步调用已有的 `POST /api/refresh_data`，从启用的下载器读取种子清单并更新 STARPT 本地缓存。HTTP 200 仍须检查结果的 `success` 和 `stats.failed_downloaders`。直连 qB 的保存目录需以只读方式挂到 STARPT 容器内。若容器路径与 qB 返回路径不同，在下载器中配置映射。
 
 管理员使用 `POST /api/local_query/scan?path=...&video_only=1` 扫描选定范围。省略 `path` 时扫描所选任务的保存目录。结果包含 `scan_summary`、`missing_files`、`orphaned_files`、`synced_torrents` 和 `scanned_at`。缺失、孤立和已找到的计数只覆盖完成核验的目录。总种子数是数据库中本次选中的任务数。
 
-`scan_status` 为 `complete`、`partial` 或 `unverified`。详情 `scan_issues` 按目录返回 `path`、`downloader_name`、`status` 和 `message`。客户端离线、目录不可访问、引用不完整或达到扫描限制时，该范围没有可用于计数的结果。`GET /api/local_query/scan/cache` 返回上次的扫描结果。
+`scan_status` 为 `complete`、`partial` 或 `unverified`。详情 `scan_issues` 按目录返回 `path`、`downloader_name`、`status` 和 `message`。无可核验任务、客户端离线、目录不可访问、引用不完整或达到扫描限制时，该范围没有可用于计数的结果。`GET /api/local_query/scan/cache` 返回上次的扫描结果。
 
 远程 qB 引用清单经已有 HTTPS 领单通道返回，只含哈希、保存路径和内容路径。媒体客户端只扫描白名单目录的顶层项目，返回缺失名称以及孤立文件的名称和体积。此流程不传输文件内容，也不提供删除操作。

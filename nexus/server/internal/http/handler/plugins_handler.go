@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pt-nexus/server/internal/service/migrationflow"
 	"github.com/pt-nexus/server/internal/service/plugins"
+	"github.com/pt-nexus/server/internal/service/torrentdata"
 	"gorm.io/gorm"
 )
 
@@ -41,6 +42,8 @@ type pluginHandler struct {
 	db               *gorm.DB
 	automation       automationPluginControl
 	downloaders      func(context.Context) ([]PluginDownloaderSummary, error)
+	inventory        *torrentdata.DownloaderInventory
+	inventoryList    func(bool) []map[string]any
 	refreshMu        sync.Mutex
 	tjupt            *migrationflow.TjuptFeed
 	tjuptTransition  sync.Mutex
@@ -49,7 +52,8 @@ type pluginHandler struct {
 
 // RegisterPlugins 挂载插件目录、已安装插件动作和宿主操作。
 func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation automationPluginControl,
-	downloaders func(context.Context) ([]PluginDownloaderSummary, error), tjupt TjuptPluginServices) error {
+	downloaders func(context.Context) ([]PluginDownloaderSummary, error), tjupt TjuptPluginServices,
+	inventory *torrentdata.DownloaderInventory, inventoryList func(bool) []map[string]any) error {
 	catalog := plugins.New(dataDir,
 		plugins.Manifest{
 			SchemaVersion: 2, ID: automationPluginID, Name: "自动转种", Version: "2.0",
@@ -64,6 +68,8 @@ func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation
 	}
 	h := &pluginHandler{
 		catalog: catalog, packages: packages, db: db, automation: automation, downloaders: downloaders,
+		inventory:        inventory,
+		inventoryList:    inventoryList,
 		tjupt:            tjupt.Feed,
 		schedulesChanged: make(chan struct{}, 1),
 	}
@@ -87,6 +93,7 @@ func RegisterPlugins(g *gin.RouterGroup, dataDir string, db *gorm.DB, automation
 	g.GET("/:id/schedule", h.getSchedule)
 	g.PUT("/:id/schedule", h.putSchedule)
 	g.POST("/:id/actions/:action", h.invoke)
+	g.GET("/downloader-summary/inventory", h.downloaderInventory)
 	RegisterTjuptRSS(g.Group("/tjupt"), tjupt.RSS, tjupt.Automation, tjupt.Feed, &h.tjuptTransition, h.invokeTjupt)
 	return nil
 }

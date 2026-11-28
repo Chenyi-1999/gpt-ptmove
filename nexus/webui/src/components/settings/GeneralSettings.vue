@@ -3,6 +3,7 @@
     <h2 class="settings-section-title">{{ transferOnly ? '转种设置' : '通用设置' }}</h2>
     <div class="settings-grid">
       <PTGenSourcesSettings v-if="transferOnly" class="ptgen-settings-card" />
+      <SitesLayoutSettings v-if="!transferOnly" class="sites-layout-card" />
       <!-- 用户信息设置卡片 -->
       <div
         v-if="!transferOnly"
@@ -956,6 +957,7 @@ import {
 import { ElMessage } from '@/utils/uiNotify'
 import { useContentFiltersStore } from '@/stores/contentFilters'
 import PTGenSourcesSettings from './PTGenSourcesSettings.vue'
+import SitesLayoutSettings from './SitesLayoutSettings.vue'
 
 const props = defineProps<{ transferOnly?: boolean }>()
 const router = useRouter()
@@ -1865,6 +1867,10 @@ onMounted(() => {
 }
 
 .ptgen-settings-card {
+  grid-column: 1 / -1;
+}
+
+.sites-layout-card {
   grid-column: 1 / -1;
 }
 

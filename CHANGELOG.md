@@ -1016,3 +1016,105 @@
 - 同步 README、AGENTS、Docker OCI 元数据、浏览器标题、设置页源码/反馈及站点扩展链接和 Go 版本提示。GitHub 项目名与仓库路径使用 StarPT。以现有两仓同一 master 为基线，只更改名称和链接以及对应的前端构建文件。
 - GitHub 仍是现有公开仓库，Gitee 保持私有，显示名均验证为 StarPT。校验新克隆地址指向同一提交。Vue 类型检查、定向 ESLint、Vite 生产构建与产物标题和链接检查通过，后端 bootstrap 测试及 Git 差异检查通过。
 - 记录时本次源码提交和双仓同步尚待执行。此次没有发布发行附件或部署。
+
+## PTM-20261128-LOCAL-QUERY-VISIBILITY — 2026-11-28T00:44:47+08:00 — Codex root / ovh_seed_index / ovh_media_scope / local_query_ui，区分空索引和下载目录不可访问
+
+- 仅在 OVH 只读排查。qB v5.3.1 返回 86 个任务，STARPT 的 torrents 索引 0 条。qB 保存路径 /mnt/data/01PTDoenLoad 在宿主机存在，STARPT 容器只挂载 /app/data。视频筛选关闭和开启时，旧接口均没有路径。
+- 修改 nexus/server/internal/service/localquery/{cache_paths,cache_paths_test,scan}.go 和 docs/API_CONTRACT.md。路径接口返回筛选前索引数及目录状态，保留不可访问的保存目录。空范围和不可读取的目录标记未核验或失败；缺失、孤立只统计完成核验的目录。
+- 修改 nexus/webui/src/views/SitesView.vue、App.vue 和构建产物。增加主动同步入口，区分空索引、视频筛选和挂载故障，HTTP 200 的业务失败不显示成功。同步复用只读下载器查询和既有索引更新。
+- 152 断网 Go 全量 30 个包通过，Windows localquery 回归通过。断网模拟 qB 经正常 API 从空索引同步 3 条，核验有只读挂载和无挂载两种路径，准确报出 1 个缺失及 1 个孤立，并确认没有 qB 写请求。Vue 类型、定向 ESLint、10 项 Node 测试及 Vite 构建通过。桌面和 390px Edge 夹具验证同步成功、失败、不可访问路径及视频筛选。
+- 记录时最终镜像复测和 152 生产切换待完成，代码将在隔离工作分支提交。未推送或发布。OVH 只读排查，未更改下载目录挂载或同步其索引，未操作 81。
+
+
+## PTM-20261128-LOCAL-QUERY-VISIBILITY-152 — 2026-11-28T00:49:59+08:00 — Codex root，做种检索修复部署回执
+
+- 源码 191725e，152 当前镜像 ptmove-nexus:1.1.7-local-query.1，旧镜像及 Compose、SQLite 一致性快照保留。已核对原配置、467 条索引记录及 5 个远程路径，Hub 容器未替换。
+- 最终镜像断网用真实 API 测试空索引、模拟 qB 同步、只读挂载、无挂载、缺失与孤立，模拟 qB 仅收到 GET。兼容 WASM 安装和重启测试通过。生产校验 47 个页面或资源、权限及启动健康，公网 /sites、新版页面资源和健康接口通过。两种视口浏览器测试通过。
+- 首轮上线发现北洋园 ZIP 需按既有机制执行「刷新插件」才会载入，已回滚。第二轮只在原插件目录没有其他 ZIP 的条件下装载经验证的北洋园包并调用刷新，原北洋园入口继续可用，RSS 仍关闭。未触发真实下载、发种或 qB 任务修改。
+- OVH 仅执行只读排查，未部署、修改挂载或写入种子索引，未操作 81。docs/DEPLOYMENT.json 补充本轮回执，工作分支提交，未推送或发布。
+
+
+## PTM-20261128-SITES-LAYOUT — 2026-11-28T01:04:21+08:00 — Codex root / sites_layout_view / sites_layout_settings / sites_layout_api，做种检索布局
+
+- 在「设置 → 通用设置」增加做种检索的电脑列数和六个模块的优先级。双列从左到右逐行展示，手机竖屏和横屏使用同一顺序的单列布局。原有统计与只读扫描入口继续可用。
+- 更新 nexus/webui/src/views/SitesView.vue、src/components/settings/{GeneralSettings,SitesLayoutSettings}.vue、src/stores/sitesLayout.ts 和 nexus/webui/dist。独立的认证布局 API 由 nexus/server/internal/bootstrap/app.go 与 internal/{http/handler,service}/settings/sites_layout.go 提供，持久化到 ui_settings.sites_layout。docs/API_CONTRACT.md 补充接口。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和 152 断网 Go 全量测试及构建通过。浏览器夹具验证 1440px 双列和单列、保存失败保留草稿及重试、刷新恢复排序，以及手机竖屏和横屏单列。Vite 保留原有大包提示。
+- 本条随隔离工作分支提交。完整镜像的 152 断网验收及上线待执行，结果另记。未推送或发布，未访问 OVH 或 81。
+
+
+## PTM-20261128-SITES-LAYOUT-152 — 2026-11-28T01:05:50+08:00 — Codex root，做种检索布局部署回执
+
+- 152 从 ptmove-nexus:1.1.7-local-query.1 更新至 ptmove-nexus:1.1.7-sites-layout.1，源码 3a54eab。保留旧镜像和切换前 Compose。新旧 Compose 仅镜像项不同，容器挂载、配置、467 条种子索引、136 个站点和领单 Hub 均核对一致。
+- 152 断网候选经实际接口验证默认双列、单列和双列保存、排序、重启持久化、其他界面设置保留、非法列数 400 和匿名请求 401。上线后核对 48 个资源及路由、后端哈希、容器健康。公网做种检索、通用设置、新版 JS 与健康接口均通过。
+- docs/DEPLOYMENT.json 记录镜像摘要、源码和实测结果。功能和部署回执在隔离工作分支提交。未推送或发布，未部署 OVH、未接触 81，也没有实际下载、发种或调整 qB 任务。
+
+## PTM-20261128-SITES-LAYOUT-OVH — 2026-11-28T12:07:47+08:00 — Codex root / ovh_layout_review，152 布局镜像部署至 OVH
+
+- 源码 3a54eab。用已验证的 152 镜像原始 Docker 归档部署 OVH，归档原始字节、镜像配置摘要、111 层根文件系统及后端哈希一致。OVH 断网容器复测布局保存、重启、鉴权及 48 个路由或资源。公网 HTTPS 健康、两个页面、布局鉴权和 8 个页面或资源校验通过。
+- 等北洋园 RSS 当前租约结束后暂时停用并建立 SQLite 一致性快照。切换前后保留原 /docker/starpt/data、环境、站点配置、136 个站点、234 条 RSS 台账、插件 ZIP 和缓存。自动转种、下载器概览和北洋园插件清单状态一致。原 1 分钟 RSS 已恢复，复核时自然周期新增 1、跳过 9、失败 0。
+- 旧镜像归档 /mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_120605__历史发布__STARPT-OVH做种检索上线旧镜像.zip 完成 ZIP CRC 与 SHA-256 校验。定向清理 3 个旧容器、2 个旧镜像标签和 3 份已归档旧镜像文件。旧运行时数据与快照继续保留。
+- 更新 docs/DEPLOYMENT.json 和 CHANGELOG.md，回执在隔离工作分支提交。未推送或发布。152 仅核对及导出通过验证的镜像，未操作 81，也未手动下载、退种或发种。
+
+
+## PTM-20261128-DOWNLOADER-STATS — 2026-11-28T12:49:54+08:00 — Codex root / downloader_stats_map / downloader_stats_source / downloader_stats_ui / downloader_stats_canary，下载器统计 2.0
+
+- examples/plugins/downloader-summary/plugin.json 保持 ZIP 插件 ID，新增只读统计能力。nexus/webui/src/components/plugins/{DownloaderInventoryPanel.vue,pluginApi.ts}、src/views/PluginsView.vue 与 webui/dist 提供下载器选择、分类/标签/站点/路径计数、按状态筛选、折叠及分页展开。旧版插件继续用原面板。
+- nexus/server/internal/bootstrap/app.go、internal/http/handler/{plugins_handler,plugin_downloader_inventory}.go、internal/service/plugins/package_types.go、downloaderclient/torrents_fetch.go、torrentdata/downloader_inventory.go 与测试接入独立的只读查询。分类和标签分别读取，复用每个下载器的短时快照，站点只输出配置名或 tracker 主机名。正常空清单和失联分别返回成功与错误。文档更新 docs/{API_CONTRACT,STARPT_PLUGINS}.md。
+- 152 断网 gofmt、全量 Go 测试含实际 WASI ZIP 加载和构建通过。Vue 类型检查、定向 ESLint、10 项 Node 测试与生产构建通过。桌面和 390px 浏览器夹具通过维度切换、状态计数、按需展开、分页失败重试、离线和长路径检查。Vite 保留既有大分包提示。
+- 隔离工作分支提交本次代码和构建产物。152 候选镜像与部署验收待完成，另记回执。未推送或发布、未操作 OVH 和 81。
+
+## PTM-20261128-DOWNLOADER-STATS-152 — 2026-11-28T12:54:32+08:00 — Codex root，下载器统计 2.0 部署回执
+
+- 152 容器更新为 ptmove-nexus:1.1.7-downloader-stats.1，源码 2f0bf41。安装校验过的 downloader-summary.zip 2.0.0，保留原容器挂载、配置、领单 Hub、467 条种子索引、站点和已有插件。保存了旧镜像、切换前 Compose、插件缓存和 SQLite 一致性快照。
+- 152 断网候选通过插件安装、qBittorrent 和 Transmission、四维计数、分页和多标签、实际空结果与下载器失联、权限及 47 项资源或路由。qB 夹具只接受认证与读接口，维度切换和明细复用同一份任务快照。公网插件页、资源和权限通过。
+- 真实 qB 只读读取 384 个任务，通过四维计数和路径展开。没有添加、改动或删除 qB 任务。docs/DEPLOYMENT.json 和本回执在隔离分支提交，未推送或发布；本轮仅部署 152，未操作 OVH 或 81。
+
+## PTM-20261128-DOWNLOADER-STATS-OVH — 2026-11-28T17:10:14+08:00 — Codex root / stats_ovh_review，152 下载器统计 2.0 部署至 OVH
+
+- 使用 152 验证的镜像与 ZIP，源码 2f0bf41。核对 Docker 归档原始 SHA-256、OVH 配置镜像 ID、114 个根文件系统层、后端二进制和 ZIP 摘要。OVH 断网复验 qBittorrent、Transmission、四维计数、分页、异常及 47 个路由或静态资源。公网 HTTPS 插件页、JS/CSS、健康及鉴权通过。
+- 复用 /docker/starpt/data 和原容器环境。短暂停北洋园 RSS，备份 SQLite 快照、旧 ZIP 和插件缓存，核对现有站点、种子索引、RSS 台账及其他插件。保留下载器统计的设置、调度和停用状态，并恢复北洋园原 1 分钟设置。
+- 在北洋园暂停期间用 OVH 直连 qB 只读核对 1 台下载器、共 221 个种子。四类计数和按状态展开的名单均通过。下载器统计原为停用，临时启用仅用于验证，随后恢复停用。没有手动新增、修改或删除 qB 任务。
+- 旧镜像和上一版插件 ZIP 已校验归档到 /mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_170950__历史发布__STARPT-OVH下载器统计升级回滚.zip。已清理旧容器、旧镜像标签及原存放位置的旧发布包。保留切换前的数据库和插件状态快照。
+- docs/DEPLOYMENT.json 与 CHANGELOG.md 记录验收结果，在隔离分支提交。未推送或发布，152 仅核对并导出已验证产物，未操作 81。
+
+
+## PTM-20261128-DOWNLOADER-FILTERS — 2026-11-28T17:31:41+08:00 — Codex root / filters_ui / filters_backend，下载器统计组合筛选
+
+- 下载器统计 ZIP 升级为 2.1.0。nexus/webui/src/components/plugins/DownloaderInventoryPanel.vue 和 webui/dist 加入分类、标签、Tracker 和状态的组合筛选与清空操作，支持按 Tracker 和种子状态分组，展开和分页沿用当前筛选。
+- nexus/server/internal/http/handler/plugin_downloader_inventory.go、internal/service/torrentdata/downloader_inventory.go 和测试接入同一套筛选规则。返回匹配数量、下载器任务总数及完整选项，Tracker 仅用主机名。docs/{API_CONTRACT,STARPT_PLUGINS}.md 记录协议与使用方式。
+- 152 断网 Go 全量测试、WASI 包和二进制构建通过。Vue 类型检查、定向 ESLint、10 项 Node 测试及 Vite 构建通过。桌面、390px 测试四个条件组合、清空、切换下载器、刷新、分页和长内容。Vite 显示原有大分包提示。
+- 本条随隔离分支提交。152 最终候选和真实 qB 验证另记。远程主分支有独立的项目名称更新，本条未推送或发布，未操作 OVH 和 81。
+
+## PTM-20261128-DOWNLOADER-FILTERS-152 — 2026-11-28T17:33:13+08:00 — Codex root，下载器统计组合筛选部署回执
+
+- 152 镜像 ptmove-nexus:1.1.7-downloader-filters.1，源码 6a4224c，下载器统计 ZIP 2.1.0。保留原配置、插件设置和调度、467 条种子索引、站点、原插件和领单 Hub。保存了上一版镜像、ZIP、Compose、SQLite 与插件缓存。
+- 152 断网环境通过 qBittorrent 和 Transmission、六维分组、四条件组合、匹配分页、零匹配保留选项、非法筛选及鉴权验证。公网插件页、JS/CSS 和健康验证通过。
+- 实际 qB 只读核对：384 个任务中匹配 144 个，展开核对 10 条。未修改下载器任务。本轮仅部署 152，未操作 OVH 或 81。回执随隔离分支提交，独立的主分支项目名改动待整合后才能统一发布。
+
+
+## PTM-20261128-PLUGIN-INSTALL-HINT — 2026-11-28T18:29:34+08:00 — Codex root，插件安装提示移至页首
+
+- nexus/webui/src/views/PluginsView.vue 将 ZIP 或 JSON 安装路径及刷新提示放在「插件」标题下，使用次级文字样式。移除底部「安装与移除」折叠说明、重复空态文案及相关样式，重新生成 nexus/webui/dist。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试及 Vite 构建通过。Vite 保留已有大分包提示。离线浏览器确认桌面、390px、插件空态均显示唯一一条标题下提示，原刷新按钮仍调用刷新接口。组合筛选和分页回归通过。
+- 功能与构建产物随隔离分支提交。152 镜像和上线核对另记。未推送或发行，未操作 OVH 或 81。
+
+
+## PTM-20261128-PLUGIN-INSTALL-HINT-152 — 2026-11-28T18:30:42+08:00 — Codex root，插件安装提示上线
+
+- 152 容器切换到 ptmove-nexus:1.1.7-plugin-install-hint.1，源码 369594c。镜像仅替换前端，保留切换前 Compose、上一版镜像、原配置、插件 ZIP 和缓存、领单 Hub 及 467 条种子索引。
+- 候选断网启动和生产健康通过，后端 SHA-256 与上一版一致。核对 47 个页面或资源，公网插件页、JS/CSS 和鉴权通过。部署范围为 152，该回执随隔离分支提交。未推送或发行，未操作 OVH 或 81。
+
+## PTM-20261128-PLUGIN-HINT-FILTERS-OVH — 2026-11-28T18:59:57+08:00 — Codex root / hint_ovh_review，部署插件安装提示与下载器统计组合筛选
+
+- OVH 更新 StarPT 容器时使用 152 已验证的镜像 ptmove-nexus:1.1.7-plugin-install-hint.1 和下载器统计 ZIP 2.1.0。核对镜像归档原始 SHA-256、119 个镜像层、后端 SHA-256 与 47 个前端路由或资源。隔离容器验证四个筛选和展开分页，校对插件页顶部安装提示。公网 HTTPS、JS/CSS、健康和鉴权通过。
+- 将部署目录和代码归档目录分别归组到 /project/StarPT 和 /mnt/data/02CodeBackup/StarPT，核验两份历史归档 SHA-256 一致，原服务入口与 /docker/starpt/data 继续使用。
+- 保留 OVH 原配置、站点、种子索引、RSS 台账、插件缓存中的设置项和启停状态。下载器统计保持启用，原插件调度保留，北洋园 RSS 恢复原 1 分钟间隔。切换前备份 SQLite、旧 ZIP 和插件缓存。
+- OVH 本机 qB 只读验收（分类、标签、Tracker、状态同时生效）：240 条种子中命中 238 条，展开核对 10 条。未手动修改 qB 任务。旧镜像、旧插件 ZIP 已校验归档到 /mnt/data/02CodeBackup/StarPT/StarPT__2026-11-28_185924__历史发布__StarPT-OVH组合筛选升级回滚.zip。已定向清理旧容器、旧镜像标签和原位置的镜像压缩包。运行数据和切换前快照已保留。
+- docs/DEPLOYMENT.json 与 CHANGELOG.md 回执在隔离分支提交。未推送或发行。本轮从 152 核对并导出产物，未操作 81。
+
+## PTM-20261128-STARPT-V118 — 2026-11-28T19:09:43+08:00 — Codex root，合并 StarPT v1.1.8
+
+- 将下载器统计 2.1、可展开种子名单和插件安装提示归入 GitHub、Gitee 双仓共同主线，保留 StarPT 改名。插件提示由 nexus/webui/src/views/PluginsView.vue 显示数据目录 plugins/ 和容器挂载路径。重新生成 nexus/webui/dist。
+- 更新 nexus/VERSION、nexus/Dockerfile.ptmove、nexus/compose.ptmove.yaml、compose.starpt.yaml、nexus/server/internal/bootstrap/fork_update.go 和 docs/RELEASE-v1.1.8.md。保留两边已有的历史记录。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 构建和桌面及 390px 浏览器验收通过。Vite 保留大分块提示。152 隔离容器 Go 测试和构建通过。第一次 Go 检查使用了错误的插件测试输入，更换为下载器统计 ZIP 后通过。
+- 当前为发行源码及构建产物提交。152 最终镜像部署、双仓推送和发行验收另记。多页面并发刷新统计时，已打开的汇总和随后展开的明细可能读取不同快照。未操作 81 或 OVH。

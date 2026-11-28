@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // TorrentSnapshot 表示从下载器读取的一条标准化种子快照。
@@ -12,17 +13,20 @@ import (
 // 失败场景：无直接失败场景，具体失败由 FetchTorrents 返回。
 // 副作用：无副作用，仅承载数据。
 type TorrentSnapshot struct {
-	Hash     string
-	Name     string
-	SavePath string
-	Size     int64
-	Progress float64
-	State    string
-	Trackers []string
-	Comment  string
-	Group    string
-	Seeders  int64
-	Uploaded int64
+	Hash           string
+	Name           string
+	SavePath       string
+	Size           int64
+	Progress       float64
+	State          string
+	Trackers       []string
+	Comment        string
+	Group          string
+	Category       string
+	Tags           []string
+	InventoryState string
+	Seeders        int64
+	Uploaded       int64
 }
 
 // FetchTorrents 拉取下载器当前全部种子并归一化为统一结构。
@@ -30,21 +34,34 @@ type TorrentSnapshot struct {
 // 失败场景：连接失败、认证失败、RPC 异常、响应解析失败时返回错误。
 // 副作用：会向下载器发起网络请求。
 func (d Downloader) FetchTorrents() ([]TorrentSnapshot, error) {
+	return d.fetchTorrents(90 * time.Second)
+}
+
+// FetchInventoryTorrents 为插件统计读取下载器当前快照，每次 HTTP 调用最多等待 12 秒。
+// 参数/返回：无参数；成功返回归一化种子快照，失败返回认证或下载器错误。
+// 失败场景：下载器不可用、认证失败或接口响应无效。
+// 副作用：每种下载器仅读取一次种子列表。
+func (d Downloader) FetchInventoryTorrents() ([]TorrentSnapshot, error) {
+	return d.fetchTorrents(12 * time.Second)
+}
+
+func (d Downloader) fetchTorrents(timeout time.Duration) ([]TorrentSnapshot, error) {
 	switch d.Type {
 	case "qbittorrent":
-		return d.fetchQBTorrents()
+		return d.fetchQBTorrents(timeout)
 	case "transmission":
-		return d.fetchTransmissionTorrents()
+		return d.fetchTransmissionTorrents(timeout)
 	default:
 		return nil, fmt.Errorf("不支持的下载器类型: %s", d.Type)
 	}
 }
 
-func (d Downloader) fetchQBTorrents() ([]TorrentSnapshot, error) {
+func (d Downloader) fetchQBTorrents(timeout time.Duration) ([]TorrentSnapshot, error) {
 	client, err := newQBClient(d)
 	if err != nil {
 		return nil, err
 	}
+	client.client.Timeout = timeout
 	if err := client.Login(); err != nil {
 		return nil, err
 	}
@@ -60,6 +77,9 @@ func (d Downloader) fetchQBTorrents() ([]TorrentSnapshot, error) {
 	if err := json.Unmarshal(body, &rows); err != nil {
 		return nil, fmt.Errorf("qB 种子列表解析失败: %w", err)
 	}
+	if rows == nil {
+		return nil, fmt.Errorf("qB 未返回种子列表")
+	}
 
 	result := make([]TorrentSnapshot, 0, len(rows))
 	for _, row := range rows {
@@ -74,10 +94,9 @@ func (d Downloader) fetchQBTorrents() ([]TorrentSnapshot, error) {
 			trackers = append(trackers, tracker)
 		}
 
-		group := strings.TrimSpace(toString(row["category"], ""))
-		if group == "" {
-			group = firstCSVItem(toString(row["tags"], ""))
-		}
+		category := strings.TrimSpace(toString(row["category"], ""))
+		tags := parseTorrentTags(row["tags"])
+		group := torrentGroup(category, tags)
 
 		progress := normalizeProgressPercent(row["progress"])
 		seeders := toInt64Any(row["num_seeds"])
@@ -86,25 +105,29 @@ func (d Downloader) fetchQBTorrents() ([]TorrentSnapshot, error) {
 		}
 
 		result = append(result, TorrentSnapshot{
-			Hash:     hash,
-			Name:     name,
-			SavePath: strings.TrimSpace(toString(row["save_path"], "")),
-			Size:     toInt64Any(row["size"]),
-			Progress: progress,
-			State:    formatTorrentState(toString(row["state"], "")),
-			Trackers: trackers,
-			Comment:  strings.TrimSpace(toString(row["comment"], "")),
-			Group:    group,
-			Seeders:  seeders,
-			Uploaded: toInt64Any(row["uploaded"]),
+			Hash:           hash,
+			Name:           name,
+			SavePath:       strings.TrimSpace(toString(row["save_path"], "")),
+			Size:           toInt64Any(row["size"]),
+			Progress:       progress,
+			State:          formatTorrentState(toString(row["state"], "")),
+			Trackers:       trackers,
+			Comment:        strings.TrimSpace(toString(row["comment"], "")),
+			Group:          group,
+			Category:       category,
+			Tags:           tags,
+			InventoryState: normalizeInventoryState(toString(row["state"], "")),
+			Seeders:        seeders,
+			Uploaded:       toInt64Any(row["uploaded"]),
 		})
 	}
 
 	return result, nil
 }
 
-func (d Downloader) fetchTransmissionTorrents() ([]TorrentSnapshot, error) {
+func (d Downloader) fetchTransmissionTorrents(timeout time.Duration) ([]TorrentSnapshot, error) {
 	client := newTransmissionClient(d)
+	client.client.Timeout = timeout
 	response, err := client.Call("torrent-get", map[string]any{
 		"fields": []string{
 			"hashString",
@@ -113,6 +136,7 @@ func (d Downloader) fetchTransmissionTorrents() ([]TorrentSnapshot, error) {
 			"totalSize",
 			"sizeWhenDone",
 			"status",
+			"error",
 			"comment",
 			"trackers",
 			"trackerStats",
@@ -127,7 +151,10 @@ func (d Downloader) fetchTransmissionTorrents() ([]TorrentSnapshot, error) {
 	}
 
 	args := toMap(response["arguments"])
-	torrents := toSlice(args["torrents"])
+	torrents, ok := args["torrents"].([]any)
+	if !ok || torrents == nil {
+		return nil, fmt.Errorf("Transmission 未返回种子列表")
+	}
 	result := make([]TorrentSnapshot, 0, len(torrents))
 
 	for _, raw := range torrents {
@@ -144,59 +171,98 @@ func (d Downloader) fetchTransmissionTorrents() ([]TorrentSnapshot, error) {
 		}
 
 		trackers := extractTransmissionTrackers(row)
-		group := firstLabel(row["labels"])
+		tags := parseTorrentTags(row["labels"])
+		group := firstString(tags)
 		statusText := transmissionStatusText(int(toInt64Any(row["status"])))
+		inventoryState := normalizeInventoryState(statusText)
+		if toInt64Any(row["error"]) > 0 {
+			inventoryState = "error"
+		}
 
 		result = append(result, TorrentSnapshot{
-			Hash:     hash,
-			Name:     name,
-			SavePath: strings.TrimSpace(toString(row["downloadDir"], "")),
-			Size:     size,
-			Progress: normalizeProgressPercent(row["percentDone"]),
-			State:    formatTorrentState(statusText),
-			Trackers: trackers,
-			Comment:  strings.TrimSpace(toString(row["comment"], "")),
-			Group:    group,
-			Seeders:  toInt64Any(row["peersGettingFromUs"]),
-			Uploaded: toInt64Any(row["uploadedEver"]),
+			Hash:           hash,
+			Name:           name,
+			SavePath:       strings.TrimSpace(toString(row["downloadDir"], "")),
+			Size:           size,
+			Progress:       normalizeProgressPercent(row["percentDone"]),
+			State:          formatTorrentState(statusText),
+			Trackers:       trackers,
+			Comment:        strings.TrimSpace(toString(row["comment"], "")),
+			Group:          group,
+			Tags:           tags,
+			InventoryState: inventoryState,
+			Seeders:        toInt64Any(row["peersGettingFromUs"]),
+			Uploaded:       toInt64Any(row["uploadedEver"]),
 		})
 	}
 
 	return result, nil
 }
 
-func firstCSVItem(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	for _, part := range strings.Split(trimmed, ",") {
-		item := strings.TrimSpace(part)
-		if item != "" {
-			return item
+func parseTorrentTags(raw any) []string {
+	var values []string
+	switch typed := raw.(type) {
+	case string:
+		values = strings.Split(typed, ",")
+	case []string:
+		values = typed
+	case []any:
+		values = make([]string, 0, len(typed))
+		for _, value := range typed {
+			values = append(values, toString(value, ""))
 		}
 	}
-	return ""
+
+	tags := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		tag := strings.TrimSpace(value)
+		if tag == "" {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+	return tags
 }
 
-func firstLabel(raw any) string {
-	switch typed := raw.(type) {
-	case []string:
-		for _, item := range typed {
-			trimmed := strings.TrimSpace(item)
-			if trimmed != "" {
-				return trimmed
-			}
-		}
-	case []any:
-		for _, item := range typed {
-			trimmed := strings.TrimSpace(toString(item, ""))
-			if trimmed != "" {
-				return trimmed
-			}
-		}
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
 	}
-	return ""
+	return values[0]
+}
+
+func torrentGroup(category string, tags []string) string {
+	if value := strings.TrimSpace(category); value != "" {
+		return value
+	}
+	return firstString(tags)
+}
+
+func normalizeInventoryState(state string) string {
+	state = strings.ToLower(strings.TrimSpace(state))
+	switch {
+	case state == "", state == "unknown":
+		return "other"
+	case strings.Contains(state, "error"), strings.Contains(state, "missing"):
+		return "error"
+	case strings.Contains(state, "check"):
+		return "checking"
+	case strings.Contains(state, "queue"):
+		return "queued"
+	case strings.Contains(state, "download"), strings.Contains(state, "metadl"), strings.Contains(state, "forceddl"), state == "stalleddl", strings.Contains(state, "allocat"):
+		return "downloading"
+	case strings.Contains(state, "upload"), strings.Contains(state, "seed"), state == "stalledup", state == "forcedup":
+		return "seeding"
+	case strings.Contains(state, "pause"), strings.Contains(state, "stop"), state == "stalled":
+		return "paused"
+	default:
+		return "other"
+	}
 }
 
 func extractTransmissionTrackers(row map[string]any) []string {

@@ -21,6 +21,7 @@ import (
 	"github.com/pt-nexus/server/internal/repository"
 	"github.com/pt-nexus/server/internal/service"
 	migrationflow "github.com/pt-nexus/server/internal/service/migrationflow"
+	"github.com/pt-nexus/server/internal/service/torrentdata"
 )
 
 // App 封装 Gin 引擎实例，供主程序启动 HTTP 服务。
@@ -216,7 +217,8 @@ func NewApp() (*App, error) {
 				})
 			}
 			return summaries, ctx.Err()
-		}, handler.TjuptPluginServices{RSS: tjuptPlugin, Automation: tjuptAutomation, Feed: tjuptFeed}); err != nil {
+		}, handler.TjuptPluginServices{RSS: tjuptPlugin, Automation: tjuptAutomation, Feed: tjuptFeed},
+		torrentdata.NewDownloaderInventory(cfgManager, torrentDataRepo), settingsService.DownloadersList); err != nil {
 		return nil, fmt.Errorf("初始化插件目录失败: %w", err)
 	}
 	engine.GET("/api/migrate/source-restriction", func(c *gin.Context) {
@@ -308,6 +310,8 @@ func registerRoutes(
 		api.POST("/ui_settings/cross_seed", settingsHandler.SaveCrossSeedUISettings)
 		api.GET("/ui_settings/publish_logs", settingsHandler.GetPublishLogsUISettings)
 		api.POST("/ui_settings/publish_logs", settingsHandler.SavePublishLogsUISettings)
+		api.GET("/ui_settings/sites_layout", settingsHandler.GetSitesLayoutSettings)
+		api.POST("/ui_settings/sites_layout", settingsHandler.SaveSitesLayoutSettings)
 		api.GET("/upload_settings", settingsHandler.GetUploadSettings)
 		api.POST("/upload_settings", settingsHandler.SaveUploadSettings)
 		api.GET("/settings/ptgen", settingsHandler.GetPTGenSettings)

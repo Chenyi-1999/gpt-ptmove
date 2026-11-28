@@ -50,9 +50,9 @@ func (s *Service) Scan(ctx context.Context, targetPath string, videoOnly bool) (
 		missing: map[string][]map[string]any{}, found: map[string]*syncedItem{}, localFound: map[string]bool{},
 		orphaned: []map[string]any{}, issues: []scanIssue{},
 	}
-	if len(torrents) == 0 && targetPath != "" {
+	if len(torrents) == 0 {
 		scans.issues = append(scans.issues, scanIssue{
-			Path: targetPath, Status: "unverified", Message: "此路径在当前筛选中没有可核验的任务",
+			Path: targetPath, Status: "unverified", Message: "当前范围没有可核验的任务，请同步下载器或调整筛选",
 		})
 	}
 	for _, torrent := range torrents {
@@ -203,7 +203,7 @@ func scanLocalDirectory(ctx context.Context, directory, displayPath string, refe
 	}
 	entries, err := os.ReadDir(directory)
 	if err != nil {
-		return directoryScan{}, errors.New("无法读取本地目录")
+		return directoryScan{}, errors.New("STARPT 无法读取保存目录，请检查只读挂载、路径映射或读取权限")
 	}
 	result := directoryScan{items: len(entries), missing: map[string]bool{}}
 	listed := make(map[string]os.DirEntry, len(entries))

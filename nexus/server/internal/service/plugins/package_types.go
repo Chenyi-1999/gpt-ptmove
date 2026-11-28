@@ -14,6 +14,11 @@ import (
 const DownloaderSummaryCapability = "downloader.summary"
 
 const (
+	// DownloaderInventoryPluginID 标识下载器统计外装包。
+	DownloaderInventoryPluginID = "downloader-summary"
+	// DownloaderInventoryCapability 开放宿主的只读种子统计面板。
+	DownloaderInventoryCapability = "downloader.inventory"
+
 	// TjuptFeedPluginID 标识北洋园 RSS 的外装控制面板。
 	TjuptFeedPluginID = "tjupt-rss"
 	// TjuptFeedCapability 允许北洋园插件确认本次请求的宿主动作。
@@ -108,6 +113,10 @@ func normalizeManifest(m *PackageManifest, id string) error {
 		if len(m.Capabilities) != 1 || m.Capabilities[0] != TjuptFeedCapability ||
 			len(m.Fields) != 0 || len(m.Actions) != len(tjuptFeedActions) {
 			return errors.New("北洋园插件须声明专用宿主能力和全部固定操作，配置由宿主保存")
+		}
+	} else if id == DownloaderInventoryPluginID && slices.Contains(m.Capabilities, DownloaderInventoryCapability) {
+		if len(m.Capabilities) != 2 || !slices.Contains(m.Capabilities, DownloaderSummaryCapability) {
+			return errors.New("下载器统计包须声明统计面板及兼容统计能力")
 		}
 	} else if len(m.Capabilities) > 1 || (len(m.Capabilities) == 1 && m.Capabilities[0] != DownloaderSummaryCapability) {
 		return errors.New("插件声明了不受支持的能力")

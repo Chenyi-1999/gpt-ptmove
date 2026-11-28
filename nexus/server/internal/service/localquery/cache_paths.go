@@ -31,6 +31,7 @@ func (s *Service) GetPaths(videoOnly bool) (map[string]any, error) {
 	return map[string]any{"paths": paths, "total": len(paths)}, nil
 }
 
+// GetDownloadersWithPaths 列出索引中的保存路径，保留容器暂时无法访问的目录。
 func (s *Service) GetDownloadersWithPaths(videoOnly bool) (map[string]any, error) {
 	downloaders := s.downloadersInConfigOrder()
 	result := make([]map[string]any, 0)
@@ -41,6 +42,17 @@ func (s *Service) GetDownloadersWithPaths(videoOnly bool) (map[string]any, error
 			return nil, err
 		}
 
+		indexedRows := pathRows
+		if videoOnly {
+			indexedRows, err = s.repo.DownloaderPathCounts(meta.ID, false)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var indexedCount int64
+		for _, row := range indexedRows {
+			indexedCount += row.Count
+		}
 		merged := map[string]int64{}
 		for _, row := range pathRows {
 			savePath := strings.TrimSpace(row.SavePath)
@@ -61,22 +73,25 @@ func (s *Service) GetDownloadersWithPaths(videoOnly bool) (map[string]any, error
 
 		paths := make([]map[string]any, 0)
 		for path, count := range merged {
+			accessStatus := "remote"
 			if !meta.Remote {
 				localPath := applyRemoteToLocal(path, meta.Mappings)
-				if _, err := os.Stat(localPath); err != nil {
-					continue
+				accessStatus = "unavailable"
+				if info, err := os.Stat(localPath); err == nil && info.IsDir() {
+					accessStatus = "available"
 				}
 			}
-			paths = append(paths, map[string]any{"path": path, "count": count})
+			paths = append(paths, map[string]any{"path": path, "count": count, "access_status": accessStatus})
 		}
 		sort.Slice(paths, func(i, j int) bool {
 			return stringFromAny(paths[i]["path"]) < stringFromAny(paths[j]["path"])
 		})
 
 		result = append(result, map[string]any{
-			"id":    meta.ID,
-			"name":  meta.Name,
-			"paths": paths,
+			"id":            meta.ID,
+			"name":          meta.Name,
+			"indexed_count": indexedCount,
+			"paths":         paths,
 		})
 	}
 	return map[string]any{"downloaders": result}, nil
