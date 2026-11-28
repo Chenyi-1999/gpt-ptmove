@@ -156,6 +156,12 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 展开明细时加 `details=1`、`group`（汇总返回的分组标识），并沿用相同筛选，可带 `page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条。Tracker 明细仅返回主机名。快照过期后须先刷新统计。
 
+## 下载器设置摘要
+
+`GET /api/settings` 返回的下载器对象提供只读布尔值 `password_configured`，用于在密码被隐去时判断是否已配置。保存设置时服务端忽略该字段。
+
+下载器对象可选的 `display_location` 支持 `auto`、`local` 和 `remote`。这个字段只影响设置页的位置标记。自动识别优先读取已有的位置标记，也能识别回环地址，其余地址显示「位置未标注」。
+
 ## 首页和做种检索布局
 
 通过 `GET /api/ui_settings/home_layout` 或 `GET /api/ui_settings/sites_layout` 读取对应页面布局，使用同一路径的 `POST` 保存。布局对象包含 `columns`（1 或 2）、按优先级排列的 `order` 和隐藏模块列表 `hidden`。保存成功返回 `{"success":true}`，另一页面的布局及其他界面设置保留。

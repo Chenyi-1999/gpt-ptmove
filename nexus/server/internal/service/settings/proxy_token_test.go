@@ -19,15 +19,35 @@ func TestProxyTokenPreserveClearAndRedaction(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	update(map[string]any{"proxy_token": "first-proxy-secret-at-least-32-characters", "api_key": "separate-qb-key", "proxy_media_only": true})
+	update(map[string]any{"password": "downloader-password", "password_configured": false, "proxy_token": "first-proxy-secret-at-least-32-characters", "api_key": "separate-qb-key", "proxy_media_only": true})
 	masked := proxyTestMap(toSlice(service.GetSettingsMasked()["downloaders"])[0])
-	if masked["proxy_token"] != "" || masked["proxy_token_configured"] != true || masked["api_key"] != "" {
+	if masked["password"] != "" || masked["password_configured"] != true || masked["proxy_token"] != "" || masked["proxy_token_configured"] != true || masked["api_key"] != "" {
 		t.Fatal("secret leaked")
 	}
-	update(map[string]any{"proxy_token": "", "api_key": ""})
 	saved := proxyTestMap(toSlice(manager.Get()["downloaders"])[0])
+	if saved["password"] != "downloader-password" {
+		t.Fatal("password was not saved")
+	}
+	if _, exists := saved["password_configured"]; exists {
+		t.Fatal("client-supplied password marker was persisted")
+	}
+	update(map[string]any{"proxy_token": "", "api_key": ""})
+	saved = proxyTestMap(toSlice(manager.Get()["downloaders"])[0])
 	if saved["proxy_token"] != "first-proxy-secret-at-least-32-characters" || saved["api_key"] != "separate-qb-key" {
 		t.Fatal("blank token did not preserve distinct credentials")
+	}
+	if saved["password"] != "downloader-password" {
+		t.Fatal("blank password did not preserve saved credential")
+	}
+	if err := service.UpdateSettings(map[string]any{"downloaders": []any{
+		map[string]any{"id": "nas", "password": ""},
+		map[string]any{"id": "empty", "password": ""},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	maskedDownloaders := toSlice(service.GetSettingsMasked()["downloaders"])
+	if proxyTestMap(maskedDownloaders[0])["password_configured"] != true || proxyTestMap(maskedDownloaders[1])["password_configured"] != false {
+		t.Fatal("password configured status did not reflect stored credentials")
 	}
 	update(map[string]any{"proxy_token": "rotated-secret-at-least-32-characters"})
 	if service.DownloaderConfigs()[0]["proxy_token"] != "rotated-secret-at-least-32-characters" {

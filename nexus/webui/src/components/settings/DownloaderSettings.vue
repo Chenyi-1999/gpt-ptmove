@@ -24,8 +24,17 @@
             <div class="downloader-heading">
               <h3>{{ downloader.name || '新下载器' }}</h3>
               <div class="downloader-meta">
-                <span v-if="downloader.type">
-                  {{ downloader.type === 'qbittorrent' ? 'qBittorrent' : 'Transmission' }}
+                <span v-if="downloader.type">{{ downloaderTypeLabel(downloader.type) }}</span>
+                <span class="downloader-location">{{
+                  downloaderSummaries.get(downloader.id)?.location
+                }}</span>
+                <span>{{ downloader.use_proxy ? '远程媒体' : '直连' }}</span>
+                <span
+                  class="downloader-config-state"
+                  :class="`downloader-config-state--${downloaderSummaries.get(downloader.id)?.state}`"
+                  :title="downloaderSummaries.get(downloader.id)?.issue || '配置字段已齐'"
+                >
+                  {{ downloaderSummaries.get(downloader.id)?.label }}
                 </span>
                 <span
                   class="downloader-status"
@@ -33,7 +42,14 @@
                 >
                   {{ downloader.enabled ? '已启用' : '已禁用' }}
                 </span>
-                <span v-if="draftDownloaderIds.has(downloader.id)">未保存</span>
+                <span
+                  v-if="
+                    draftDownloaderIds.has(downloader.id) &&
+                    downloaderSummaries.get(downloader.id)?.state === 'missing'
+                  "
+                >
+                  未保存
+                </span>
               </div>
             </div>
             <el-button
@@ -136,6 +152,9 @@
                 @hold="confirmDeleteDownloader(downloader.id)"
               />
             </div>
+            <p v-if="downloaderSummaries.get(downloader.id)?.issue" class="downloader-config-hint">
+              {{ downloaderSummaries.get(downloader.id)?.issue }}
+            </p>
             <el-form :model="downloader" label-position="top" :disabled="isLoading || isSaving">
               <el-form-item label="名称">
                 <div class="name-and-client-row">
@@ -156,6 +175,16 @@
                     <el-option label="Transmission" value="transmission"></el-option>
                   </el-select>
                 </div>
+              </el-form-item>
+              <el-form-item label="下载器位置">
+                <el-radio-group v-model="downloader.display_location" aria-label="下载器位置">
+                  <el-radio-button value="auto">自动识别</el-radio-button>
+                  <el-radio-button value="local">本地</el-radio-button>
+                  <el-radio-button value="remote">远程</el-radio-button>
+                </el-radio-group>
+                <span class="credential-hint"
+                  >位置标记仅用于列表显示，自动识别适用于本机回环地址和已有位置标记。</span
+                >
               </el-form-item>
               <el-form-item label="连接方式">
                 <div class="proxy-settings-row">
@@ -375,7 +404,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import {
@@ -393,6 +422,7 @@ import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import { ElMessage } from '@/utils/uiNotify'
 
 type ConnectionTestStatus = 'success' | 'error'
+type DownloaderLocation = 'auto' | 'local' | 'remote'
 
 type PathMapping = {
   remote: string
@@ -407,6 +437,8 @@ type DownloaderConfig = {
   host: string
   username: string
   password: string
+  password_configured: boolean
+  display_location: DownloaderLocation
   api_key: string
   api_key_configured: boolean
   clear_api_key: boolean
@@ -451,6 +483,85 @@ const testingConnectionId = ref<string | null>(null)
 const connectionTestResults = ref<Record<string, ConnectionTestStatus | undefined>>({})
 const API_BASE_URL = '/api'
 const torrentsViewState = useTorrentsViewState()
+
+function downloaderTypeLabel(type: string) {
+  const normalized = type.trim().toLowerCase()
+  if (normalized === 'qbittorrent') return 'qBittorrent'
+  if (normalized === 'transmission') return 'Transmission'
+  return normalized
+}
+
+function normalizeLocation(value: unknown): DownloaderLocation {
+  return value === 'local' || value === 'remote' ? value : 'auto'
+}
+
+function downloaderHostname(host: string) {
+  const address = host.trim()
+  if (!address) return ''
+  try {
+    const url = new URL(address.includes('://') ? address : `http://${address}`)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : ''
+  } catch {
+    return ''
+  }
+}
+
+function downloaderLocation(downloader: DownloaderConfig, hostname: string) {
+  const selected = downloader.display_location
+  const stored = selected === 'auto' ? normalizeLocation(downloader.location) : selected
+  if (stored === 'local') return '本地'
+  if (stored === 'remote' || downloader.is_remote === true) return '远程'
+  if (
+    hostname === 'localhost' ||
+    hostname === 'localhost.' ||
+    hostname === '[::1]' ||
+    /^127\.\d+\.\d+\.\d+$/.test(hostname)
+  ) {
+    return '本地'
+  }
+  return '位置未标注'
+}
+
+function downloaderConfigIssue(downloader: DownloaderConfig, hostname: string) {
+  const kind = downloader.type.trim().toLowerCase()
+  if (kind !== 'qbittorrent' && kind !== 'transmission') return '请选择支持的下载器类型。'
+  if (!hostname) return '请填写有效的下载器主机地址。'
+  const hasApiKey =
+    Boolean(downloader.api_key.trim()) ||
+    (downloader.api_key_configured && !downloader.clear_api_key)
+  const hasPassword = Boolean(downloader.password.trim()) || downloader.password_configured
+  if (kind === 'qbittorrent' && !hasApiKey && !(downloader.username.trim() && hasPassword))
+    return '请填写 qBittorrent API Token，或填写用户名和密码。'
+  if (downloader.use_proxy) {
+    const port = Number(downloader.proxy_port)
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return '请填写有效的媒体代理端口。'
+    const token = downloader.proxy_token.trim()
+    const hasToken = token
+      ? token.length >= 32
+      : downloader.proxy_token_configured && !downloader.clear_proxy_token
+    if (!hasToken) return '请填写至少 32 字符的媒体代理 Token。'
+  }
+  return ''
+}
+
+const downloaderSummaries = computed(() => {
+  return new Map(
+    settings.value.downloaders.map((downloader) => {
+      const hostname = downloaderHostname(downloader.host)
+      const issue = downloaderConfigIssue(downloader, hostname)
+      const unsaved = draftDownloaderIds.value.has(downloader.id)
+      return [
+        downloader.id,
+        {
+          location: downloaderLocation(downloader, hostname),
+          issue,
+          state: issue ? 'missing' : unsaved ? 'draft' : 'ready',
+          label: issue ? '待配置' : unsaved ? '待保存' : '已配置',
+        },
+      ]
+    }),
+  )
+})
 
 const predefinedDownloaderColors = [
   '#409EFF',
@@ -555,6 +666,8 @@ const fetchSettings = async () => {
         host: typeof record.host === 'string' ? record.host : '',
         username: typeof record.username === 'string' ? record.username : '',
         password: typeof record.password === 'string' ? record.password : '',
+        password_configured: record.password_configured === true,
+        display_location: normalizeLocation(record.display_location),
         api_key: '',
         api_key_configured: record.api_key_configured === true,
         clear_api_key: false,
@@ -598,7 +711,8 @@ const settingsPayload = (editedDownloader?: DownloaderConfig) => ({
     const downloader = editedDownloader?.id === item.id ? editedDownloader : item
     const payload = Object.fromEntries(
       Object.entries(downloader).filter(
-        ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
+        ([key]) =>
+          !['password_configured', 'api_key_configured', 'proxy_token_configured'].includes(key),
       ),
     )
     if (downloader.use_proxy) payload.proxy_media_only = true
@@ -643,6 +757,8 @@ const addDownloader = () => {
     host: '',
     username: '',
     password: '',
+    password_configured: false,
+    display_location: 'auto',
     api_key: '',
     api_key_configured: false,
     clear_api_key: false,
@@ -714,7 +830,8 @@ const testConnection = async (downloader: DownloaderConfig) => {
   try {
     const testConfig = Object.fromEntries(
       Object.entries(downloader).filter(
-        ([key]) => key !== 'api_key_configured' && key !== 'proxy_token_configured',
+        ([key]) =>
+          !['password_configured', 'api_key_configured', 'proxy_token_configured'].includes(key),
       ),
     )
     if (downloader.use_proxy) testConfig.proxy_media_only = true
@@ -908,6 +1025,25 @@ const savePathMappings = async () => {
   margin-top: 4px;
   color: var(--star-muted);
   font-size: 0.75rem;
+}
+
+.downloader-config-state {
+  font-weight: 600;
+}
+
+.downloader-config-state--ready {
+  color: var(--el-color-success);
+}
+
+.downloader-config-state--missing,
+.downloader-config-state--draft,
+.downloader-config-hint {
+  color: var(--el-color-warning);
+}
+
+.downloader-config-hint {
+  margin: -4px 0 16px;
+  font-size: 0.8125rem;
 }
 
 .downloader-status {

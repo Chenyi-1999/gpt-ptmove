@@ -1173,3 +1173,10 @@
 - 离线浏览器确认 1440px 桌面、390px 手机的默认折叠、键盘编辑、测试与路径映射、新增聚焦、保存流程和页面刷新。无横向溢出，无页面错误。
 - 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 370995649 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
 - 同一 v1.2.1 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
+
+## PTM-20261128-STARPT-V122-DOWNLOADER-STATUS — 2026-11-28T22:26:21+08:00 — Codex root / down_status_password_flag / down_status_qa，显示下载器位置及配置状态
+
+- nexus/webui/src/components/settings/DownloaderSettings.vue 为折叠卡片增加本地、远程或位置未标注，以及已配置、待配置或待保存状态。自动识别使用已有位置标记和回环地址，手动位置记录独立于媒体处理和路由。完整度按已填字段和服务端脱敏标记判定，不发起连接请求。
+- nexus/server/internal/service/settings/core.go 返回只读 password_configured，屏蔽明文密码、忽略客户端提交的标记，保留已有密码。proxy_token_test.go 覆盖凭据脱敏和标记持久化行为。同步 API_CONTRACT、发布说明、版本、Compose、Dockerfile 和重新构建的前端。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试和 Vite 构建通过，保留既有大分块提示。152 离线 Go 全量测试和编译通过。模拟 API 的 1440px 桌面、390px 手机核对自动识别、手动位置保存、配置完整度、脱敏、现有连接方式，无额外探测、控制台异常或横向溢出。
+- 152 容器验收、完整镜像、双仓 Git 推送和发布结果另记。本阶段未操作 OVH 或 81。

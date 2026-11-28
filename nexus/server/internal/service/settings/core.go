@@ -80,6 +80,7 @@ func (s *SettingsService) GetSettingsMasked() map[string]any {
 		if !ok {
 			continue
 		}
+		downloader["password_configured"] = strings.TrimSpace(toString(downloader["password"], "")) != ""
 		downloader["password"] = ""
 		downloader["api_key_configured"] = strings.TrimSpace(toString(downloader["api_key"], "")) != ""
 		downloader["api_key"] = ""
@@ -164,6 +165,7 @@ func (s *SettingsService) UpdateSettings(newConfig map[string]any) error {
 			delete(downloader, "proxy_token_configured")
 			delete(downloader, "clear_api_key")
 			delete(downloader, "api_key_configured")
+			delete(downloader, "password_configured")
 			updated[index] = downloader
 		}
 		newConfig["downloaders"] = updated
