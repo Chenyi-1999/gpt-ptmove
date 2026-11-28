@@ -1159,3 +1159,10 @@
 - 离线浏览器确认 1440px 桌面、390px 手机的隐藏、重排、恢复及刷新后保留。手机保持单列且无横向溢出，本地扫描空缓存按真实接口返回 404，流量实际绘制。
 - 完整 Linux amd64 镜像包含压紧的运行文件系统，校验启动配置、媒体工具、Docker 归档 SHA-256 和重新载入。打包体积 371001500 字节。源码、Compose、双仓发行和附件记录追加到 docs/DEPLOYMENT.json。
 - 同一 v1.2.0 标签已发布到 GitHub 和 Gitee。GitHub 提供完整镜像、Compose 及校验，Gitee 提供 Compose、校验和完整镜像下载入口。未更新 OVH，未操作 81。
+
+## PTM-20261128-STARPT-V121-DOWNLOADER-CARDS — 2026-11-28T21:49:14+08:00 — Codex root / downloader_qa，下载器默认折叠
+
+- nexus/webui/src/components/settings/DownloaderSettings.vue 将下载器设置改为精简列表。已保存配置默认折叠，列表显示名称、类型和启停状态，编辑后展开可用字段、测速、路径映射与删除按钮。新增草稿自动打开并聚焦名称，手动收起保留输入，整页保存成功后收起，失败保留编辑现场。
+- 更新 nexus/webui/dist、nexus/VERSION、Dockerfile、Compose、版本信息与 docs/RELEASE-v1.2.1.md。下载器设置 API 和凭据传输规则继续使用现有逻辑。
+- Vue 类型检查、定向 ESLint、10 项 Node 测试、Vite 与 152 离线 Go 全量通过。Vite 保留既有大分块提示。模拟 API 的 1440px 和 390px 浏览器验证折叠、键盘编辑、连接测试、路径映射、草稿、保存失败恢复、成功收起及刷新，核对掩码凭据字段和水平溢出。
+- 152 生产切换、完整镜像及双仓发行另记。未访问 OVH 或 81。

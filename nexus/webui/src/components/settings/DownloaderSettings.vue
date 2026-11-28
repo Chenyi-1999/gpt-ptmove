@@ -16,17 +16,42 @@
       <el-card
         v-for="downloader in settings.downloaders"
         :key="downloader.id"
+        :class="{ 'downloader-card--expanded': expandedDownloaderIds.has(downloader.id) }"
         class="downloader-card glass-card glass-rounded glass-transparent-header glass-transparent-body"
       >
         <template #header>
           <div class="card-header">
             <div class="downloader-heading">
               <h3>{{ downloader.name || '新下载器' }}</h3>
-              <span v-if="downloader.type">
-                {{ downloader.type === 'qbittorrent' ? 'qBittorrent' : 'Transmission' }}
-              </span>
+              <div class="downloader-meta">
+                <span v-if="downloader.type">
+                  {{ downloader.type === 'qbittorrent' ? 'qBittorrent' : 'Transmission' }}
+                </span>
+                <span
+                  class="downloader-status"
+                  :class="{ 'downloader-status--enabled': downloader.enabled }"
+                >
+                  {{ downloader.enabled ? '已启用' : '已禁用' }}
+                </span>
+                <span v-if="draftDownloaderIds.has(downloader.id)">未保存</span>
+              </div>
             </div>
-            <div class="header-controls">
+            <el-button
+              class="downloader-disclosure"
+              :icon="expandedDownloaderIds.has(downloader.id) ? ArrowUp : EditPen"
+              :aria-expanded="expandedDownloaderIds.has(downloader.id)"
+              :aria-controls="downloaderEditorId(downloader.id)"
+              :aria-label="`${expandedDownloaderIds.has(downloader.id) ? '收起' : '编辑'} ${downloader.name || '新下载器'}`"
+              :disabled="isLoading || isSaving"
+              @click="toggleDownloader(downloader.id)"
+            >
+              {{ expandedDownloaderIds.has(downloader.id) ? '收起' : '编辑' }}
+            </el-button>
+          </div>
+        </template>
+        <div :id="downloaderEditorId(downloader.id)" class="downloader-editor">
+          <template v-if="expandedDownloaderIds.has(downloader.id)">
+            <div class="editor-controls">
               <div class="downloader-color-controls">
                 <el-popover
                   trigger="click"
@@ -39,6 +64,7 @@
                       class="downloader-color-trigger"
                       :style="{ backgroundColor: downloader.color }"
                       aria-label="选择下载器颜色"
+                      :disabled="isLoading || isSaving"
                     />
                   </template>
                   <el-color-picker-panel
@@ -72,18 +98,21 @@
                 :plain="!connectionTestResults[downloader.id]"
                 @click="testConnection(downloader)"
                 :loading="testingConnectionId === downloader.id"
+                :disabled="isLoading || isSaving"
                 :icon="Link"
               >
                 测试
               </el-button>
               <el-button
                 :icon="FolderOpened"
+                :disabled="isLoading || isSaving"
                 @click="openPathMappingDialog(downloader)"
               >
                 路径映射
               </el-button>
               <el-switch
                 v-model="downloader.enabled"
+                :disabled="isLoading || isSaving"
                 :aria-label="downloader.name ? '启用 ' + downloader.name : '启用下载器'"
               />
 
@@ -107,191 +136,192 @@
                 @hold="confirmDeleteDownloader(downloader.id)"
               />
             </div>
-          </div>
-        </template>
-        <el-form :model="downloader" label-position="top">
-          <el-form-item label="名称">
-            <div class="name-and-client-row">
-              <el-input
-                v-model="downloader.name"
-                placeholder="例如：家庭服务器 qB"
-                class="name-input"
-                @input="resetConnectionStatus(downloader.id)"
-              ></el-input>
-              <el-select
-                v-model="downloader.type"
-                placeholder="请选择类型"
-                aria-label="下载器类型"
-                class="client-type-select"
-                @change="resetConnectionStatus(downloader.id)"
-              >
-                <el-option label="qBittorrent" value="qbittorrent"></el-option>
-                <el-option label="Transmission" value="transmission"></el-option>
-              </el-select>
-            </div>
-          </el-form-item>
-          <el-form-item label="连接方式">
-            <div class="proxy-settings-row">
-              <el-switch
-                v-model="downloader.use_proxy"
-                inline-prompt
-                active-text="远程"
-                inactive-text="直连"
-                :aria-label="
-                  '连接方式：' + (downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器')
-                "
-                @change="onConnectionModeChange(downloader)"
-              />
-              <strong class="connection-mode-title">
-                {{ downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器' }}
-              </strong>
-              <span class="credential-hint connection-mode-hint">
-                {{
-                  downloader.use_proxy
-                    ? '种子列表和流量继续走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
-                    : 'STARPT 直接连接下载器 API，有可读媒体目录时在本机处理视频。'
-                }}
-              </span>
-            </div>
-          </el-form-item>
-          <el-form-item v-if="downloader.use_proxy" label="媒体代理端口">
-            <div class="proxy-settings-row">
-              <el-input
-                v-model="downloader.proxy_port"
-                type="number"
-                placeholder="19090"
-                class="proxy-port-input"
-                :min="1"
-                :max="65535"
-                aria-label="媒体代理端口"
-                @input="resetConnectionStatus(downloader.id)"
-              />
-              <span class="credential-hint connection-mode-hint">
-                直接连接远程服务器或 NAS 上的媒体代理时，填写代理的服务端口（默认 19090）。
-              </span>
-              <span class="credential-hint connection-mode-hint">
-                远程客户端通过 HTTPS 主动领单时，主机地址填写领单服务（Hub）的内网 API 地址（默认端口
-                28380），媒体代理端口填 29090。HTTPS 领单端口（默认 28443）在远程客户端设置中填写。
-              </span>
-            </div>
-          </el-form-item>
-          <el-form-item label="出种限速">
-            <el-tooltip
-              content="开启后，此下载器将参与基于站点分享率阈值的出种限速"
-              placement="top"
-              :hide-after="0"
-            >
-              <span class="ratio-limiter-label">
-                <el-switch
-                  v-model="downloader.enable_ratio_limiter"
-                  inline-prompt
-                  active-text="开"
-                  inactive-text="关"
-                  aria-label="出种限速"
-                />
-              </span>
-            </el-tooltip>
-          </el-form-item>
-          <el-form-item v-if="downloader.use_proxy" label="媒体代理 Token">
-            <div class="api-token-field">
-              <el-input
-                v-model="downloader.proxy_token"
-                type="password"
-                show-password
-                autocomplete="new-password"
-                placeholder="留空保留已配置 Token，新增至少 32 字符"
-                @input="onProxyTokenInput(downloader)"
-              />
-              <span class="api-token-status">{{
-                downloader.clear_proxy_token
-                  ? '待清除'
-                  : downloader.proxy_token_configured && !downloader.proxy_token
-                    ? '已配置'
-                    : downloader.proxy_token
-                      ? '待保存'
-                      : '未配置'
-              }}</span>
-              <el-checkbox
-                v-if="downloader.proxy_token_configured"
-                v-model="downloader.clear_proxy_token"
-                @change="onClearProxyTokenChange(downloader)"
-                >清除媒体代理 Token</el-checkbox
-              >
-              <span class="credential-hint"
-                >通过 HTTPS 领单时填写 Hub 的 controller.token。直接连接媒体代理时填写该程序的
-                PTMOVE_PROXY_TOKEN。</span
-              >
-            </div>
-          </el-form-item>
-          <el-form-item label="主机地址">
-            <el-input
-              v-model="downloader.host"
-              :placeholder="
-                downloader.type === 'transmission'
-                  ? '例如：192.168.1.10:9091 或 http://192.168.1.10:9091'
-                  : '例如：192.168.1.10:8080'
-              "
-              @input="resetConnectionStatus(downloader.id)"
-            ></el-input>
-            <span class="credential-hint connection-mode-hint">
-              {{
-                downloader.use_proxy
-                  ? '填写 STARPT 能访问的下载器 API 地址（含端口）。媒体代理使用同一个主机名和上面的独立端口。HTTPS 领单的 API 地址示例为 ptmove-pull-hub:28380。'
-                  : '填写 STARPT 能访问的下载器 WebUI 或 RPC 地址及端口。'
-              }}
-            </span>
-          </el-form-item>
-          <el-form-item label="用户名">
-            <el-input
-              v-model="downloader.username"
-              placeholder="登录用户名"
-              @input="resetConnectionStatus(downloader.id)"
-            ></el-input>
-          </el-form-item>
-          <el-form-item label="密码">
-            <el-input
-              v-model="downloader.password"
-              type="password"
-              show-password
-              placeholder="登录密码（未修改则留空）"
-              @input="resetConnectionStatus(downloader.id)"
-            ></el-input>
-          </el-form-item>
-          <el-form-item v-if="downloader.type === 'qbittorrent'" label="API Token">
-            <div class="api-token-field">
-              <el-input
-                v-model="downloader.api_key"
-                type="password"
-                show-password
-                autocomplete="new-password"
-                placeholder="留空保留已配置 Token"
-                @input="onApiKeyInput(downloader)"
-              />
-              <span class="api-token-status">{{
-                downloader.clear_api_key
-                  ? '待清除'
-                  : downloader.api_key_configured && !downloader.api_key
-                    ? '已配置'
-                    : downloader.api_key
-                      ? '待保存'
-                      : '未配置'
-              }}</span>
-              <el-checkbox
-                v-if="downloader.api_key_configured"
-                v-model="downloader.clear_api_key"
-                @change="onClearApiKeyChange(downloader)"
-              >
-                明确清除 Token
-              </el-checkbox>
-            </div>
-          </el-form-item>
-          <el-form-item v-if="downloader.type === 'qbittorrent'" label="认证提示">
-            <span class="credential-hint"
-              >已配置 API Token 或填写新 Token 时，用户名和密码可留空；留空 Token
-              会保留当前凭据。</span
-            >
-          </el-form-item>
-        </el-form>
+            <el-form :model="downloader" label-position="top" :disabled="isLoading || isSaving">
+              <el-form-item label="名称">
+                <div class="name-and-client-row">
+                  <el-input
+                    v-model="downloader.name"
+                    placeholder="例如：家庭服务器 qB"
+                    class="name-input"
+                    @input="resetConnectionStatus(downloader.id)"
+                  ></el-input>
+                  <el-select
+                    v-model="downloader.type"
+                    placeholder="请选择类型"
+                    aria-label="下载器类型"
+                    class="client-type-select"
+                    @change="resetConnectionStatus(downloader.id)"
+                  >
+                    <el-option label="qBittorrent" value="qbittorrent"></el-option>
+                    <el-option label="Transmission" value="transmission"></el-option>
+                  </el-select>
+                </div>
+              </el-form-item>
+              <el-form-item label="连接方式">
+                <div class="proxy-settings-row">
+                  <el-switch
+                    v-model="downloader.use_proxy"
+                    inline-prompt
+                    active-text="远程"
+                    inactive-text="直连"
+                    :aria-label="
+                      '连接方式：' + (downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器')
+                    "
+                    @change="onConnectionModeChange(downloader)"
+                  />
+                  <strong class="connection-mode-title">
+                    {{ downloader.use_proxy ? '远程截图与 MediaInfo' : '直连下载器' }}
+                  </strong>
+                  <span class="credential-hint connection-mode-hint">
+                    {{
+                      downloader.use_proxy
+                        ? '种子列表和流量继续走下载器 API，截图和 MediaInfo 由远程媒体程序处理。'
+                        : 'STARPT 直接连接下载器 API，有可读媒体目录时在本机处理视频。'
+                    }}
+                  </span>
+                </div>
+              </el-form-item>
+              <el-form-item v-if="downloader.use_proxy" label="媒体代理端口">
+                <div class="proxy-settings-row">
+                  <el-input
+                    v-model="downloader.proxy_port"
+                    type="number"
+                    placeholder="19090"
+                    class="proxy-port-input"
+                    :min="1"
+                    :max="65535"
+                    aria-label="媒体代理端口"
+                    @input="resetConnectionStatus(downloader.id)"
+                  />
+                  <span class="credential-hint connection-mode-hint">
+                    直接连接远程服务器或 NAS 上的媒体代理时，填写代理的服务端口（默认 19090）。
+                  </span>
+                  <span class="credential-hint connection-mode-hint">
+                    远程客户端通过 HTTPS 主动领单时，主机地址填写领单服务（Hub）的内网 API
+                    地址（默认端口 28380），媒体代理端口填 29090。HTTPS 领单端口（默认
+                    28443）在远程客户端设置中填写。
+                  </span>
+                </div>
+              </el-form-item>
+              <el-form-item label="出种限速">
+                <el-tooltip
+                  content="开启后，此下载器将参与基于站点分享率阈值的出种限速"
+                  placement="top"
+                  :hide-after="0"
+                >
+                  <span class="ratio-limiter-label">
+                    <el-switch
+                      v-model="downloader.enable_ratio_limiter"
+                      inline-prompt
+                      active-text="开"
+                      inactive-text="关"
+                      aria-label="出种限速"
+                    />
+                  </span>
+                </el-tooltip>
+              </el-form-item>
+              <el-form-item v-if="downloader.use_proxy" label="媒体代理 Token">
+                <div class="api-token-field">
+                  <el-input
+                    v-model="downloader.proxy_token"
+                    type="password"
+                    show-password
+                    autocomplete="new-password"
+                    placeholder="留空保留已配置 Token，新增至少 32 字符"
+                    @input="onProxyTokenInput(downloader)"
+                  />
+                  <span class="api-token-status">{{
+                    downloader.clear_proxy_token
+                      ? '待清除'
+                      : downloader.proxy_token_configured && !downloader.proxy_token
+                        ? '已配置'
+                        : downloader.proxy_token
+                          ? '待保存'
+                          : '未配置'
+                  }}</span>
+                  <el-checkbox
+                    v-if="downloader.proxy_token_configured"
+                    v-model="downloader.clear_proxy_token"
+                    @change="onClearProxyTokenChange(downloader)"
+                    >清除媒体代理 Token</el-checkbox
+                  >
+                  <span class="credential-hint"
+                    >通过 HTTPS 领单时填写 Hub 的 controller.token。直接连接媒体代理时填写该程序的
+                    PTMOVE_PROXY_TOKEN。</span
+                  >
+                </div>
+              </el-form-item>
+              <el-form-item label="主机地址">
+                <el-input
+                  v-model="downloader.host"
+                  :placeholder="
+                    downloader.type === 'transmission'
+                      ? '例如：192.168.1.10:9091 或 http://192.168.1.10:9091'
+                      : '例如：192.168.1.10:8080'
+                  "
+                  @input="resetConnectionStatus(downloader.id)"
+                ></el-input>
+                <span class="credential-hint connection-mode-hint">
+                  {{
+                    downloader.use_proxy
+                      ? '填写 STARPT 能访问的下载器 API 地址（含端口）。媒体代理使用同一个主机名和上面的独立端口。HTTPS 领单的 API 地址示例为 ptmove-pull-hub:28380。'
+                      : '填写 STARPT 能访问的下载器 WebUI 或 RPC 地址及端口。'
+                  }}
+                </span>
+              </el-form-item>
+              <el-form-item label="用户名">
+                <el-input
+                  v-model="downloader.username"
+                  placeholder="登录用户名"
+                  @input="resetConnectionStatus(downloader.id)"
+                ></el-input>
+              </el-form-item>
+              <el-form-item label="密码">
+                <el-input
+                  v-model="downloader.password"
+                  type="password"
+                  show-password
+                  placeholder="登录密码（未修改则留空）"
+                  @input="resetConnectionStatus(downloader.id)"
+                ></el-input>
+              </el-form-item>
+              <el-form-item v-if="downloader.type === 'qbittorrent'" label="API Token">
+                <div class="api-token-field">
+                  <el-input
+                    v-model="downloader.api_key"
+                    type="password"
+                    show-password
+                    autocomplete="new-password"
+                    placeholder="留空保留已配置 Token"
+                    @input="onApiKeyInput(downloader)"
+                  />
+                  <span class="api-token-status">{{
+                    downloader.clear_api_key
+                      ? '待清除'
+                      : downloader.api_key_configured && !downloader.api_key
+                        ? '已配置'
+                        : downloader.api_key
+                          ? '待保存'
+                          : '未配置'
+                  }}</span>
+                  <el-checkbox
+                    v-if="downloader.api_key_configured"
+                    v-model="downloader.clear_api_key"
+                    @change="onClearApiKeyChange(downloader)"
+                  >
+                    明确清除 Token
+                  </el-checkbox>
+                </div>
+              </el-form-item>
+              <el-form-item v-if="downloader.type === 'qbittorrent'" label="认证提示">
+                <span class="credential-hint"
+                  >已配置 API Token 或填写新 Token 时，用户名和密码可留空；留空 Token
+                  会保留当前凭据。</span
+                >
+              </el-form-item>
+            </el-form>
+          </template>
+        </div>
       </el-card>
     </div>
   </section>
@@ -332,12 +362,7 @@
         </div>
       </div>
 
-      <el-button
-        type="primary"
-        :icon="Plus"
-        class="add-mapping"
-        @click="addPathMapping"
-      >
+      <el-button type="primary" :icon="Plus" class="add-mapping" @click="addPathMapping">
         添加映射规则
       </el-button>
     </div>
@@ -350,10 +375,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
-import { Delete, Plus, Select, Link, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import {
+  ArrowUp,
+  Delete,
+  EditPen,
+  FolderOpened,
+  Link,
+  Plus,
+  Refresh,
+  Select,
+} from '@element-plus/icons-vue'
 import HoldButton from '@/components/HoldButton.vue'
 import { useTorrentsViewState } from '@/stores/torrentsViewState'
 import { ElMessage } from '@/utils/uiNotify'
@@ -404,6 +438,15 @@ const settings = ref<SettingsState>({
 const isLoading = ref(true)
 const isSaving = ref(false)
 const draftDownloaderIds = ref(new Set<string>())
+const expandedDownloaderIds = ref(new Set<string>())
+let nextDraftSequence = 0
+
+const downloaderEditorId = (id: string) => `downloader-editor-${encodeURIComponent(id)}`
+
+const toggleDownloader = (id: string) => {
+  if (expandedDownloaderIds.value.has(id)) expandedDownloaderIds.value.delete(id)
+  else expandedDownloaderIds.value.add(id)
+}
 const testingConnectionId = ref<string | null>(null)
 const connectionTestResults = ref<Record<string, ConnectionTestStatus | undefined>>({})
 const API_BASE_URL = '/api'
@@ -574,11 +617,12 @@ const saveSettings = async () => {
   isSaving.value = true
   try {
     await persistSettings()
+    expandedDownloaderIds.value.clear()
     ElMessage.success('设置已成功保存并应用！')
     // 关键：删除/停用下载器后，TorrentsView 的下载器筛选列表使用缓存，
     // 不强制刷新会导致“已删除下载器仍可筛选”的错觉。
     await torrentsViewState.fetchDownloadersList(true)
-    fetchSettings()
+    await fetchSettings()
   } catch (error) {
     ElMessage.error('保存设置失败！')
     console.error(error)
@@ -588,8 +632,9 @@ const saveSettings = async () => {
 }
 
 const addDownloader = () => {
-  const id = `new_${Date.now()}`
+  const id = `new_${Date.now()}_${++nextDraftSequence}`
   draftDownloaderIds.value.add(id)
+  expandedDownloaderIds.value.add(id)
   settings.value.downloaders.push({
     id,
     enabled: true,
@@ -610,6 +655,12 @@ const addDownloader = () => {
     color: deriveDownloaderColor(id),
     path_mappings: [], // 初始化空的路径映射数组
     enable_ratio_limiter: false, // 默认关闭出种限速
+  })
+  void nextTick(() => {
+    document
+      .getElementById(downloaderEditorId(id))
+      ?.querySelector<HTMLInputElement>('.name-input input')
+      ?.focus()
   })
 }
 
@@ -632,6 +683,7 @@ const confirmDeleteDownloader = (downloaderId: string) => {
 const deleteDownloader = (downloaderId: string) => {
   settings.value.downloaders = settings.value.downloaders.filter((d) => d.id !== downloaderId)
   draftDownloaderIds.value.delete(downloaderId)
+  expandedDownloaderIds.value.delete(downloaderId)
 }
 
 const resetConnectionStatus = (downloaderId: string) => {
@@ -727,7 +779,7 @@ const addPathMapping = () => {
 }
 
 const deletePathMapping = (mapping: (typeof currentPathMappings.value)[number]) => {
-  currentPathMappings.value = currentPathMappings.value.filter(item => item !== mapping)
+  currentPathMappings.value = currentPathMappings.value.filter((item) => item !== mapping)
 }
 
 const savePathMappings = async () => {
@@ -748,7 +800,7 @@ const savePathMappings = async () => {
     downloader.path_mappings = validMappings
     pathMappingDialogVisible.value = false
     ElMessage.success('路径映射已保存！')
-    fetchSettings()
+    await fetchSettings()
   } catch (error) {
     ElMessage.error('保存路径映射失败！')
     console.error(error)
@@ -768,7 +820,7 @@ const savePathMappings = async () => {
 .downloader-page__header,
 .top-actions,
 .card-header,
-.header-controls {
+.editor-controls {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -783,21 +835,20 @@ const savePathMappings = async () => {
 }
 
 .top-actions,
-.header-controls {
+.editor-controls {
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .top-actions > .el-button,
-.header-controls > .el-button {
+.editor-controls > .el-button {
   min-height: 36px;
   margin-left: 0;
 }
 
-
 .downloader-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 410px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 14px;
 }
@@ -815,9 +866,25 @@ const savePathMappings = async () => {
 }
 
 .card-header {
-  flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px 14px;
+}
+
+.downloader-disclosure {
+  flex: none;
+  min-height: 36px;
+}
+
+.downloader-card:not(.downloader-card--expanded) :deep(.el-card__header) {
+  border-bottom: 0;
+}
+
+.downloader-card:not(.downloader-card--expanded) :deep(.el-card__body) {
+  display: none;
+}
+
+.downloader-editor {
+  max-width: 820px;
 }
 
 .downloader-heading {
@@ -833,14 +900,39 @@ const savePathMappings = async () => {
   line-height: 1.3;
 }
 
-.downloader-heading > span {
+.downloader-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
   color: var(--star-muted);
   font-size: 0.75rem;
 }
 
-.header-controls {
+.downloader-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.downloader-status::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background-color: currentColor;
+  content: '';
+}
+
+.downloader-status--enabled {
+  color: var(--el-color-success);
+}
+
+.editor-controls {
   --settings-action-height: 36px;
   max-width: 100%;
+  margin-bottom: 16px;
 }
 
 .downloader-color-controls {
@@ -848,13 +940,13 @@ const savePathMappings = async () => {
   align-items: center;
 }
 
-.header-controls > .el-button,
-.header-controls :deep(.el-switch) {
+.editor-controls > .el-button,
+.editor-controls :deep(.el-switch) {
   height: var(--settings-action-height);
   min-height: var(--settings-action-height);
 }
 
-.header-controls > .el-button {
+.editor-controls > .el-button {
   padding-inline: 11px;
 }
 
@@ -983,7 +1075,7 @@ const savePathMappings = async () => {
   min-width: 0;
 }
 
-.header-controls > .delete-draft-button,
+.editor-controls > .delete-draft-button,
 .mapping-item__remove {
   width: var(--settings-action-height);
   height: var(--settings-action-height);
@@ -1006,6 +1098,10 @@ const savePathMappings = async () => {
   .top-actions > .el-button {
     min-height: 44px;
     flex: 1 1 auto;
+  }
+
+  .downloader-disclosure {
+    min-height: 44px;
   }
 
   .downloader-card :deep(.el-card__header),
