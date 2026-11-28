@@ -57,6 +57,11 @@ const router = createRouter({
           component: () => import('../components/settings/GeneralSettings.vue'),
         },
         {
+          path: 'layout',
+          name: 'settings-layout',
+          component: () => import('../components/settings/SitesLayoutSettings.vue'),
+        },
+        {
           path: 'downloader',
           name: 'settings-downloader',
           component: () => import('../components/settings/DownloaderSettings.vue'),

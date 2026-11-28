@@ -3,7 +3,7 @@
     <header class="card-header">
       <div class="header-content">
         <el-icon class="header-icon"><Grid /></el-icon>
-        <h3 id="sites-layout-title">做种检索布局</h3>
+        <h2 id="sites-layout-title">做种检索布局</h2>
       </div>
       <el-button type="primary" :loading="saving" :disabled="loading || Boolean(loadError) || !dirty" @click="saveLayout">
         保存布局
@@ -152,7 +152,7 @@ onMounted(loadLayout)
   min-width: 0;
 }
 
-.header-content h3 {
+.header-content h2 {
   margin: 0;
   color: var(--el-text-color-primary);
   font-size: 16px;

@@ -2,7 +2,7 @@ package bootstrap
 
 import "github.com/gin-gonic/gin"
 
-const forkVersion = "1.1.8"
+const forkVersion = "1.1.9"
 
 // registerForkUpdateRoutes 提供本改版的离线版本信息；升级通过已校验的 Docker 发布包完成。
 // 不请求上游升级服务，也不下载或安装原版二进制，避免覆盖本改版模块和数据结构。
@@ -17,6 +17,11 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 		history := []gin.H{
 			{
 				"version": forkVersion,
+				"date":    "2026-11-28",
+				"changes": []string{"设置增加独立的布局入口，可调整做种检索的列数和模块顺序"},
+			},
+			{
+				"version": "1.1.8",
 				"date":    "2026-11-28",
 				"changes": []string{"下载器统计 2.1 支持组合筛选和展开种子名单", "插件页直接显示安装路径和刷新方法", "项目名称统一为 StarPT"},
 			},

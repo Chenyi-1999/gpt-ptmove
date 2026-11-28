@@ -305,6 +305,7 @@ const primaryNavigation = [
 const routeTitleMap: Record<string, string> = {
   ...Object.fromEntries(primaryNavigation.map(({ to, label }) => [to, label])),
   '/settings/general': '基础设置',
+  '/settings/layout': '布局设置',
   '/settings/downloader': '下载器设置',
   '/settings/cookie': '站点管理',
   '/settings/transfer': '转种设置',

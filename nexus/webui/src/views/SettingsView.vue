@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { Connection, Download, Key, Refresh, Setting, Tickets } from '@element-plus/icons-vue'
+import { Connection, Download, Grid, Key, Refresh, Setting, Tickets } from '@element-plus/icons-vue'
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -36,6 +36,7 @@ watch(
 
 const sections = [
   { label: '通用', path: '/settings/general', icon: Setting },
+  { label: '布局', path: '/settings/layout', icon: Grid },
   { label: '下载器', path: '/settings/downloader', icon: Download },
   { label: '站点管理', path: '/settings/cookie', icon: Tickets },
   { label: '转种', path: '/settings/transfer', icon: Refresh },

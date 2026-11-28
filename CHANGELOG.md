@@ -1125,3 +1125,10 @@
 - 152 使用同一 linux/amd64 镜像通过断网启动、四项组合筛选、分页和错误态验证，核对 47 项前端资源与路由。更新 152 后健康，保留数据、配置、插件、已有 467 条种子索引及领单服务。已有镜像和 Compose 可回退。
 - 完整 Docker 归档含 122 层，SHA-256 为 674e7488d0c146f42ba15ebad9126eb2e7774b904ac1e98327545e99a8a06753，gzip 与 docker load 复验通过。GitHub 发布完整镜像、Compose、两份插件 ZIP 与校验文件，按附件大小和 SHA-256 核验。Gitee 发布 Compose、插件 ZIP、校验文件和同一完整镜像下载地址，接口查阅确认。
 - 发行源码标签保留镜像对应提交。这条回执只更新变更记录与部署文档。未操作 81 或 OVH，未触发发种。
+
+## PTM-20261128-STARPT-V119-LAYOUT-SETTINGS — 2026-11-28T20:48:44+08:00 — Codex root / layout_browser_qa，拆分布局设置
+
+- nexus/webui/src/router/index.ts 新增独立 /settings/layout 路由，SettingsView.vue 侧栏将「布局」放在「通用」下方，App.vue 展示对应页名。做种检索组件从 GeneralSettings.vue 移出并复用 SitesLayoutSettings.vue，保留原列数、顺序存储、保存接口与手机单列规则。
+- 同步构建 nexus/webui/dist，并更新 nexus/VERSION、Dockerfile、Compose、版本信息和 docs/RELEASE-v1.1.9.md。
+- Vue 类型检查、变更文件 ESLint、10 项 Node 测试、Vite 与 152 离线 Go 全量测试通过。Vite 保留已有大分块提示。1440px 桌面与 390px 手机浏览器检查通过，涵盖设置导航、保存和刷新、通用及转种页卡片缺席、无横向溢出。前端验收采用模拟接口。
+- 发行产物、152 切换及双仓发布待验收另记。本轮未部署 OVH 或访问 81。
