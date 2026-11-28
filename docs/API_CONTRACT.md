@@ -148,6 +148,12 @@ Web 管理员的 `POST /api/automation/preview` 在扫描成功后保存最近�
 
 现有 `/api/automation` 与 `/api/v1` 自动化接口保留。禁用内置自动转种插件后，手动及定时执行入口停止接受新的下载和发种操作；任务与预览读取继续可用。
 
+## 下载器统计插件
+
+`GET /api/plugins/downloader-summary/inventory` 需要管理员登录及已启用的下载器统计 2.0。省略 `downloader_id` 时只列出下载器的 ID、名称和启用状态。指定 ID 后，用 `dimension=category|tag|site|path` 读取分组及各状态的计数，`refresh=1` 可主动刷新。成功响应的 `refreshed_at` 是快照的 Unix 秒。连接失败返回错误，汇总不会修改下载器任务或 STARPT 种子索引。
+
+展开明细时加 `details=1`、`group`（汇总返回的分组标识），可带 `status`、`page` 和 `page_size`。状态为 `seeding`、`downloading`、`paused`、`checking`、`queued`、`error` 或 `other`。明细每页默认 25 条、最多 50 条，只返回展示所需字段。快照过期后须先刷新统计。
+
 ## 做种检索布局
 
 通过 `GET /api/ui_settings/sites_layout` 读取布局，使用同一路径的 `POST` 保存布局。布局对象包含 `columns`（1 或 2）和按优先级排列的 `order`。保存成功返回 `{"success":true}`，其他界面设置保留。可用模块依次为 `summary`、`site-chart`、`group-chart`、`site-stats`、`group-stats`、`local-scan`。缺省为两列和上述顺序。窄屏固定单列，沿用同一排序。

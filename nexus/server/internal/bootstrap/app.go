@@ -21,6 +21,7 @@ import (
 	"github.com/pt-nexus/server/internal/repository"
 	"github.com/pt-nexus/server/internal/service"
 	migrationflow "github.com/pt-nexus/server/internal/service/migrationflow"
+	"github.com/pt-nexus/server/internal/service/torrentdata"
 )
 
 // App 封装 Gin 引擎实例，供主程序启动 HTTP 服务。
@@ -216,7 +217,8 @@ func NewApp() (*App, error) {
 				})
 			}
 			return summaries, ctx.Err()
-		}, handler.TjuptPluginServices{RSS: tjuptPlugin, Automation: tjuptAutomation, Feed: tjuptFeed}); err != nil {
+		}, handler.TjuptPluginServices{RSS: tjuptPlugin, Automation: tjuptAutomation, Feed: tjuptFeed},
+		torrentdata.NewDownloaderInventory(cfgManager, torrentDataRepo), settingsService.DownloadersList); err != nil {
 		return nil, fmt.Errorf("初始化插件目录失败: %w", err)
 	}
 	engine.GET("/api/migrate/source-restriction", func(c *gin.Context) {

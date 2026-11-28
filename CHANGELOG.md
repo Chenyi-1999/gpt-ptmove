@@ -1048,3 +1048,11 @@
 - 等北洋园 RSS 当前租约结束后暂时停用并建立 SQLite 一致性快照。切换前后保留原 /docker/starpt/data、环境、站点配置、136 个站点、234 条 RSS 台账、插件 ZIP 和缓存。自动转种、下载器概览和北洋园插件清单状态一致。原 1 分钟 RSS 已恢复，复核时自然周期新增 1、跳过 9、失败 0。
 - 旧镜像归档 /mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_120605__历史发布__STARPT-OVH做种检索上线旧镜像.zip 完成 ZIP CRC 与 SHA-256 校验。定向清理 3 个旧容器、2 个旧镜像标签和 3 份已归档旧镜像文件。旧运行时数据与快照继续保留。
 - 更新 docs/DEPLOYMENT.json 和 CHANGELOG.md，回执在隔离工作分支提交。未推送或发布。152 仅核对及导出通过验证的镜像，未操作 81，也未手动下载、退种或发种。
+
+
+## PTM-20261128-DOWNLOADER-STATS — 2026-11-28T12:49:54+08:00 — Codex root / downloader_stats_map / downloader_stats_source / downloader_stats_ui / downloader_stats_canary，下载器统计 2.0
+
+- examples/plugins/downloader-summary/plugin.json 保持 ZIP 插件 ID，新增只读统计能力。nexus/webui/src/components/plugins/{DownloaderInventoryPanel.vue,pluginApi.ts}、src/views/PluginsView.vue 与 webui/dist 提供下载器选择、分类/标签/站点/路径计数、按状态筛选、折叠及分页展开。旧版插件继续用原面板。
+- nexus/server/internal/bootstrap/app.go、internal/http/handler/{plugins_handler,plugin_downloader_inventory}.go、internal/service/plugins/package_types.go、downloaderclient/torrents_fetch.go、torrentdata/downloader_inventory.go 与测试接入独立的只读查询。分类和标签分别读取，复用每个下载器的短时快照，站点只输出配置名或 tracker 主机名。正常空清单和失联分别返回成功与错误。文档更新 docs/{API_CONTRACT,STARPT_PLUGINS}.md。
+- 152 断网 gofmt、全量 Go 测试含实际 WASI ZIP 加载和构建通过。Vue 类型检查、定向 ESLint、10 项 Node 测试与生产构建通过。桌面和 390px 浏览器夹具通过维度切换、状态计数、按需展开、分页失败重试、离线和长路径检查。Vite 保留既有大分包提示。
+- 隔离工作分支提交本次代码和构建产物。152 候选镜像与部署验收待完成，另记回执。未推送或发布、未操作 OVH 和 81。

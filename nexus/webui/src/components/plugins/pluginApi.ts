@@ -32,6 +32,7 @@ type CatalogPlugin = PluginIdentity & {
 export type WasmPlugin = PluginIdentity & {
   kind: 'wasm'
   enabled: boolean
+  capabilities?: string[]
   fields?: PluginField[]
   actions: { id: string; label: string }[]
   settings?: Record<string, PluginSetting>

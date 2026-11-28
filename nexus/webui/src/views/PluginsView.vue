@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Box, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import DownloaderInventoryPanel from '../components/plugins/DownloaderInventoryPanel.vue'
 import TjuptRssPanel from '../components/plugins/TjuptRssPanel.vue'
 import WasmPluginPanel from '../components/plugins/WasmPluginPanel.vue'
 import { requestPlugin, type PluginCatalog, type PluginInfo } from '../components/plugins/pluginApi'
@@ -182,6 +183,13 @@ onMounted(() => void load())
           </p>
           <AutomationSettings class="automation-settings" :plugin-enabled="current.enabled !== false" />
         </template>
+        <DownloaderInventoryPanel
+          v-else-if="current.id === 'downloader-summary' && current.kind === 'wasm' && current.capabilities?.includes('downloader.inventory')"
+          :plugin="current"
+          :refreshing="Boolean(loading)"
+          @updated="updatePlugin"
+          @busy="panelBusy = $event"
+        />
         <WasmPluginPanel
           v-else-if="current.kind === 'wasm'"
           :key="current.id"
