@@ -1097,3 +1097,11 @@
 
 - 152 容器切换到 ptmove-nexus:1.1.7-plugin-install-hint.1，源码 369594c。镜像仅替换前端，保留切换前 Compose、上一版镜像、原配置、插件 ZIP 和缓存、领单 Hub 及 467 条种子索引。
 - 候选断网启动和生产健康通过，后端 SHA-256 与上一版一致。核对 47 个页面或资源，公网插件页、JS/CSS 和鉴权通过。部署范围为 152，该回执随隔离分支提交。未推送或发行，未操作 OVH 或 81。
+
+## PTM-20261128-PLUGIN-HINT-FILTERS-OVH — 2026-11-28T18:59:57+08:00 — Codex root / hint_ovh_review，部署插件安装提示与下载器统计组合筛选
+
+- OVH 更新 StarPT 容器时使用 152 已验证的镜像 ptmove-nexus:1.1.7-plugin-install-hint.1 和下载器统计 ZIP 2.1.0。核对镜像归档原始 SHA-256、119 个镜像层、后端 SHA-256 与 47 个前端路由或资源。隔离容器验证四个筛选和展开分页，校对插件页顶部安装提示。公网 HTTPS、JS/CSS、健康和鉴权通过。
+- 将部署目录和代码归档目录分别归组到 /project/StarPT 和 /mnt/data/02CodeBackup/StarPT，核验两份历史归档 SHA-256 一致，原服务入口与 /docker/starpt/data 继续使用。
+- 保留 OVH 原配置、站点、种子索引、RSS 台账、插件缓存中的设置项和启停状态。下载器统计保持启用，原插件调度保留，北洋园 RSS 恢复原 1 分钟间隔。切换前备份 SQLite、旧 ZIP 和插件缓存。
+- OVH 本机 qB 只读验收（分类、标签、Tracker、状态同时生效）：240 条种子中命中 238 条，展开核对 10 条。未手动修改 qB 任务。旧镜像、旧插件 ZIP 已校验归档到 /mnt/data/02CodeBackup/StarPT/StarPT__2026-11-28_185924__历史发布__StarPT-OVH组合筛选升级回滚.zip。已定向清理旧容器、旧镜像标签和原位置的镜像压缩包。运行数据和切换前快照已保留。
+- docs/DEPLOYMENT.json 与 CHANGELOG.md 回执在隔离分支提交。未推送或发行。本轮从 152 核对并导出产物，未操作 81。

@@ -3676,5 +3676,86 @@
     },
     "updated_ovh": false,
     "protected_81_operated": false
+  },
+  "starpt_plugin_install_hint_and_filters_ovh_20261128": {
+    "source_commit": "369594c37f1610bbe79d1840227c6c83a0893c91",
+    "verified_ovh": {
+      "image": "ptmove-nexus:1.1.7-plugin-install-hint.1",
+      "id": "sha256:504ec7d2bcd41bb863f713df28be44b9d559c73d0a9e7ac72088575a2a5a2d66",
+      "verified_152_index_id": "sha256:4d6373b6d496963da98f4f3bad1b3f6b3dc7eedfd676892bb510853de4f55e49",
+      "rootfs_sha256": "f4f70423319403ad4ed265e9bf13b0cfc093f60ecdc53e58691bb559b9b10c29",
+      "revision": "369594c37f1610bbe79d1840227c6c83a0893c91",
+      "rollback_image": "ptmove-nexus:1.1.7-downloader-stats.1",
+      "rollback_container": "starpt-v117-plugin-install-hint-rollback",
+      "container": "starpt",
+      "url": "https://ovh-starpt.star1999.de/plugins?plugin=downloader-summary",
+      "routes_verified": 47,
+      "config_data_other_plugins_preserved": true,
+      "plugin_version_before": "2.0.0",
+      "plugin_version": "2.1.0",
+      "plugin_sha256": "eeb2de05d25b781ba599667aa7bcba3c691cbd89389fbbb471dd00cbb17fa667",
+      "previous_plugin_sha256": "4c94c5e29e95bd72e76b5d63fdff6bada2fc1664af4ab1676ee911563f221d72",
+      "summary_schedule_preserved": true,
+      "summary_schedule_enabled": false,
+      "plugin_enabled": true,
+      "rss_enabled": true,
+      "rss_interval_minutes": 1,
+      "db_counts_during_switch": {
+        "torrents": 0,
+        "sites": 136,
+        "tjupt_feed_tasks": 314
+      },
+      "other_plugin_ids": [
+        "automation",
+        "tjupt-rss"
+      ],
+      "protected_files_verified": 5,
+      "archive_sha256": "7fa3cab54142b30406e173ef5d727c8a59d771e3a2df981f96ad5c9ae42d1e7a",
+      "live_qb": {
+        "verified": true,
+        "read_only": true,
+        "configured_downloaders": 1,
+        "results": [
+          {
+            "total": 240,
+            "combined_matches": 238,
+            "details_verified": 10,
+            "filters": [
+              "category",
+              "tag",
+              "tracker",
+              "status"
+            ]
+          }
+        ],
+        "temporarily_enabled_for_check": false,
+        "enabled_after_verification": true
+      },
+      "raw_docker_archive_sha256": "8b254475819200c8aa3658b083b18b5ca65b1f8ef773279f1efe43ab8e242d14",
+      "archive_bytes": 1173833857,
+      "restart_count": 0,
+      "exact_152_image_and_plugin_verified": true,
+      "six_dimensions_and_four_combined_filters_verified": true,
+      "public_plugin_page_and_assets_verified": true,
+      "project_name_migration": {
+        "project_from": "/project/GPT-PTMOVE",
+        "project_to": "/project/StarPT",
+        "archives_from": "/mnt/data/02CodeBackup/GPT-PTMOVE",
+        "archives_to": "/mnt/data/02CodeBackup/StarPT",
+        "previous_archive_hashes_matched": 2,
+        "container_runtime_references_changed": false
+      },
+      "historical_artifact_cleanup": {
+        "archive": "/mnt/data/02CodeBackup/StarPT/StarPT__2026-11-28_185924__历史发布__StarPT-OVH组合筛选升级回滚.zip",
+        "archive_sha256": "a71b14e67f9ca9589f9b4edcd428418aa385e11cc4b2778cb18f7b96171404e0",
+        "archive_bytes": 1140746588,
+        "database_and_plugin_state_snapshots_preserved": true,
+        "removed_container": true,
+        "removed_image_tag": true,
+        "removed_previous_image_archive": true
+      }
+    },
+    "protected_81_operated": false,
+    "push_or_release_performed": false
   }
 }
