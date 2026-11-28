@@ -3430,5 +3430,76 @@
     },
     "ovh_updated": false,
     "protected_81_operated": false
+  },
+  "starpt_sites_layout_ovh_20261128": {
+    "source_commit": "3a54eab1e88a70713d98193eed1e946dc032dbac",
+    "ovh": {
+      "image": "ptmove-nexus:1.1.7-sites-layout.1",
+      "id": "sha256:ff5941edc80b3e12b76cae242c2ffba45dafeed74419f28286a361a3a833e824",
+      "verified_152_index_id": "sha256:5fcd4021cbf047255db6cd71184991cc437c58fd3e0325344905dd4743a444e0",
+      "rootfs_sha256": "f6f088de9eddcab339c65ebb5316a791a2f369b77b37458b9ee544fc4b28b5e2",
+      "revision": "3a54eab1e88a70713d98193eed1e946dc032dbac",
+      "rollback_image": "ptmove-nexus:1.1.7-remote-scan.1",
+      "rollback_container": "starpt-v117-sites-layout-rollback",
+      "container": "starpt",
+      "url": "https://ovh-starpt.star1999.de/",
+      "routes_verified": 48,
+      "config_package_and_database_preserved": true,
+      "rss_enabled": true,
+      "rss_interval_minutes": 1,
+      "db_counts_during_switch": {
+        "torrents": 0,
+        "sites": 136,
+        "tjupt_feed_tasks": 234
+      },
+      "scan_auth_401": true,
+      "layout_auth_401": true,
+      "layout_columns": 2,
+      "plugin_ids": [
+        "automation",
+        "downloader-summary",
+        "tjupt-rss"
+      ],
+      "protected_files_verified": 8,
+      "archive_sha256": "7920400ccd5cb5c419745829978b6eb9ee05ece837e4e2442a01691687bf5419",
+      "raw_docker_archive_sha256": "eb02782fdc3e99fce159ce5339e1a3192e019639d51cb60c3ccd380fecc08534",
+      "archive_bytes": 1107200246,
+      "restart_count": 0,
+      "public_https_pages_and_assets_verified": 8,
+      "isolated_layout_restart_verified": true,
+      "identical_docker_archive_to_152": true,
+      "rss_natural_cycle_check": {
+        "enabled": true,
+        "interval_minutes": 1,
+        "natural_rss_cycle_completed": true,
+        "tasks": 235,
+        "added": 1,
+        "skipped": 9,
+        "failed": 0
+      },
+      "historical_artifact_cleanup": {
+        "archive": "/mnt/data/02CodeBackup/GPT-PTMOVE/GPT-PTMOVE__2026-11-28_120605__历史发布__STARPT-OVH做种检索上线旧镜像.zip",
+        "archive_sha256": "c7deed2f9e1cfea8283ab6a520a3a8d2bc745355ac2042dcd3779f23feb95e48",
+        "archive_bytes": 2135397669,
+        "removed_containers": [
+          "starpt-v117-sites-layout-rollback",
+          "starpt-v117-remote-scan-failed",
+          "starpt-v117-remote-scan-rollback"
+        ],
+        "removed_tags": [
+          "ptmove-nexus:1.1.7-remote-scan.1",
+          "ptmove-nexus:1.1.7"
+        ],
+        "removed_prior_archives": [
+          "starpt-v1.1.7-remote-scan.1-linux-amd64.tar.gz",
+          "existing-v117.local.tar.gz",
+          "existing-v117.local.tar"
+        ],
+        "retained_with_references_or_changes": [],
+        "data_snapshots_preserved": true
+      }
+    },
+    "protected_81_operated": false,
+    "push_or_release_performed": false
   }
 }
