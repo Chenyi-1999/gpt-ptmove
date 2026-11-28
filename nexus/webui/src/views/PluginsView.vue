@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Box, FolderOpened, Refresh } from '@element-plus/icons-vue'
+import { ArrowRight, Box, Refresh } from '@element-plus/icons-vue'
 import DownloaderInventoryPanel from '../components/plugins/DownloaderInventoryPanel.vue'
 import TjuptRssPanel from '../components/plugins/TjuptRssPanel.vue'
 import WasmPluginPanel from '../components/plugins/WasmPluginPanel.vue'
@@ -104,7 +104,9 @@ onMounted(() => void load())
     <header class="plugin-heading">
       <div>
         <h1 id="plugins-heading">插件</h1>
-        <p>未看到北洋园插件？将 <code>tjupt-rss.zip</code> 放入 <code>data/plugins/</code>，再点击「刷新插件」。</p>
+        <p class="plugin-install-hint">
+          将插件的 ZIP 或 JSON 文件复制到 <code>data/plugins/</code>，再点击「刷新插件」。
+        </p>
       </div>
       <button class="plugin-refresh" type="button" :disabled="busy" @click="load(true)">
         <Refresh class="plugin-icon" aria-hidden="true" />
@@ -221,14 +223,8 @@ onMounted(() => void load())
     <div v-else-if="!error && !loading" class="plugin-empty">
       <Box class="plugin-empty-icon" aria-hidden="true" />
       <h2>还没有安装插件</h2>
-      <p>把插件 ZIP 放进 <code>data/plugins/</code>，再点击刷新。</p>
     </div>
     <div v-else-if="loading" class="plugin-empty" role="status">正在读取插件列表…</div>
-
-    <details v-if="current" class="plugin-details">
-      <summary><FolderOpened class="plugin-icon" aria-hidden="true" /> 安装与移除</summary>
-      <p>把插件 ZIP 复制到 <code>data/plugins/</code> 后，点击「刷新插件」。移除 ZIP 后再次刷新，会从列表撤下插件并保留设置。JSON 卡片也通过同一目录管理。</p>
-    </details>
   </section>
 </template>
 
@@ -258,11 +254,12 @@ onMounted(() => void load())
 .plugin-heading { margin-bottom: 24px; }
 .plugin-heading h1, .plugin-content h2, .plugin-empty h2 { margin: 0; letter-spacing: -0.035em; }
 .plugin-heading h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.14; }
-.plugin-heading p, .plugin-description, .plugin-block p, .plugin-block small, .plugin-empty p {
+.plugin-install-hint, .plugin-description, .plugin-block p, .plugin-block small {
   color: var(--star-muted, #a8b3cf);
   margin: 6px 0 0;
   line-height: 1.55;
 }
+.plugin-install-hint { font-size: 0.875rem; }
 
 .plugin-refresh {
   display: inline-flex;
@@ -284,7 +281,7 @@ onMounted(() => void load())
 .plugin-icon, .plugin-chev { width: 18px; height: 18px; flex: 0 0 auto; }
 .plugin-chev { width: 15px; height: 15px; }
 .plugin-layout { display: grid; grid-template-columns: clamp(160px, 22%, 226px) minmax(0, 1fr); gap: 16px; }
-.plugin-list, .plugin-content, .plugin-empty, .plugin-details {
+.plugin-list, .plugin-content, .plugin-empty {
   border: 1px solid var(--star-border, #293553);
   border-radius: 16px;
   background: var(--star-surface, #12182b);
@@ -332,10 +329,7 @@ onMounted(() => void load())
 .plugin-empty { padding: clamp(36px, 8vw, 90px) 18px; text-align: center; }
 .plugin-empty-icon { width: 35px; height: 35px; margin-bottom: 10px; color: var(--star-accent, #b8a4ff); }
 .plugin-empty h2 { font-size: 1.15rem; }
-.plugin-details, .plugin-message { margin-top: 13px; padding: 12px 15px; overflow-wrap: anywhere; }
-.plugin-details summary { cursor: pointer; font-weight: 600; }
-.plugin-details summary svg { vertical-align: middle; margin-right: 5px; }
-.plugin-details p { margin-bottom: 0; }
+.plugin-message { margin-top: 13px; padding: 12px 15px; overflow-wrap: anywhere; }
 .plugin-warning { margin-bottom: 16px; }
 .automation-state { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 16px; color: var(--star-muted); }
 .automation-state__active { color: var(--star-accent); }
@@ -345,7 +339,7 @@ onMounted(() => void load())
   color: var(--star-warning-ink, #ffd27a);
   background: var(--star-warning-soft, #302719);
 }
-:where(button, a, summary):focus-visible { outline: 2px solid var(--star-accent, #b8a4ff); outline-offset: 2px; }
+:where(button, a):focus-visible { outline: 2px solid var(--star-accent, #b8a4ff); outline-offset: 2px; }
 
 @media (max-width: 780px) {
   .plugin-layout { grid-template-columns: minmax(0, 1fr); }
