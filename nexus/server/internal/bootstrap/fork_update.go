@@ -150,7 +150,7 @@ func registerForkUpdateRoutes(engine *gin.Engine) {
 				"version": "0.3.0",
 				"date":    "2026-10-27",
 				"changes": []string{"提供 Go + Vue 的手动转种界面", "新增可启停的自动下载与转种模块、站点 JSON 声明导入和独立 AI API"},
-				"note":    "发布地址：https://github.com/Chenyi-1999/gpt-ptmove/releases",
+				"note":    "发布地址：https://github.com/Chenyi-1999/StarPT/releases",
 			},
 		}
 		c.JSON(200, gin.H{"success": true, "history": history})

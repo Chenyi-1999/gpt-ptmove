@@ -1,10 +1,10 @@
-# STARPT
+# StarPT
 
-STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可关闭的自动下载与转种、站点 JSON 导入和机器 API。仓库中的 Python 0.2 实现及文档用于旧版本维护，不是当前运行入口。
+StarPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可关闭的自动下载与转种、站点 JSON 导入和机器 API。仓库中的 Python 0.2 实现及文档用于旧版本维护，不是当前运行入口。
 
 使用者应遵守站点规则和适用法律。
 
-[项目源码](https://github.com/Chenyi-1999/gpt-ptmove) · [问题反馈](https://github.com/Chenyi-1999/gpt-ptmove/issues)
+[项目源码](https://github.com/Chenyi-1999/StarPT) · [问题反馈](https://github.com/Chenyi-1999/StarPT/issues)
 
 ## 功能与安全默认值
 
@@ -23,8 +23,8 @@ STARPT 是基于 Go 和 Vue 的 PT 种子管理程序，提供手动转种、可
 先准备 Docker Compose 环境，并为本改版选择独立目录。不要复用旧 Python 版的目录、数据库、密钥或 NAS worker 状态目录。
 
 ```sh
-git clone https://github.com/Chenyi-1999/gpt-ptmove.git
-cd gpt-ptmove/nexus
+git clone https://github.com/Chenyi-1999/StarPT.git
+cd StarPT/nexus
 ```
 
 创建仅供该实例使用的 `.env.ptmove`。至少设置高熵、私有的 `JWT_SECRET`；不要提交该文件。`PTMOVE_BIND` 默认 `0.0.0.0`，若只需本机或反向代理访问，可设为 `127.0.0.1`。端口默认 `18120`。
